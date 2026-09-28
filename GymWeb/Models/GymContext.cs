@@ -1,0 +1,680 @@
+using System;
+using System.Collections.Generic;
+using Microsoft.EntityFrameworkCore;
+
+namespace GymWeb.Models;
+
+public partial class GymContext : DbContext
+{
+    public GymContext(DbContextOptions<GymContext> options)
+        : base(options)
+    {
+    }
+
+    public virtual DbSet<Configuracion> Configuracions { get; set; }
+
+
+    public virtual DbSet<Detallesalidum> Detallesalida { get; set; }
+
+
+    public virtual DbSet<Estado> Estados { get; set; }
+
+    public virtual DbSet<Membresium> Membresia { get; set; }
+
+    public virtual DbSet<Producto> Productos { get; set; }
+
+    public virtual DbSet<Registro> Registros { get; set; }
+
+
+
+
+    public virtual DbSet<Rptventaproducto> Rptventaproductos { get; set; }
+
+
+    public virtual DbSet<Pago> Pagos { get; set; }
+
+    public virtual DbSet<SocioHuella> SocioHuellas { get; set; }
+
+    public virtual DbSet<Salidum> Salida { get; set; }
+
+    public virtual DbSet<Socio> Socios { get; set; }
+
+    public virtual DbSet<Sociomembresium> Sociomembresia { get; set; }
+
+    public virtual DbSet<Usuario> Usuarios { get; set; }
+
+
+
+
+
+
+
+
+
+
+    public virtual DbSet<Vwmembresia> Vwmembresias { get; set; }
+
+    public virtual DbSet<Vwproducto> Vwproductos { get; set; }
+
+
+    public virtual DbSet<Vwsocio> Vwsocios { get; set; }
+
+    public virtual DbSet<Vwsociomembresia> Vwsociomembresias { get; set; }
+
+    public virtual DbSet<Vwultimamembresiadetalladum> Vwultimamembresiadetallada { get; set; }
+
+    public virtual DbSet<Vwultimamembresium> Vwultimamembresia { get; set; }
+
+    public virtual DbSet<Vwusuario> Vwusuarios { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Configuracion>(entity =>
+        {
+            entity.HasKey(e => e.IdConfiguracion).HasName("PRIMARY");
+
+            entity.ToTable("configuracion");
+
+            entity.Property(e => e.IdConfiguracion)
+                .HasColumnName("idConfiguracion");
+            entity.Property(e => e.Domicilio).HasMaxLength(200);
+            entity.Property(e => e.FechaModificacion)
+                .HasColumnType("datetime")
+                .HasColumnName("fechaModificacion");
+            entity.Property(e => e.IdUsuarioModifico)
+                .HasColumnName("idUsuarioModifico");
+            entity.Property(e => e.Mensaje).HasMaxLength(100);
+            entity.Property(e => e.MensajeVencimiento)
+                .HasColumnName("mensajeVencimiento");
+            entity.Property(e => e.NombreGimnacio).HasMaxLength(45);
+            entity.Property(e => e.PrecioVisita)
+                .HasPrecision(8, 2)
+                .HasColumnName("precio_visita");
+            entity.Property(e => e.Rfc)
+                .HasMaxLength(45)
+                .HasColumnName("RFC");
+            entity.Property(e => e.Telefono).HasMaxLength(45);
+            entity.Property(e => e.Logo).HasColumnName("Logo");
+        });
+
+        modelBuilder.Entity<Detallesalidum>(entity =>
+        {
+            entity.HasKey(e => e.IddetalleSalida).HasName("PRIMARY");
+
+            entity.ToTable("detallesalida");
+
+            entity.HasIndex(e => e.IdProducto, "fk_detalleSalida_Producto1");
+
+            entity.HasIndex(e => e.IdSalida, "fk_detalleSalida_Salida1");
+
+            entity.Property(e => e.IddetalleSalida)
+                .HasColumnName("iddetalleSalida");
+            entity.Property(e => e.IdProducto)
+                .HasColumnName("idProducto");
+            entity.Property(e => e.IdSalida)
+                .HasColumnName("idSalida");
+            entity.Property(e => e.PrecioUnitario)
+                .HasPrecision(8, 2)
+                .HasColumnName("precioUnitario");
+            entity.Property(e => e.Cantidad)
+                .HasColumnName("cantidad");
+
+            entity.HasOne(d => d.IdProductoNavigation).WithMany(p => p.Detallesalida)
+                .HasForeignKey(d => d.IdProducto)
+                .HasConstraintName("fk_detalleSalida_Producto1");
+
+            entity.HasOne(d => d.IdSalidaNavigation).WithMany(p => p.Detallesalida)
+                .HasForeignKey(d => d.IdSalida)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_detalleSalida_Salida1");
+        });
+
+        modelBuilder.Entity<Estado>(entity =>
+        {
+            entity.HasKey(e => e.IdEstados).HasName("PRIMARY");
+
+            entity.ToTable("estado");
+
+            entity.Property(e => e.IdEstados)
+                .HasColumnName("idEstados");
+            entity.Property(e => e.Estado1)
+                .HasMaxLength(45)
+                .HasColumnName("Estado");
+        });
+
+        modelBuilder.Entity<Membresium>(entity =>
+        {
+            entity.HasKey(e => e.IdMembresia).HasName("PRIMARY");
+
+            entity.ToTable("membresia");
+
+            entity.HasIndex(e => e.IdEstado, "fk_Membresia_Estado1");
+
+            entity.HasIndex(e => e.IdUsuarioCreo, "fk_Membresia_Usuario1");
+
+            entity.Property(e => e.IdMembresia)
+                .HasColumnName("idMembresia");
+            entity.Property(e => e.FechaCreacion)
+                .HasColumnType("datetime")
+                .HasColumnName("fechaCreacion");
+            entity.Property(e => e.HoraFinal)
+                .HasComment("hora en que termina la membresia para horarios especiales")
+                .HasColumnType("time")
+                .HasColumnName("horaFinal");
+            entity.Property(e => e.HoraInicio)
+                .HasComment("hora que comienza la membresia para horarios especiales")
+                .HasColumnType("time")
+                .HasColumnName("horaInicio");
+            entity.Property(e => e.IdEstado)
+                .HasColumnName("idEstado");
+            entity.Property(e => e.IdUsuarioCreo)
+                .HasColumnName("idUsuarioCreo");
+            entity.Property(e => e.Meses)
+                .HasComment("meses de la membresia")
+                .HasColumnName("meses");
+            entity.Property(e => e.Nombre).HasMaxLength(45);
+            entity.Property(e => e.Precio).HasPrecision(8, 2);
+
+            entity.HasOne(d => d.IdEstadoNavigation).WithMany(p => p.Membresia)
+                .HasForeignKey(d => d.IdEstado)
+                .HasConstraintName("fk_Membresia_Estado1");
+
+            entity.HasOne(d => d.IdUsuarioCreoNavigation).WithMany(p => p.Membresia)
+                .HasForeignKey(d => d.IdUsuarioCreo)
+                .HasConstraintName("fk_Membresia_Usuario1");
+        });
+
+        modelBuilder.Entity<Producto>(entity =>
+        {
+            entity.HasKey(e => e.IdProducto).HasName("PRIMARY");
+
+            entity.ToTable("producto");
+
+            entity.HasIndex(e => e.IdEstado, "fk_Producto_Estado1");
+
+            entity.HasIndex(e => e.IdUsuarioCreo, "fk_Producto_Usuario1");
+
+            entity.Property(e => e.IdProducto)
+                .HasColumnName("idProducto");
+            entity.Property(e => e.Costo).HasPrecision(8, 2);
+            entity.Property(e => e.Descripcion).HasMaxLength(100);
+            entity.Property(e => e.FechaCreacion)
+                .HasColumnType("datetime")
+                .HasColumnName("fechaCreacion");
+            entity.Property(e => e.IdEstado)
+                .HasColumnName("idEstado");
+            entity.Property(e => e.IdUsuarioCreo)
+                .HasColumnName("idUsuarioCreo");
+            entity.Property(e => e.Nombre).HasMaxLength(45);
+            entity.Property(e => e.Precio).HasPrecision(8, 2);
+            entity.Property(e => e.Categoria).HasMaxLength(50).HasColumnName("categoria").HasDefaultValue("Otro");
+            entity.Property(e => e.Stock).HasColumnName("stock").HasDefaultValue(0);
+            entity.Property(e => e.StockMinimo).HasColumnName("stockMinimo").HasDefaultValue(5);
+            entity.Property(e => e.ImagenUrl).HasMaxLength(255).HasColumnName("imagen_url");
+
+            entity.HasOne(d => d.IdEstadoNavigation).WithMany(p => p.Productos)
+                .HasForeignKey(d => d.IdEstado)
+                .HasConstraintName("fk_Producto_Estado1");
+
+            entity.HasOne(d => d.IdUsuarioCreoNavigation).WithMany(p => p.Productos)
+                .HasForeignKey(d => d.IdUsuarioCreo)
+                .HasConstraintName("fk_Producto_Usuario1");
+        });
+
+        modelBuilder.Entity<Registro>(entity =>
+        {
+            entity.HasKey(e => e.Idregistro).HasName("PRIMARY");
+
+            entity.ToTable("registro");
+
+            entity.HasIndex(e => e.IdSocio, "fk_registro_Socio1");
+
+            entity.Property(e => e.Idregistro)
+                .HasColumnName("idregistro");
+            entity.Property(e => e.FechaCreacion)
+                .HasColumnType("datetime")
+                .HasColumnName("fechaCreacion");
+            entity.Property(e => e.IdSocio)
+                .HasColumnName("idSocio");
+            entity.Property(e => e.NombreVisita)
+                .HasMaxLength(150)
+                .HasColumnName("nombre_visita");
+            entity.Property(e => e.PrecioVisita)
+                .HasPrecision(8, 2)
+                .HasColumnName("precio_visita");
+
+            entity.HasOne(d => d.IdSocioNavigation).WithMany(p => p.Registros)
+                .HasForeignKey(d => d.IdSocio)
+                .HasConstraintName("fk_registro_Socio1");
+        });
+
+        modelBuilder.Entity<Rptventaproducto>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToView("rptventaproductos");
+
+            entity.Property(e => e.CostoUnitario).HasPrecision(8, 2);
+            entity.Property(e => e.Fecha).HasColumnName("fecha");
+            entity.Property(e => e.Fechacreacion)
+                .HasColumnType("datetime")
+                .HasColumnName("fechacreacion");
+            entity.Property(e => e.Ganancia)
+                .HasPrecision(9, 2)
+                .HasColumnName("ganancia");
+            entity.Property(e => e.Nombre).HasMaxLength(45);
+            entity.Property(e => e.PrecioUnitario)
+                .HasPrecision(8, 2)
+                .HasColumnName("precioUnitario");
+        });
+
+        modelBuilder.Entity<Salidum>(entity =>
+        {
+            entity.HasKey(e => e.IdSalida).HasName("PRIMARY");
+
+            entity.ToTable("salida");
+
+            entity.HasIndex(e => e.IdEstado, "fk_Salida_Estado1");
+
+            entity.HasIndex(e => e.IdUsuarioCreo, "fk_Salida_Usuario1");
+
+            entity.Property(e => e.IdSalida)
+                .HasColumnName("idSalida");
+            entity.Property(e => e.FechaCreacion)
+                .HasColumnType("datetime")
+                .HasColumnName("fechaCreacion");
+            entity.Property(e => e.IdEstado)
+                .HasColumnName("idEstado");
+            entity.Property(e => e.IdUsuarioCreo)
+                .HasColumnName("idUsuarioCreo");
+            entity.Property(e => e.Total)
+                .HasPrecision(8, 2)
+                .HasColumnName("total");
+            entity.Property(e => e.MetodoPago).HasMaxLength(50).HasColumnName("metodoPago").HasDefaultValue("Efectivo");
+            entity.Property(e => e.Folio).HasMaxLength(50).HasColumnName("folio");
+            entity.Property(e => e.Descuento).HasPrecision(8, 2).HasColumnName("descuento").HasDefaultValue(0m);
+            entity.Property(e => e.MontoRecibido).HasPrecision(8, 2).HasColumnName("montoRecibido");
+            entity.Property(e => e.Cambio).HasPrecision(8, 2).HasColumnName("cambio");
+            entity.Property(e => e.Referencia).HasMaxLength(100).HasColumnName("referencia");
+            entity.Property(e => e.Notas).HasMaxLength(255).HasColumnName("notas");
+
+            entity.HasOne(d => d.IdEstadoNavigation).WithMany(p => p.Salida)
+                .HasForeignKey(d => d.IdEstado)
+                .HasConstraintName("fk_Salida_Estado1");
+
+            entity.HasOne(d => d.IdUsuarioCreoNavigation).WithMany(p => p.Salida)
+                .HasForeignKey(d => d.IdUsuarioCreo)
+                .HasConstraintName("fk_Salida_Usuario1");
+        });
+
+        modelBuilder.Entity<Pago>(entity =>
+        {
+            entity.HasKey(e => e.IdPago).HasName("PRIMARY");
+            entity.ToTable("pago");
+            entity.Property(e => e.IdPago).HasColumnName("idPago");
+            entity.Property(e => e.IdSocio).HasColumnName("idSocio");
+            entity.Property(e => e.IdMembresia).HasColumnName("idMembresia");
+            entity.Property(e => e.Monto).HasPrecision(10, 2).HasColumnName("monto");
+            entity.Property(e => e.MetodoPago).HasMaxLength(50).HasColumnName("metodoPago").HasDefaultValue("Efectivo");
+            entity.Property(e => e.FechaPago).HasColumnName("fechaPago");
+            entity.Property(e => e.Notas).HasColumnType("text").HasColumnName("notas");
+            entity.Property(e => e.IdEstado).HasColumnName("idEstado").HasDefaultValue(1);
+            entity.Property(e => e.FechaCreacion).HasColumnType("datetime").HasColumnName("fechaCreacion");
+            entity.Property(e => e.IdUsuarioCreo).HasColumnName("idUsuarioCreo");
+
+            entity.HasOne(d => d.IdSocioNavigation).WithMany()
+                .HasForeignKey(d => d.IdSocio).HasConstraintName("fk_pago_socio");
+            entity.HasOne(d => d.IdMembresiaNavigation).WithMany()
+                .HasForeignKey(d => d.IdMembresia).HasConstraintName("fk_pago_membresia");
+            entity.HasOne(d => d.IdUsuarioCreoNavigation).WithMany()
+                .HasForeignKey(d => d.IdUsuarioCreo).HasConstraintName("fk_pago_usuario");
+        });
+
+        modelBuilder.Entity<Socio>(entity =>
+        {
+            entity.HasKey(e => e.IdSocio).HasName("PRIMARY");
+
+            entity.ToTable("socio");
+
+            entity.HasIndex(e => e.IdEstado, "fk_Socio_Estado1");
+
+            entity.HasIndex(e => e.IdUsuarioCreo, "fk_Socio_Usuario1");
+
+            entity.Property(e => e.IdSocio)
+                .HasColumnName("idSocio");
+            entity.Property(e => e.FechaCreacion)
+                .HasColumnType("datetime")
+                .HasColumnName("fechaCreacion");
+            entity.Property(e => e.Foto)
+                .HasColumnType("blob")
+                .HasColumnName("foto");
+            entity.Property(e => e.IdEstado)
+                .HasColumnName("idEstado");
+            entity.Property(e => e.IdUsuarioCreo)
+                .HasColumnName("idUsuarioCreo");
+            entity.Property(e => e.Materno).HasMaxLength(45);
+            entity.Property(e => e.Nombre).HasMaxLength(45);
+            entity.Property(e => e.Observaciones).HasMaxLength(500);
+            entity.Property(e => e.Paterno).HasMaxLength(45);
+            entity.Property(e => e.Telefono).HasMaxLength(45);
+
+            entity.HasOne(d => d.IdEstadoNavigation).WithMany(p => p.Socios)
+                .HasForeignKey(d => d.IdEstado)
+                .HasConstraintName("fk_Socio_Estado1");
+
+            entity.HasOne(d => d.IdUsuarioCreoNavigation).WithMany(p => p.Socios)
+                .HasForeignKey(d => d.IdUsuarioCreo)
+                .HasConstraintName("fk_Socio_Usuario1");
+        });
+
+        modelBuilder.Entity<Sociomembresium>(entity =>
+        {
+            entity.HasKey(e => e.IdSocioMembresia).HasName("PRIMARY");
+
+            entity.ToTable("sociomembresia");
+
+            entity.HasIndex(e => e.IdEstado, "fk_SocioMembresia_Estado1");
+
+            entity.HasIndex(e => e.IdMembresia, "fk_SocioMembresia_Membresia1");
+
+            entity.HasIndex(e => e.IdSocio, "fk_SocioMembresia_Socio1");
+
+            entity.HasIndex(e => e.IdUsuarioCreo, "fk_SocioMembresia_Usuario1");
+
+            entity.Property(e => e.IdSocioMembresia)
+                .HasColumnName("idSocioMembresia");
+            entity.Property(e => e.FechaCreacion)
+                .HasColumnType("datetime")
+                .HasColumnName("fechaCreacion");
+            entity.Property(e => e.FechaInicioMembresia)
+                .HasColumnType("datetime")
+                .HasColumnName("fechaInicioMembresia");
+            entity.Property(e => e.IdEstado)
+                .HasColumnName("idEstado");
+            entity.Property(e => e.IdMembresia)
+                .HasColumnName("idMembresia");
+            entity.Property(e => e.IdSocio)
+                .HasColumnName("idSocio");
+            entity.Property(e => e.IdUsuarioCreo)
+                .HasColumnName("idUsuarioCreo");
+            entity.Property(e => e.Precio).HasPrecision(8, 2);
+
+            entity.HasOne(d => d.IdEstadoNavigation).WithMany(p => p.Sociomembresia)
+                .HasForeignKey(d => d.IdEstado)
+                .HasConstraintName("fk_SocioMembresia_Estado1");
+
+            entity.HasOne(d => d.IdMembresiaNavigation).WithMany(p => p.Sociomembresia)
+                .HasForeignKey(d => d.IdMembresia)
+                .HasConstraintName("fk_SocioMembresia_Membresia1");
+
+            entity.HasOne(d => d.IdSocioNavigation).WithMany(p => p.Sociomembresia)
+                .HasForeignKey(d => d.IdSocio)
+                .HasConstraintName("fk_SocioMembresia_Socio1");
+
+            entity.HasOne(d => d.IdUsuarioCreoNavigation).WithMany(p => p.Sociomembresia)
+                .HasForeignKey(d => d.IdUsuarioCreo)
+                .HasConstraintName("fk_SocioMembresia_Usuario1");
+        });
+
+        modelBuilder.Entity<Usuario>(entity =>
+        {
+            entity.HasKey(e => e.IdUsuario).HasName("PRIMARY");
+
+            entity.ToTable("usuario");
+
+            entity.HasIndex(e => e.IdEstado, "fk_Usuario_Estados");
+
+            entity.Property(e => e.IdUsuario)
+                .HasColumnName("idUsuario");
+            entity.Property(e => e.FechaCreacion)
+                .HasColumnType("datetime")
+                .HasColumnName("fechaCreacion");
+            entity.Property(e => e.IdEstado)
+                .HasDefaultValueSql("'1'")
+                .HasColumnName("idEstado");
+            entity.Property(e => e.Nombre).HasMaxLength(45);
+            entity.Property(e => e.Password).HasMaxLength(100);
+            entity.Property(e => e.Usuario1)
+                .HasMaxLength(45)
+                .HasColumnName("Usuario");
+            entity.Property(e => e.Rol)
+                .HasMaxLength(20)
+                .HasColumnName("rol")
+                .HasDefaultValueSql("'admin'");
+
+            entity.HasOne(d => d.IdEstadoNavigation).WithMany(p => p.Usuarios)
+                .HasForeignKey(d => d.IdEstado)
+                .HasConstraintName("fk_Usuario_Estados");
+        });
+
+        modelBuilder.Entity<Vwmembresia>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToView("vwmembresias");
+
+            entity.Property(e => e.Estado).HasMaxLength(45);
+            entity.Property(e => e.FechaCreacion)
+                .HasColumnType("datetime")
+                .HasColumnName("fechaCreacion");
+            entity.Property(e => e.HoraFinal)
+                .HasComment("hora en que termina la membresia para horarios especiales")
+                .HasColumnType("time")
+                .HasColumnName("horaFinal");
+            entity.Property(e => e.HoraInicio)
+                .HasComment("hora que comienza la membresia para horarios especiales")
+                .HasColumnType("time")
+                .HasColumnName("horaInicio");
+            entity.Property(e => e.IdEstado)
+                .HasColumnName("idEstado");
+            entity.Property(e => e.IdMembresia)
+                .HasColumnName("idMembresia");
+            entity.Property(e => e.IdUsuarioCreo)
+                .HasColumnName("idUsuarioCreo");
+            entity.Property(e => e.Meses)
+                .HasComment("meses de la membresia")
+                .HasColumnName("meses");
+            entity.Property(e => e.Nombre).HasMaxLength(45);
+            entity.Property(e => e.Precio).HasPrecision(8, 2);
+        });
+
+        modelBuilder.Entity<Vwproducto>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToView("vwproductos");
+
+            entity.Property(e => e.Costo).HasPrecision(8, 2);
+            entity.Property(e => e.Descripcion).HasMaxLength(100);
+            entity.Property(e => e.Estado).HasMaxLength(45);
+            entity.Property(e => e.FechaCreacion)
+                .HasColumnType("datetime")
+                .HasColumnName("fechaCreacion");
+            entity.Property(e => e.IdEstado)
+                .HasColumnName("idEstado");
+            entity.Property(e => e.IdProducto)
+                .HasColumnName("idProducto");
+            entity.Property(e => e.IdUsuarioCreo)
+                .HasColumnName("idUsuarioCreo");
+            entity.Property(e => e.Nombre).HasMaxLength(45);
+            entity.Property(e => e.Precio).HasPrecision(8, 2);
+        });
+
+        modelBuilder.Entity<Vwsocio>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToView("vwsocios");
+
+            entity.Property(e => e.Estado).HasMaxLength(45);
+            entity.Property(e => e.FechaCreacion)
+                .HasColumnType("datetime")
+                .HasColumnName("fechaCreacion");
+            entity.Property(e => e.Foto)
+                .HasColumnType("blob")
+                .HasColumnName("foto");
+            entity.Property(e => e.IdEstado)
+                .HasColumnName("idEstado");
+            entity.Property(e => e.IdSocio)
+                .HasColumnName("idSocio");
+            entity.Property(e => e.IdUsuarioCreo)
+                .HasColumnName("idUsuarioCreo");
+            entity.Property(e => e.Materno).HasMaxLength(45);
+            entity.Property(e => e.Nombre).HasMaxLength(45);
+            entity.Property(e => e.Observaciones).HasMaxLength(500);
+            entity.Property(e => e.Paterno).HasMaxLength(45);
+            entity.Property(e => e.Telefono).HasMaxLength(45);
+        });
+
+        modelBuilder.Entity<Vwsociomembresia>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToView("vwsociomembresias");
+
+            entity.Property(e => e.Estado).HasMaxLength(45);
+            entity.Property(e => e.FechaCreacion)
+                .HasColumnType("datetime")
+                .HasColumnName("fechaCreacion");
+            entity.Property(e => e.FechaInicioMembresia)
+                .HasColumnType("datetime")
+                .HasColumnName("fechaInicioMembresia");
+            entity.Property(e => e.Foto)
+                .HasColumnType("blob")
+                .HasColumnName("foto");
+            entity.Property(e => e.HoraFinal)
+                .HasComment("hora en que termina la membresia para horarios especiales")
+                .HasColumnType("time")
+                .HasColumnName("horaFinal");
+            entity.Property(e => e.HoraInicio)
+                .HasComment("hora que comienza la membresia para horarios especiales")
+                .HasColumnType("time")
+                .HasColumnName("horaInicio");
+            entity.Property(e => e.IdEstado)
+                .HasColumnName("idEstado");
+            entity.Property(e => e.IdMembresia)
+                .HasColumnName("idMembresia");
+            entity.Property(e => e.IdSocio)
+                .HasColumnName("idSocio");
+            entity.Property(e => e.IdSocioMembresia)
+                .HasColumnName("idSocioMembresia");
+            entity.Property(e => e.IdUsuarioCreo)
+                .HasColumnName("idUsuarioCreo");
+            entity.Property(e => e.Materno).HasMaxLength(45);
+            entity.Property(e => e.Meses)
+                .HasComment("meses de la membresia")
+                .HasColumnName("meses");
+            entity.Property(e => e.NombreMembresia).HasMaxLength(45);
+            entity.Property(e => e.NombreSocio).HasMaxLength(45);
+            entity.Property(e => e.Observaciones).HasMaxLength(500);
+            entity.Property(e => e.Paterno).HasMaxLength(45);
+            entity.Property(e => e.Precio).HasPrecision(8, 2);
+            entity.Property(e => e.Telefono).HasMaxLength(45);
+            entity.Property(e => e.Vencimiento).HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<Vwultimamembresiadetalladum>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToView("vwultimamembresiadetallada");
+
+            entity.Property(e => e.Estado).HasMaxLength(45);
+            entity.Property(e => e.FechaCreacion)
+                .HasColumnType("datetime")
+                .HasColumnName("fechaCreacion");
+            entity.Property(e => e.FechaInicioMembresia)
+                .HasColumnType("datetime")
+                .HasColumnName("fechaInicioMembresia");
+            entity.Property(e => e.Foto)
+                .HasColumnType("blob")
+                .HasColumnName("foto");
+            entity.Property(e => e.HoraFinal)
+                .HasComment("hora en que termina la membresia para horarios especiales")
+                .HasColumnType("time")
+                .HasColumnName("horaFinal");
+            entity.Property(e => e.HoraInicio)
+                .HasComment("hora que comienza la membresia para horarios especiales")
+                .HasColumnType("time")
+                .HasColumnName("horaInicio");
+            entity.Property(e => e.IdEstado)
+                .HasColumnName("idEstado");
+            entity.Property(e => e.IdMembresia)
+                .HasColumnName("idMembresia");
+            entity.Property(e => e.IdSocio)
+                .HasColumnName("idSocio");
+            entity.Property(e => e.IdSocioMembresia)
+                .HasColumnName("idSocioMembresia");
+            entity.Property(e => e.IdUsuarioCreo)
+                .HasColumnName("idUsuarioCreo");
+            entity.Property(e => e.Materno).HasMaxLength(45);
+            entity.Property(e => e.Meses)
+                .HasComment("meses de la membresia")
+                .HasColumnName("meses");
+            entity.Property(e => e.NombreMembresia).HasMaxLength(45);
+            entity.Property(e => e.NombreSocio).HasMaxLength(45);
+            entity.Property(e => e.Observaciones).HasMaxLength(500);
+            entity.Property(e => e.Paterno).HasMaxLength(45);
+            entity.Property(e => e.Precio).HasPrecision(8, 2);
+            entity.Property(e => e.Telefono).HasMaxLength(45);
+            entity.Property(e => e.Vencimiento).HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<Vwultimamembresium>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToView("vwultimamembresia");
+
+            entity.Property(e => e.IdSocio)
+                .HasColumnName("idSocio");
+            entity.Property(e => e.IdSocioMembresia)
+                .HasColumnName("idSocioMembresia");
+        });
+
+        modelBuilder.Entity<Vwusuario>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToView("vwusuarios");
+
+            entity.Property(e => e.Estado).HasMaxLength(45);
+            entity.Property(e => e.FechaCreacion)
+                .HasColumnType("datetime")
+                .HasColumnName("fechaCreacion");
+            entity.Property(e => e.IdEstado)
+                .HasDefaultValueSql("'1'")
+                .HasColumnName("idEstado");
+            entity.Property(e => e.IdUsuario)
+                .HasColumnName("idUsuario");
+            entity.Property(e => e.Nombre).HasMaxLength(45);
+            entity.Property(e => e.Password).HasMaxLength(100);
+            entity.Property(e => e.Usuario).HasMaxLength(45);
+        });
+
+        modelBuilder.Entity<SocioHuella>(entity =>
+        {
+            entity.HasKey(e => e.IdHuella).HasName("PRIMARY");
+            entity.ToTable("socio_huella");
+            entity.HasIndex(e => e.IdSocio).IsUnique().HasDatabaseName("uq_huella_socio");
+            entity.HasIndex(e => e.Pin).IsUnique().HasDatabaseName("uq_huella_pin");
+
+            entity.Property(e => e.IdHuella).HasColumnName("idHuella");
+            entity.Property(e => e.IdSocio).HasColumnName("idSocio");
+            entity.Property(e => e.Pin).HasColumnName("pin");
+            entity.Property(e => e.Template).HasColumnType("longblob").HasColumnName("template");
+            entity.Property(e => e.IdDispositivo).HasMaxLength(50).HasColumnName("idDispositivo");
+            entity.Property(e => e.IdEstado).HasDefaultValue(1).HasColumnName("idEstado");
+            entity.Property(e => e.FechaRegistro).HasColumnType("datetime").HasColumnName("fechaRegistro");
+
+            entity.HasOne(d => d.IdSocioNavigation)
+                .WithOne(s => s.SocioHuella)
+                .HasForeignKey<SocioHuella>(d => d.IdSocio)
+                .HasConstraintName("fk_huella_socio");
+        });
+
+        OnModelCreatingPartial(modelBuilder);
+    }
+
+    partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
+}

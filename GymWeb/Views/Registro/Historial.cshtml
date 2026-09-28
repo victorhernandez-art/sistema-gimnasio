@@ -1,0 +1,140 @@
+@model IEnumerable<GymWeb.Models.Registro>
+@{
+    string desde = ViewBag.Desde;
+    string hasta = ViewBag.Hasta;
+}
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title"><i class="fa-solid fa-clock-rotate-left"></i> Historial de Visitas</div>
+        <a asp-action="Index" class="btn btn-outline btn-sm"><i class="fa-solid fa-arrow-left"></i> Volver</a>
+    </div>
+
+    <form method="get" style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:flex-end;">
+        <div class="form-group">
+            <label class="form-label">Desde</label>
+            <input type="date" name="desde" class="form-control" value="@desde" />
+        </div>
+        <div class="form-group">
+            <label class="form-label">Hasta</label>
+            <input type="date" name="hasta" class="form-control" value="@hasta" />
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm" style="align-self:flex-end;">
+            <i class="fa-solid fa-filter"></i> Filtrar
+        </button>
+    </form>
+
+    <div class="table-responsive">
+        <table class="gym-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Tipo</th>
+                    <th>Nombre</th>
+                    <th style="text-align:right;">Monto</th>
+                </tr>
+            </thead>
+            <tbody>
+            @{
+                DateTime? diaActual = null;
+                decimal totalDia = 0;
+                decimal totalGeneral = 0;
+                var lista = Model.ToList();
+            }
+            @for (int i = 0; i < lista.Count; i++)
+            {
+                var r = lista[i];
+                var fechaDia = r.FechaCreacion?.Date;
+                // Header de día nuevo
+                if (fechaDia != diaActual)
+                {
+                    if (diaActual != null && totalDia > 0)
+                    {
+                        <tr style="background:rgba(0,242,255,0.05);font-weight:600;">
+                            <td colspan="3" style="text-align:right;font-size:13px;color:var(--text-muted);">
+                                Subtotal @diaActual?.ToString("dd/MM/yyyy")
+                            </td>
+                            <td style="text-align:right;color:var(--accent);">$@totalDia.ToString("N2")</td>
+                        </tr>
+                    }
+                    totalDia = 0;
+                    diaActual = fechaDia;
+                }
+                totalDia += r.PrecioVisita;
+                totalGeneral += r.PrecioVisita;
+                var esSocio = r.IdSocio.HasValue;
+                var s = r.IdSocioNavigation;
+                <tr>
+                    <td class="text-muted" style="font-size:12px;">@r.FechaCreacion?.ToString("dd/MM/yyyy HH:mm")</td>
+                    <td>
+                        @if (esSocio)
+                        {
+                            <span class="badge badge-info">
+                                <i class="fa-solid fa-id-card"></i> Socio
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="badge" style="background:rgba(167,139,250,0.15);color:#a78bfa;border:1px solid rgba(167,139,250,0.3);">
+                                <i class="fa-solid fa-person-walking-arrow-right"></i> Visita de día
+                            </span>
+                        }
+                    </td>
+                    <td>
+                        @if (esSocio && s != null)
+                        {
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <img src="/Socios/GetFoto/@r.IdSocio" class="socio-avatar"
+                                     onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';" />
+                                <span class="socio-avatar-icon" style="display:none;"><i class="fa-solid fa-user"></i></span>
+                                <span class="name-cell">@s.Nombre @s.Paterno @s.Materno</span>
+                            </div>
+                        }
+                        else if (esSocio)
+                        {
+                            <span class="text-muted">Clave @r.IdSocio</span>
+                        }
+                        else
+                        {
+                            <span class="name-cell">@r.NombreVisita</span>
+                        }
+                    </td>
+                    <td style="text-align:right;font-size:13px;">
+                        @if (r.PrecioVisita > 0)
+                        {
+                            <span style="color:#4ade80;">$@r.PrecioVisita.ToString("N2")</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">—</span>
+                        }
+                    </td>
+                </tr>
+            }
+            @* Subtotal del último día *@
+            @if (diaActual != null && totalDia > 0)
+            {
+                <tr style="background:rgba(0,242,255,0.05);font-weight:600;">
+                    <td colspan="3" style="text-align:right;font-size:13px;color:var(--text-muted);">
+                        Subtotal @diaActual?.ToString("dd/MM/yyyy")
+                    </td>
+                    <td style="text-align:right;color:var(--accent);">$@totalDia.ToString("N2")</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <div style="margin-top:16px;display:flex;gap:24px;align-items:center;flex-wrap:wrap;">
+        <span class="text-muted" style="font-size:13px;">
+            Total visitas: <strong>@lista.Count</strong>
+            &nbsp;·&nbsp; Socios: <strong>@lista.Count(r => r.IdSocio.HasValue)</strong>
+            &nbsp;·&nbsp; Visitas de día: <strong>@lista.Count(r => !r.IdSocio.HasValue)</strong>
+        </span>
+        @if (totalGeneral > 0)
+        {
+            <span style="background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.3);border-radius:var(--radius);padding:6px 16px;font-weight:700;color:#4ade80;font-size:15px;">
+                <i class="fa-solid fa-coins"></i> Total cobrado: $@totalGeneral.ToString("N2")
+            </span>
+        }
+    </div>
+</div>

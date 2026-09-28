@@ -1,0 +1,57 @@
+@{
+    int uid = int.Parse(Context.Session.GetString("UsuarioId")!);
+    var u = Model as GymWeb.Models.Usuario;
+}
+@model GymWeb.Models.Usuario
+
+<div class="card" style="max-width:480px;">
+    <div class="card-header">
+        <div class="card-title"><i class="fa-solid fa-user-pen"></i> Editar Usuario</div>
+        <a asp-action="Index" class="btn btn-outline btn-sm"><i class="fa-solid fa-arrow-left"></i> Volver</a>
+    </div>
+    <form asp-action="Edit" method="post">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="id" value="@Model.IdUsuario" />
+        <div class="form-grid">
+            <div class="form-group" style="grid-column:1/-1;">
+                <label class="form-label">Usuario (no editable)</label>
+                <input type="text" value="@Model.Usuario1" class="form-control" disabled />
+            </div>
+            <div class="form-group" style="grid-column:1/-1;">
+                <label class="form-label">Nombre completo</label>
+                <input name="nombre" type="text" value="@Model.Nombre" class="form-control" required />
+            </div>
+            <div class="form-group" style="grid-column:1/-1;">
+                <label class="form-label">Nueva contraseña <span class="text-muted" style="font-size:11px;">(dejar vacío para no cambiar, mín. 8 caracteres)</span></label>
+                <input name="newPassword" type="password" class="form-control" autocomplete="new-password" minlength="8" id="newPwd" />
+            </div>
+            <div class="form-group" style="grid-column:1/-1;">
+                <label class="form-label">Confirmar nueva contraseña</label>
+                <input name="passwordConfirm" type="password" class="form-control" autocomplete="new-password" id="confirmPwd" />
+            </div>
+            @if (Model.IdUsuario.ToString() != Context.Session.GetString("UsuarioId"))
+            {
+            <div class="form-group" style="grid-column:1/-1;">
+                <label class="form-label">Rol</label>
+                <select name="rol" class="form-control">
+                    <option value="admin" selected="@(Model.Rol == "admin")">Administrador</option>
+                    <option value="superadmin" selected="@(Model.Rol == "superadmin")">Super Administrador</option>
+                </select>
+            </div>
+            }
+        </div>
+        <div style="margin-top:20px;display:flex;gap:10px;">
+            <button type="submit" class="btn btn-primary" onclick="return validarPwd()"><i class="fa-solid fa-floppy-disk"></i> Guardar</button>
+            <a asp-action="Index" class="btn btn-outline">Cancelar</a>
+        </div>
+    </form>
+</div>
+<script>
+function validarPwd() {
+    var np = document.getElementById('newPwd').value;
+    var cp = document.getElementById('confirmPwd').value;
+    if (np && np !== cp) { alert('Las contraseñas no coinciden.'); return false; }
+    if (np && np.length < 8) { alert('La contraseña debe tener al menos 8 caracteres.'); return false; }
+    return true;
+}
+</script>

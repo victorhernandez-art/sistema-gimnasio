@@ -1,0 +1,119 @@
+@{
+    int totalSocios     = ViewBag.TotalSocios ?? 0;
+    int totalMembresias = ViewBag.TotalMembresias ?? 0;
+    int totalProductos  = ViewBag.TotalProductos ?? 0;
+    int visitasHoy      = ViewBag.VisitasHoy ?? 0;
+    int diasAviso       = ViewBag.DiasAviso ?? 5;
+    var ultimas  = ViewBag.UltimasVisitas as IEnumerable<GymWeb.Models.Registro> ?? Enumerable.Empty<GymWeb.Models.Registro>();
+    var vencer   = ViewBag.MembresiasVencer as IEnumerable<GymWeb.Models.Vwultimamembresiadetalladum> ?? Enumerable.Empty<GymWeb.Models.Vwultimamembresiadetalladum>();
+    var licStatus = GymWeb.Helpers.LicenseService.GetStatus();
+}
+
+@if (licStatus.IsTrialActive)
+{
+    <div style="background:linear-gradient(135deg, rgba(16,185,129,0.12), rgba(15,23,42,0.85));border:1px solid rgba(16,185,129,0.35);border-radius:12px;padding:14px 20px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:14px;box-shadow:0 4px 15px rgba(0,0,0,0.2);">
+        <div style="display:flex;align-items:center;gap:12px;">
+            <div style="width:36px;height:36px;border-radius:10px;background:rgba(16,185,129,0.2);display:flex;align-items:center;justify-content:center;color:#10b981;font-size:18px;">
+                <i class="fa-solid fa-sparkles"></i>
+            </div>
+            <div>
+                <span style="color:#ffffff;font-size:13.5px;font-weight:600;">
+                    🎉 ¡Tu prueba está activa! Disfruta de GymPro durante los próximos <strong>@licStatus.DaysLeft días</strong>.
+                </span>
+                <span style="color:#94a3b8;font-size:12.5px;display:block;margin-top:2px;">
+                    Todas las funciones y módulos están 100% desbloqueados para tu gimnasio.
+                </span>
+            </div>
+        </div>
+        <a href="/Configuracion/Index?tab=licencia" class="btn btn-sm btn-outline" style="white-space:nowrap;border-color:rgba(16,185,129,0.5);color:#34d399;font-size:12px;">
+            <i class="fa-solid fa-key"></i> Ver licencia
+        </a>
+    </div>
+}
+
+<div class="stat-grid">
+    <div class="stat-card">
+        <div class="stat-icon cyan"><i class="fa-solid fa-users"></i></div>
+        <div>
+            <div class="stat-value">@totalSocios</div>
+            <div class="stat-label">Socios Activos</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon green"><i class="fa-solid fa-id-card"></i></div>
+        <div>
+            <div class="stat-value">@totalMembresias</div>
+            <div class="stat-label">Membresías Activas</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon orange"><i class="fa-solid fa-clipboard-list"></i></div>
+        <div>
+            <div class="stat-value">@visitasHoy</div>
+            <div class="stat-label">Visitas Hoy</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon purple"><i class="fa-solid fa-box"></i></div>
+        <div>
+            <div class="stat-value">@totalProductos</div>
+            <div class="stat-label">Productos</div>
+        </div>
+    </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-clock-rotate-left"></i> Últimas visitas</div>
+            <a asp-controller="Registro" asp-action="Index" class="btn btn-outline btn-sm">Ver todas</a>
+        </div>
+        @if (!ultimas.Any())
+        {
+            <p class="text-muted" style="font-size:13px;">Sin visitas registradas.</p>
+        }
+        else
+        {
+            <table class="gym-table">
+                <thead><tr><th>Socio</th><th>Fecha</th></tr></thead>
+                <tbody>
+                @foreach (var v in ultimas)
+                {
+                    <tr>
+                        <td><span class="name-cell">@(v.IdSocioNavigation != null ? $"{v.IdSocioNavigation.Nombre} {v.IdSocioNavigation.Paterno}" : v.NombreVisita)</span></td>
+                        <td class="text-muted" style="font-size:12px;">@v.FechaCreacion?.ToString("dd/MM/yy HH:mm")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-triangle-exclamation" style="color:#fbbf24;"></i> Membresías por vencer (@diasAviso días)</div>
+        </div>
+        @if (!vencer.Any())
+        {
+            <p class="text-muted" style="font-size:13px;">Ninguna membresía vence en los próximos @diasAviso días.</p>
+        }
+        else
+        {
+            <table class="gym-table">
+                <thead><tr><th>Socio</th><th>Membresía</th><th>Vence</th><th>Días</th></tr></thead>
+                <tbody>
+                @foreach (var m in vencer)
+                {
+                    int dias = m.Vencimiento.HasValue ? (int)Math.Ceiling((m.Vencimiento.Value - DateTime.Now).TotalDays) : 0;
+                    <tr>
+                        <td>@m.NombreSocio @m.Paterno</td>
+                        <td class="text-muted" style="font-size:12px;">@m.NombreMembresia</td>
+                        <td><span class="badge badge-warning">@m.Vencimiento?.ToString("dd/MM/yy")</span></td>
+                        <td><span style="font-size:12px;color:#fbbf24;font-weight:600;">@dias día@(dias == 1 ? "" : "s")</span></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>

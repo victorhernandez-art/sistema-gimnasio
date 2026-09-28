@@ -1,0 +1,84 @@
+@model IEnumerable<GymWeb.Models.Membresium>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible">
+        <i class="fa-solid fa-circle-check"></i> @TempData["Success"]
+    </div>
+}
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title"><i class="fa-solid fa-id-card"></i> Membresías</div>
+        <a asp-action="Create" class="btn btn-primary btn-sm"><i class="fa-solid fa-plus"></i> Nueva</a>
+    </div>
+
+    <div class="toolbar">
+        <div class="search-box">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input id="tableSearch" type="text" placeholder="Buscar..." />
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="gym-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Nombre</th>
+                    <th>Duración</th>
+                    <th>Precio</th>
+                    <th>Horario</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var m in Model)
+            {
+                <tr>
+                    <td class="text-muted">@m.IdMembresia</td>
+                    <td><span class="name-cell">@m.Nombre</span></td>
+                    <td>
+                        @{
+                            var dias = m.Meses ?? 0;
+                            var durLabel = dias == 1 ? "1 día" : $"{dias} días";
+                        }
+                        <span class="badge badge-info" style="font-size:11px;">@durLabel</span>
+                    </td>
+                    <td class="text-accent">$@m.Precio?.ToString("N2")</td>
+                    <td style="font-size:12px;" class="text-muted">
+                        @if (m.HoraInicio.HasValue)
+                        { @($"{m.HoraInicio} - {m.HoraFinal}") }
+                        else
+                        { <span>Sin restricción</span> }
+                    </td>
+                    <td>
+                        @if (m.IdEstado == 1)
+                        { <span class="badge badge-success">Activa</span> }
+                        else
+                        { <span class="badge badge-danger">Inactiva</span> }
+                    </td>
+                    <td>
+                        <div style="display:flex;gap:6px;">
+                            <a asp-action="Edit" asp-route-id="@m.IdMembresia" class="btn btn-outline btn-sm">
+                                <i class="fa-solid fa-pen"></i>
+                            </a>
+                            @if (m.IdEstado == 1)
+                            {
+                                <form asp-action="Delete" method="post" style="margin:0;" onsubmit="return confirm('¿Eliminar esta membresía?')">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@m.IdMembresia" />
+                                    <button type="submit" class="btn btn-danger btn-sm">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </form>
+                            }
+                        </div>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

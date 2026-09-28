@@ -1,0 +1,80 @@
+@model IEnumerable<GymWeb.Models.Usuario>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible"><i class="fa-solid fa-circle-check"></i> @TempData["Success"]</div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible"><i class="fa-solid fa-triangle-exclamation"></i> @TempData["Error"]</div>
+}
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title"><i class="fa-solid fa-user-gear"></i> Usuarios del Sistema</div>
+        <a asp-action="Create" class="btn btn-primary btn-sm"><i class="fa-solid fa-plus"></i> Nuevo</a>
+    </div>
+    <div class="table-responsive">
+        <table class="gym-table">
+            <thead><tr><th>#</th><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Estado</th><th>Registro</th><th>Acciones</th></tr></thead>
+            <tbody>
+            @foreach (var u in Model)
+            {
+                <tr>
+                    <td class="text-muted">@u.IdUsuario</td>
+                    <td><span class="name-cell">@u.Usuario1</span></td>
+                    <td><span class="name-cell">@u.Nombre</span></td>
+                    <td>
+                        @if (u.Rol == "superadmin")
+                        { <span class="badge" style="background:rgba(0,242,255,0.15);color:#00f2ff;border:1px solid rgba(0,242,255,0.3);">Super Admin</span> }
+                        else
+                        { <span class="badge" style="background:rgba(255,255,255,0.08);color:#8b8fa8;border:1px solid rgba(255,255,255,0.1);">Admin</span> }
+                    </td>
+                    <td>
+                        @if (u.IdEstado == 1)
+                        { <span class="badge badge-success">Activo</span> }
+                        else
+                        { <span class="badge badge-danger">Inactivo</span> }
+                    </td>
+                    <td class="text-muted" style="font-size:12px;">@u.FechaCreacion?.ToString("dd/MM/yyyy")</td>
+                    <td>
+                        <div style="display:flex;gap:6px;">
+                            <a asp-action="Edit" asp-route-id="@u.IdUsuario" class="btn btn-outline btn-sm">
+                                <i class="fa-solid fa-pen"></i>
+                            </a>
+                            @if (u.IdUsuario.ToString() != Context.Session.GetString("UsuarioId"))
+                            {
+                                @if (u.IdEstado == 1)
+                                {
+                                    <form asp-action="Delete" method="post" style="margin:0;" onsubmit="return confirm('¿Desactivar usuario?')">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@u.IdUsuario" />
+                                        <button type="submit" class="btn btn-danger btn-sm" title="Desactivar"><i class="fa-solid fa-ban"></i></button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <form asp-action="Activate" method="post" style="margin:0;" onsubmit="return confirm('¿Activar usuario?')">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@u.IdUsuario" />
+                                        <button type="submit" class="btn btn-sm" style="background:rgba(0,242,100,0.15);color:#00f264;border:1px solid rgba(0,242,100,0.3);" title="Activar">
+                                            <i class="fa-solid fa-rotate-left"></i>
+                                        </button>
+                                    </form>
+                                }
+                                <form asp-action="Eliminar" method="post" style="margin:0;" onsubmit="return confirm('⚠️ ¿Eliminar permanentemente al usuario @u.Usuario1? Esta acción no se puede deshacer.')">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@u.IdUsuario" />
+                                    <button type="submit" class="btn btn-sm" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.35);" title="Eliminar permanentemente">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </form>
+                            }
+                        </div>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

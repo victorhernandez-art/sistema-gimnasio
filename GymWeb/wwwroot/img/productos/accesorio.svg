@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <defs>
+    <radialGradient id="accGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00e5ff" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#070c12" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="shakerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2d3748"/>
+      <stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="#0c121d" rx="16"/>
+  <circle cx="200" cy="210" r="140" fill="url(#accGlow)"/>
+
+  <!-- Tapa Shaker con boquilla -->
+  <path d="M150,110 L250,110 L240,85 L215,85 L215,70 L185,70 L185,85 L160,85 Z" fill="#00e5ff"/>
+  <circle cx="200" cy="77" r="5" fill="#0c121d"/>
+
+  <!-- Aro de tapa -->
+  <rect x="142" y="110" width="116" height="20" rx="4" fill="#1f2937" stroke="#374151"/>
+
+  <!-- Vaso cónico Shaker -->
+  <path d="M148,130 L252,130 L236,310 L164,310 Z" fill="url(#shakerGrad)" stroke="#374151" stroke-width="2"/>
+
+  <!-- Franja decorativa e icono mancuerna -->
+  <rect x="156" y="190" width="88" height="50" fill="#0c121d" rx="6"/>
+  <path d="M185,215 L215,215 M185,208 L185,222 M215,208 L215,222" stroke="#00e5ff" stroke-width="3" stroke-linecap="round"/>
+  <text x="200" y="275" font-family="system-ui, sans-serif" font-weight="900" font-size="11" fill="#38bdf8" text-anchor="middle" letter-spacing="2">700 ML</text>
+</svg>

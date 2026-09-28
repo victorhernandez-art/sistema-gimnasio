@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] — Sistema Gimnasio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="crossorigin" />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="~/css/gym.css" asp-append-version="true" />
+    <link rel="icon" type="image/x-icon" href="~/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="~/img/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="~/img/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="~/img/apple-touch-icon.png" />
+    <link rel="manifest" href="~/manifest.json" />
+    <meta name="theme-color" content="#00f2ff" />
+    <script>
+        (function() {
+            var theme = localStorage.getItem('gym_theme') || 'cyan';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+    @if (GymWeb.Helpers.AppSettings.HasCustomBg)
+    {
+        <style>body::before { background-image: url('/img/fondo-custom.jpg'); }</style>
+    }
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body>
+
+@if (Context.Session.GetString("UsuarioId") != null)
+{
+    var topbarLic = GymWeb.Helpers.LicenseService.GetStatus();
+    bool licBloqueada = topbarLic.IsTrialExpired;
+    bool primerUso = topbarLic.IsFirstInstall;
+    bool licInvalida = !topbarLic.Valid;
+
+    <!-- Sidebar -->
+    <nav id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                @if (GymWeb.Helpers.AppSettings.HasCustomLogo)
+                {
+                    <img src="/img/logo-custom.png?v=@DateTime.Now.Ticks" alt="Logo" class="sidebar-custom-logo" />
+                }
+                else
+                {
+                    <i class="fa-solid fa-dumbbell"></i>
+                }
+                <span class="sidebar-title">@GymWeb.Helpers.AppSettings.GymNombre</span>
+            </div>
+            <button id="sidebarToggle" class="sidebar-toggle" title="Colapsar menú">
+                <i class="fa-solid fa-chevron-left"></i>
+            </button>
+        </div>
+
+        <div class="sidebar-user">
+            <div class="user-avatar"><i class="fa-solid fa-user"></i></div>
+            <div class="user-info">
+                <span class="user-name">@Context.Session.GetString("UsuarioNombre")</span>
+                <span class="user-role">@(Context.Session.GetString("UsuarioRol") == "superadmin" ? "Super Administrador" : "Administrador")</span>
+            </div>
+        </div>
+
+        <ul class="sidebar-nav">
+            <li class="nav-section-label">Principal</li>
+            <li>
+                <a href="@(licInvalida ? "/Configuracion/Index?tab=licencia" : "/Home/Index")"
+                   class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Home" ? "active" : "") @(licBloqueada ? "sidebar-locked-nav" : "")"
+                   title="@(licBloqueada ? "Módulo bloqueado: Requiere activación de Licencia Vitalicia" : (primerUso ? "Activa tu prueba gratuita de 7 días" : "Dashboard"))">
+                    <i class="fa-solid fa-gauge-high"></i>
+                    <span>Dashboard</span>
+                    @if (licBloqueada) { <i class="fa-solid fa-lock" style="font-size:11px;margin-left:auto;color:#ef4444;" title="Bloqueado por fin de prueba"></i> }
+                </a>
+            </li>
+            <li class="nav-section-label">Gestión</li>
+            <li>
+                <a href="@(licInvalida ? "/Configuracion/Index?tab=licencia" : "/Socios/Index")"
+                   class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Socios" ? "active" : "") @(licBloqueada ? "sidebar-locked-nav" : "")"
+                   title="@(licBloqueada ? "Módulo bloqueado: Requiere activación de Licencia Vitalicia" : (primerUso ? "Activa tu prueba gratuita de 7 días" : "Socios"))">
+                    <i class="fa-solid fa-users"></i>
+                    <span>Socios</span>
+                    @if (licBloqueada) { <i class="fa-solid fa-lock" style="font-size:11px;margin-left:auto;color:#ef4444;" title="Bloqueado por fin de prueba"></i> }
+                </a>
+            </li>
+            <li>
+                <a href="@(licInvalida ? "/Configuracion/Index?tab=licencia" : "/Membresias/Index")"
+                   class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Membresias" ? "active" : "") @(licBloqueada ? "sidebar-locked-nav" : "")"
+                   title="@(licBloqueada ? "Módulo bloqueado: Requiere activación de Licencia Vitalicia" : (primerUso ? "Activa tu prueba gratuita de 7 días" : "Membresías"))">
+                    <i class="fa-solid fa-id-card"></i>
+                    <span>Membresías</span>
+                    @if (licBloqueada) { <i class="fa-solid fa-lock" style="font-size:11px;margin-left:auto;color:#ef4444;" title="Bloqueado por fin de prueba"></i> }
+                </a>
+            </li>
+            <li>
+                <a href="@(licInvalida ? "/Configuracion/Index?tab=licencia" : "/Pagos/Index")"
+                   class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Pagos" ? "active" : "") @(licBloqueada ? "sidebar-locked-nav" : "")"
+                   title="@(licBloqueada ? "Módulo bloqueado: Requiere activación de Licencia Vitalicia" : (primerUso ? "Activa tu prueba gratuita de 7 días" : "Pagos"))">
+                    <i class="fa-solid fa-dollar-sign"></i>
+                    <span>Pagos</span>
+                    @if (licBloqueada) { <i class="fa-solid fa-lock" style="font-size:11px;margin-left:auto;color:#ef4444;" title="Bloqueado por fin de prueba"></i> }
+                </a>
+            </li>
+            <li>
+                <a href="@(licInvalida ? "/Configuracion/Index?tab=licencia" : "/Registro/Index")"
+                   class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Registro" ? "active" : "") @(licBloqueada ? "sidebar-locked-nav" : "")"
+                   title="@(licBloqueada ? "Módulo bloqueado: Requiere activación de Licencia Vitalicia" : (primerUso ? "Activa tu prueba gratuita de 7 días" : "Registro de Visitas"))">
+                    <i class="fa-solid fa-clipboard-list"></i>
+                    <span>Registro de Visitas</span>
+                    @if (licBloqueada) { <i class="fa-solid fa-lock" style="font-size:11px;margin-left:auto;color:#ef4444;" title="Bloqueado por fin de prueba"></i> }
+                </a>
+            </li>
+            <li class="nav-section-label">Comercial</li>
+            <li>
+                <a href="@(licInvalida ? "/Configuracion/Index?tab=licencia" : "/Productos/Index")"
+                   class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Productos" ? "active" : "") @(licBloqueada ? "sidebar-locked-nav" : "")"
+                   title="@(licBloqueada ? "Módulo bloqueado: Requiere activación de Licencia Vitalicia" : (primerUso ? "Activa tu prueba gratuita de 7 días" : "Tienda / Ventas"))">
+                    <i class="fa-solid fa-store"></i>
+                    <span>Tienda / Ventas</span>
+                    @if (licBloqueada) { <i class="fa-solid fa-lock" style="font-size:11px;margin-left:auto;color:#ef4444;" title="Bloqueado por fin de prueba"></i> }
+                </a>
+            </li>
+            <li class="nav-section-label">Sistema</li>
+            <li>
+                <a href="@(licInvalida ? "/Configuracion/Index?tab=licencia" : "/Reportes/Index")"
+                   class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Reportes" ? "active" : "") @(licBloqueada ? "sidebar-locked-nav" : "")"
+                   title="@(licBloqueada ? "Módulo bloqueado: Requiere activación de Licencia Vitalicia" : (primerUso ? "Activa tu prueba gratuita de 7 días" : "Reportes"))">
+                    <i class="fa-solid fa-chart-bar"></i>
+                    <span>Reportes</span>
+                    @if (licBloqueada) { <i class="fa-solid fa-lock" style="font-size:11px;margin-left:auto;color:#ef4444;" title="Bloqueado por fin de prueba"></i> }
+                </a>
+            </li>
+            @if (Context.Session.GetString("UsuarioRol") == "superadmin" || licInvalida)
+            {
+                if (Context.Session.GetString("UsuarioRol") == "superadmin" && !licInvalida)
+                {
+                    <li>
+                        <a asp-controller="Usuarios" asp-action="Index" class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Usuarios" ? "active" : "")">
+                            <i class="fa-solid fa-user-gear"></i>
+                            <span>Usuarios</span>
+                        </a>
+                    </li>
+                }
+                <li>
+                    <a href="/Configuracion/Index?tab=licencia" class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Configuracion" ? "active" : "") @(licBloqueada ? "sidebar-lic-active-btn" : "")"
+                       style="@(licBloqueada ? "background:rgba(239,68,68,0.12);border:1px solid #ef4444;color:#ef4444;font-weight:700;" : (primerUso ? "background:rgba(0,242,255,0.12);border:1px solid #00f2ff;color:#00f2ff;font-weight:700;" : ""))">
+                        <i class="fa-solid @(licBloqueada ? "fa-key" : (primerUso ? "fa-rocket" : "fa-gear"))"></i>
+                        <span>@(licBloqueada ? "Activar Licencia" : (primerUso ? "Activar Prueba" : "Configuración"))</span>
+                    </a>
+                </li>
+                if (Context.Session.GetString("UsuarioRol") == "superadmin" && !licInvalida)
+                {
+                    <li>
+                        <a asp-controller="Backup" asp-action="Index" class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Backup" ? "active" : "")">
+                            <i class="fa-solid fa-database"></i>
+                            <span>Respaldo</span>
+                        </a>
+                    </li>
+                }
+            }
+        </ul>
+
+        <div class="sidebar-footer">
+            <a asp-controller="Account" asp-action="Logout" class="nav-link logout-link">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span>Cerrar Sesión</span>
+            </a>
+        </div>
+    </nav>
+
+    <!-- Main content -->
+    <div id="mainContent" class="main-content">
+        @if (licBloqueada)
+        {
+            <div style="background:linear-gradient(90deg, #dc2626, #991b1b);color:#ffffff;padding:12px 20px;font-size:13.5px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:14px;box-shadow:0 4px 14px rgba(220,38,38,0.4);position:relative;z-index:100;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <i class="fa-solid fa-lock" style="font-size:18px;color:#fca5a5;"></i>
+                    <span><strong>Periodo de prueba finalizado:</strong> Tus datos están 100% seguros y respaldados. Activa tu licencia vitalicia para continuar usando todos los módulos.</span>
+                </div>
+                <a href="/Configuracion/Index?tab=licencia" class="btn btn-sm" style="background:#ffffff;color:#991b1b;font-weight:800;white-space:nowrap;padding:6px 14px;border-radius:8px;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+                    <i class="fa-solid fa-key"></i> Activar Licencia Ahora
+                </a>
+            </div>
+        }
+        else if (primerUso)
+        {
+            <div style="background:linear-gradient(90deg, #0284c7, #0369a1);color:#ffffff;padding:12px 20px;font-size:13.5px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:14px;box-shadow:0 4px 14px rgba(2,132,199,0.35);position:relative;z-index:100;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <i class="fa-solid fa-wand-magic-sparkles" style="font-size:18px;color:#7dd3fc;"></i>
+                    <span><strong>¡Bienvenido a GymPro!</strong> Disfruta de 7 días de prueba completa sin compromiso ni restricciones.</span>
+                </div>
+                <a href="/Configuracion/Index?tab=licencia" class="btn btn-sm" style="background:#ffffff;color:#0369a1;font-weight:800;white-space:nowrap;padding:6px 14px;border-radius:8px;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+                    <i class="fa-solid fa-rocket"></i> Activar Prueba Gratuita
+                </a>
+            </div>
+        }
+        else if (topbarLic.IsTrialActive && topbarLic.DaysLeft <= 1)
+        {
+            <div style="background:linear-gradient(90deg, #ea580c, #c2410c);color:#ffffff;padding:12px 20px;font-size:13.5px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:14px;box-shadow:0 4px 14px rgba(234,88,12,0.35);position:relative;z-index:100;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <i class="fa-solid fa-hourglass-end" style="font-size:18px;color:#fed7aa;"></i>
+                    <span><strong>Último día de prueba gratuita:</strong> Activa tu licencia para seguir usando GymPro sin interrupciones.</span>
+                </div>
+                <a href="/Configuracion/Index?tab=licencia" class="btn btn-sm" style="background:#ffffff;color:#c2410c;font-weight:800;white-space:nowrap;padding:6px 14px;border-radius:8px;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+                    <i class="fa-solid fa-key"></i> Activar Licencia
+                </a>
+            </div>
+        }
+        else if (topbarLic.IsTrialActive && topbarLic.DaysLeft <= 3)
+        {
+            <div style="background:linear-gradient(90deg, #d97706, #b45309);color:#ffffff;padding:12px 20px;font-size:13.5px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:14px;box-shadow:0 4px 14px rgba(217,119,6,0.35);position:relative;z-index:100;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <i class="fa-solid fa-clock" style="font-size:18px;color:#fde68a;"></i>
+                    <span><strong>Aviso de Prueba:</strong> Te quedan @topbarLic.DaysLeft días de prueba gratuita. Adquiere tu licencia para no perder el acceso a tus funciones.</span>
+                </div>
+                <a href="/Configuracion/Index?tab=licencia" class="btn btn-sm" style="background:#ffffff;color:#b45309;font-weight:800;white-space:nowrap;padding:6px 14px;border-radius:8px;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+                    <i class="fa-solid fa-key"></i> Activar Licencia
+                </a>
+            </div>
+        }
+        <header class="topbar">
+            <button id="mobileMenuBtn" class="mobile-menu-btn">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+            <div class="topbar-title">
+                @ViewData["Title"]
+                @{
+                    var ctrl = ViewContext.RouteData.Values["controller"]?.ToString();
+                    var tipTexts = new Dictionary<string, string> {
+                        ["Home"]         = "Resumen general del gimnasio: socios activos, membresías próximas a vencer, ingresos del día y últimas actividades registradas.",
+                        ["Socios"]       = "Alta y gestión de miembros. Registra socios con foto, asigna membresías, consulta historial de asistencia y controla bajas.",
+                        ["Membresias"]   = "Define los planes de acceso disponibles: visita de día, semana, quincena o mes. Configura nombre, duración en días y precio de cada plan.",
+                        ["Registro"]     = "Control de acceso diario. Ingresa el ID del socio para registrar su entrada, o registra visitantes de un día con cobro automático según el plan Visita.",
+                        ["Productos"]    = "Inventario de productos: agrega, edita, controla stock y registra ventas rápidas desde una sola pantalla.",
+                        ["Reportes"]     = "Corte del día (ingresos por visitas y ventas) e historial de asistencias por periodo.",
+                        ["Usuarios"]     = "Administra las cuentas de acceso al sistema. Crea, edita o desactiva usuarios y gestiona sus contraseñas.",
+                    };
+                    if (ctrl != null && tipTexts.TryGetValue(ctrl, out var tipText))
+                    {
+                        <i class="fa-solid fa-circle-info topbar-tip" data-tip="@tipText"></i>
+                    }
+                }
+            </div>
+            <div class="topbar-actions">
+                <!-- License Status Badge -->
+                <a href="/Configuracion/Index?tab=licencia" class="topbar-license-badge @(topbarLic.IsLifetime ? "vitalicia" : (topbarLic.IsTrialActive ? (topbarLic.DaysLeft <= 3 ? "trial-orange" : "trial-green") : (primerUso ? "trial-blue" : "demo")))" title="Estado de la Licencia (Clic para gestionar)">
+                    @if (topbarLic.IsLifetime)
+                    {
+                        <span class="license-dot green"></span>
+                        <span>LICENCIA VITALICIA</span>
+                    }
+                    else if (topbarLic.IsTrialActive)
+                    {
+                        <span class="license-dot @(topbarLic.DaysLeft <= 3 ? "orange" : "green")"></span>
+                        <span>PRUEBA GRATUITA (@topbarLic.DaysLeft DÍAS)</span>
+                    }
+                    else if (primerUso)
+                    {
+                        <span class="license-dot blue"></span>
+                        <span>PRUEBA GRATUITA (7 DÍAS)</span>
+                    }
+                    else
+                    {
+                        <span class="license-dot red"></span>
+                        <span>PRUEBA FINALIZADA</span>
+                    }
+                </a>
+
+                <!-- Theme Palette Selector -->
+                <div class="theme-palette-wrapper" id="themePaletteWrapper">
+                    <button type="button" class="theme-palette-btn" id="themePaletteBtn" title="Cambiar color del tema">
+                        <i class="fa-solid fa-palette"></i>
+                    </button>
+                    <div class="theme-palette-dropdown" id="themePaletteDropdown">
+                        <div class="theme-palette-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Color del Sistema</div>
+                        <div class="theme-colors-grid">
+                            <button type="button" class="theme-color-opt" data-color="cyan" title="Cian Neón" style="--swatch:#00f2ff;"></button>
+                            <button type="button" class="theme-color-opt" data-color="emerald" title="Verde Esmeralda" style="--swatch:#10b981;"></button>
+                            <button type="button" class="theme-color-opt" data-color="orange" title="Naranja Fuego" style="--swatch:#f97316;"></button>
+                            <button type="button" class="theme-color-opt" data-color="purple" title="Púrpura Eléctrico" style="--swatch:#a855f7;"></button>
+                            <button type="button" class="theme-color-opt" data-color="red" title="Rojo Adrenalina" style="--swatch:#ef4444;"></button>
+                            <button type="button" class="theme-color-opt" data-color="gold" title="Oro Deportivo" style="--swatch:#eab308;"></button>
+                        </div>
+                    </div>
+                </div>
+
+                <span class="topbar-user">
+                    <i class="fa-solid fa-circle-user"></i>
+                    @Context.Session.GetString("UsuarioNombre")
+                </span>
+            </div>
+        </header>
+
+        <main class="page-content">
+            @RenderBody()
+        </main>
+    </div>
+
+    <div id="sidebarOverlay" class="sidebar-overlay"></div>
+}
+else
+{
+    @RenderBody()
+}
+
+<div id="navTip" class="nav-tip-popup"></div>
+<script src="~/lib/jquery/dist/jquery.min.js"></script>
+<script src="~/js/gym.js" asp-append-version="true"></script>
+@await RenderSectionAsync("Scripts", required: false)
+
+@if (Context.Session.GetString("UsuarioId") != null)
+{
+<script>
+// ── Cierre autom\u00e1tico por inactividad (55 min aviso, 60 min logout) ──
+(function(){
+    const WARN_MS   = 55 * 60 * 1000;
+    const LOGOUT_MS = 60 * 60 * 1000;
+    let warnTimer, logoutTimer;
+    const events = ['mousemove','keydown','mousedown','touchstart','scroll'];
+
+    function resetTimers() {
+        clearTimeout(warnTimer);
+        clearTimeout(logoutTimer);
+        document.getElementById('sessionWarnBox').style.display = 'none';
+        warnTimer   = setTimeout(showWarn,   WARN_MS);
+        logoutTimer = setTimeout(doLogout,   LOGOUT_MS);
+    }
+
+    function showWarn() {
+        document.getElementById('sessionWarnBox').style.display = 'flex';
+        let s = 300;
+        const cd = document.getElementById('sessionCountdown');
+        cd.textContent = s;
+        const t = setInterval(() => { s--; cd.textContent = s; if(s<=0) clearInterval(t); }, 1000);
+    }
+
+    function doLogout() {
+        window.location.href = '/Account/Logout';
+    }
+
+    events.forEach(ev => document.addEventListener(ev, resetTimers, { passive:true }));
+    resetTimers();
+})();
+</script>
+
+<!-- Aviso inactividad -->
+<div id="sessionWarnBox" style="display:none;position:fixed;bottom:24px;right:24px;z-index:99999;background:#1a1b2e;border:1px solid rgba(251,191,36,0.5);border-radius:14px;padding:18px 24px;box-shadow:0 8px 32px rgba(0,0,0,0.6);max-width:320px;align-items:flex-start;gap:14px;">
+    <div style="font-size:22px;color:#fbbf24;"><i class="fa-solid fa-clock"></i></div>
+    <div>
+        <div style="font-weight:600;color:#fbbf24;margin-bottom:4px;">Sesi\u00f3n por expirar</div>
+        <div style="font-size:13px;color:var(--text-muted);">La sesi\u00f3n cerrar\u00e1 en <strong id="sessionCountdown" style="color:#fbbf24;">300</strong> segundos por inactividad.</div>
+        <div style="margin-top:10px;display:flex;gap:8px;">
+            <button onclick="(function(){document.getElementById('sessionWarnBox').style.display='none';document.dispatchEvent(new Event('mousemove'));})()" class="btn btn-sm" style="background:rgba(251,191,36,0.2);color:#fbbf24;border:1px solid rgba(251,191,36,0.4);">
+                Seguir aqu\u00ed
+            </button>
+            <a href="/Account/Logout" class="btn btn-sm btn-outline">Cerrar sesi\u00f3n</a>
+        </div>
+    </div>
+</div>
+
+@* ── Toast de Actualización Disponible (GitHub Releases API) ── *@
+@if (Context.Session.GetString("UsuarioRol") == "superadmin")
+{
+<!-- Toast actualización -->
+<div id="updateToast" style="display:none;position:fixed;bottom:24px;left:24px;z-index:99998;max-width:340px;background:linear-gradient(135deg,#0f1628,#1a2035);border:1px solid rgba(0,242,255,0.35);border-radius:16px;padding:0;box-shadow:0 12px 40px rgba(0,0,0,0.7),0 0 0 1px rgba(0,242,255,0.08);overflow:hidden;animation:slideInUpdate 0.4s cubic-bezier(0.34,1.56,0.64,1);">
+    <!-- Barra superior de color -->
+    <div style="height:3px;background:linear-gradient(90deg,#00f2ff,#0891b2);"></div>
+    <div style="padding:16px 18px 14px;">
+        <div style="display:flex;align-items:flex-start;gap:12px;">
+            <!-- Icono -->
+            <div style="width:40px;height:40px;border-radius:12px;background:rgba(0,242,255,0.12);border:1px solid rgba(0,242,255,0.25);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="fa-solid fa-rocket" style="color:#00f2ff;font-size:17px;"></i>
+            </div>
+            <!-- Contenido -->
+            <div style="flex:1;min-width:0;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;">
+                    <span style="font-size:13px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">Actualización disponible</span>
+                    <button onclick="gymDismissUpdate()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:16px;line-height:1;padding:0 0 0 8px;" title="Cerrar">&times;</button>
+                </div>
+                <div style="font-size:12px;color:#94a3b8;margin-bottom:10px;">
+                    Versión <span id="updateCurrentBadge" style="color:#64748b;font-weight:600;"></span>
+                    <i class="fa-solid fa-arrow-right" style="font-size:10px;margin:0 4px;"></i>
+                    <span id="updateLatestBadge" style="color:#00f2ff;font-weight:700;"></span> ya está lista.
+                </div>
+                <a id="updateDownloadBtn" href="#" target="_blank"
+                   style="display:inline-flex;align-items:center;gap:7px;background:linear-gradient(135deg,#00f2ff,#0891b2);color:#000000;font-size:12px;font-weight:700;padding:7px 14px;border-radius:8px;text-decoration:none;letter-spacing:0.3px;box-shadow:0 4px 12px rgba(0,242,255,0.3);transition:opacity 0.2s;"
+                   onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+                    <i class="fa-solid fa-download"></i> Descargar parche
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@@keyframes slideInUpdate {
+    from { opacity:0; transform:translateX(-24px) scale(0.96); }
+    to   { opacity:1; transform:translateX(0) scale(1); }
+}
+</style>
+
+<script>
+(function(){
+    // Verificar solo 1 vez por sesión del navegador (no molestar en cada recarga)
+    const SESSION_KEY = 'gym_update_checked';
+    const DISMISS_KEY = 'gym_update_dismissed';
+
+    if (sessionStorage.getItem(SESSION_KEY)) return;
+    sessionStorage.setItem(SESSION_KEY, '1');
+
+    // Esperar 3 segundos después de cargar para no impactar rendimiento
+    setTimeout(async function(){
+        try {
+            const res  = await fetch('/Home/CheckUpdate');
+            if (!res.ok) return;
+            const data = await res.json();
+
+            if (!data.hasUpdate) return;
+
+            // No mostrar si el usuario ya descartó esta versión específica
+            const dismissed = localStorage.getItem(DISMISS_KEY);
+            if (dismissed === data.latest) return;
+
+            // Rellenar datos del toast
+            const toast = document.getElementById('updateToast');
+            document.getElementById('updateCurrentBadge').textContent = data.current;
+            document.getElementById('updateLatestBadge').textContent  = data.latest;
+            document.getElementById('updateDownloadBtn').href         = data.downloadUrl || '#';
+
+            // Mostrar con animación
+            toast.style.display = 'block';
+
+            // Guardar la última versión vista para no mostrar la misma notificación infinitamente
+            localStorage.setItem(DISMISS_KEY + '_seen', data.latest);
+
+        } catch(e) {
+            // Sin internet o error — silencio total
+        }
+    }, 3000);
+
+    // Función global para cerrar y recordar que ya se vio esta versión
+    window.gymDismissUpdate = function() {
+        const toast = document.getElementById('updateToast');
+        if (toast) {
+            toast.style.animation = 'none';
+            toast.style.transition = 'opacity 0.25s, transform 0.25s';
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(-24px)';
+            setTimeout(function(){ toast.style.display = 'none'; }, 260);
+        }
+        // Guardar en localStorage la versión descartada para no volver a mostrarla
+        var latest = document.getElementById('updateLatestBadge')?.textContent;
+        if (latest) localStorage.setItem('gym_update_dismissed', latest);
+    };
+})();
+</script>
+}
+}
+</body>
+</html>

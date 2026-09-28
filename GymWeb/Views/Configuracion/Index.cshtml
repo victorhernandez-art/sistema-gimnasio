@@ -1,0 +1,521 @@
+@model GymWeb.Models.Configuracion
+@using GymWeb.Helpers
+@{
+    var licStatus = ViewBag.LicenseStatus as LicenseInfo ?? LicenseService.GetStatus();
+    var pcId = ViewBag.PcId as string ?? LicenseService.GetPcId();
+    var activeTab = TempData["ActiveTab"]?.ToString() ?? Context.Request.Query["tab"].ToString();
+    if (string.IsNullOrEmpty(activeTab)) {
+        activeTab = !licStatus.Valid ? "licencia" : "general";
+    }
+}
+
+@if (licStatus.IsTrialExpired)
+{
+    <div style="background:linear-gradient(135deg, rgba(239,68,68,0.18), rgba(15,23,42,0.95));border:1.5px solid #ef4444;border-radius:14px;padding:20px 24px;margin-bottom:24px;display:flex;align-items:center;gap:18px;box-shadow:0 8px 24px rgba(239,68,68,0.15);">
+        <div style="font-size:36px;color:#ef4444;flex-shrink:0;">
+            <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <div style="flex:1;">
+            <h3 style="color:#f87171;font-size:16px;font-weight:800;margin:0 0 6px 0;letter-spacing:0.5px;">
+                ⚠️ PERIODO DE PRUEBA FINALIZADO — SISTEMA EN ESPERA DE ACTIVACIÓN
+            </h3>
+            <p style="color:#cbd5e1;font-size:13.5px;margin:0;line-height:1.5;">
+                Tu periodo de prueba de 7 días ha concluido. <strong>Todos tus datos (socios, pagos, asistencias, ventas y configuración) están 100% seguros y respaldados</strong>. Para desbloquear el acceso completo e ilimitado de por vida, solicita tu clave oficial vitalicia y actívala abajo.
+            </p>
+        </div>
+    </div>
+}
+else if (licStatus.IsFirstInstall)
+{
+    <div style="background:linear-gradient(135deg, rgba(2,132,199,0.18), rgba(15,23,42,0.95));border:1.5px solid #0284c7;border-radius:14px;padding:20px 24px;margin-bottom:24px;display:flex;align-items:center;gap:18px;box-shadow:0 8px 24px rgba(2,132,199,0.15);">
+        <div style="font-size:36px;color:#38bdf8;flex-shrink:0;">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+        </div>
+        <div style="flex:1;">
+            <h3 style="color:#38bdf8;font-size:16px;font-weight:800;margin:0 0 6px 0;letter-spacing:0.5px;">
+                👋 ¡BIENVENIDO A GYMPRO! — SISTEMA LISTO PARA USAR
+            </h3>
+            <p style="color:#cbd5e1;font-size:13.5px;margin:0;line-height:1.5;">
+                Disfruta de <strong>7 días de prueba completa</strong> sin compromiso ni restricciones. Explora todos los módulos y gestiona tu gimnasio de forma profesional.
+            </p>
+        </div>
+    </div>
+}
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible"><i class="fa-solid fa-circle-check"></i> @TempData["Success"]</div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible"><i class="fa-solid fa-circle-exclamation"></i> @TempData["Error"]</div>
+}
+
+<!-- Pestañas de navegación de Configuración -->
+<div class="config-nav-tabs">
+    <button type="button" class="config-tab-btn @(activeTab == "general" ? "active" : "")" data-tab="general">
+        <i class="fa-solid fa-gear"></i> General
+    </button>
+    <button type="button" class="config-tab-btn @(activeTab == "licencia" ? "active" : "")" data-tab="licencia">
+        <i class="fa-solid fa-key"></i> Licencia
+    </button>
+    <button type="button" class="config-tab-btn @(activeTab == "tema" ? "active" : "")" data-tab="tema">
+        <i class="fa-solid fa-palette"></i> Tema
+    </button>
+</div>
+
+<!-- ==========================================
+     PESTAÑA 1: GENERAL
+     ========================================== -->
+<div id="tabContentGeneral" class="config-tab-content @(activeTab == "general" ? "" : "d-none")">
+    <div class="card" style="max-width:650px;">
+        <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-gear"></i> Configuración del Gimnasio</div>
+        </div>
+        <form asp-action="Index" method="post" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+            <div class="form-grid">
+                <div class="form-group" style="grid-column:1/-1;">
+                    <label class="form-label">Nombre del Gimnasio</label>
+                    <input name="NombreGimnacio" value="@Model.NombreGimnacio" class="form-control" placeholder="Ej: Mi Gimnasio" />
+                </div>
+                <div class="form-group" style="grid-column:1/-1;">
+                    <label class="form-label"><i class="fa-solid fa-location-dot" style="color:#38bdf8;"></i> Dirección / Domicilio del Negocio</label>
+                    <input name="Domicilio" value="@Model.Domicilio" class="form-control" placeholder="Ej: Av. Central Poniente #123, Col. Centro, CP 29000" />
+                    <small style="color:var(--text-muted);font-size:12px;">Esta dirección se imprimirá en el encabezado de los tickets de venta POS.</small>
+                </div>
+                <div class="form-group" style="grid-column:1/-1;">
+                    <label class="form-label"><i class="fa-solid fa-phone" style="color:#38bdf8;"></i> Teléfono / WhatsApp de Contacto</label>
+                    <input name="Telefono" value="@Model.Telefono" class="form-control" placeholder="Ej: 961 123 4567" />
+                    <small style="color:var(--text-muted);font-size:12px;">Se mostrará en los tickets para atención a clientes y dudas sobre sus compras.</small>
+                </div>
+                <div class="form-group" style="grid-column:1/-1;">
+                    <label class="form-label"><i class="fa-solid fa-receipt" style="color:#38bdf8;"></i> Mensaje al pie del Ticket de Venta</label>
+                    <input name="Mensaje" value="@(string.IsNullOrWhiteSpace(Model.Mensaje) ? "¡Gracias por su preferencia!" : Model.Mensaje)" class="form-control" placeholder="Ej: ¡Gracias por tu compra! Conserva este comprobante." />
+                    <small style="color:var(--text-muted);font-size:12px;">Texto de despedida o agradecimiento que aparecerá al final de cada ticket impreso.</small>
+                </div>
+                <div class="form-group" style="grid-column:1/-1;">
+                    <label class="form-label">Logo del Gimnasio (Marca / Branding)</label>
+                    <div style="background:rgba(0,0,0,0.3);border:1px dashed var(--border);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px;">
+                        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+                            <div style="width:90px;height:70px;background:rgba(255,255,255,0.04);border-radius:8px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,0.08);overflow:hidden;padding:4px;">
+                                @if (AppSettings.HasCustomLogo)
+                                {
+                                    <img id="logoPreviewImg" src="/img/logo-custom.png?v=@DateTime.Now.Ticks" style="max-height:100%;max-width:100%;object-fit:contain;" alt="Logo Gimnasio" />
+                                    <div id="logoPlaceholder" style="display:none;font-size:24px;color:var(--accent);"><i class="fa-solid fa-dumbbell"></i></div>
+                                }
+                                else
+                                {
+                                    <img id="logoPreviewImg" src="" style="display:none;max-height:100%;max-width:100%;object-fit:contain;" alt="Logo Gimnasio" />
+                                    <div id="logoPlaceholder" style="font-size:24px;color:var(--accent);"><i class="fa-solid fa-dumbbell"></i></div>
+                                }
+                            </div>
+                            <div style="flex:1;min-width:200px;">
+                                <div id="logoPreviewStatus">
+                                    @if (AppSettings.HasCustomLogo)
+                                    {
+                                        <div style="color:#4ade80;font-size:12px;font-weight:500;margin-bottom:6px;">
+                                            <i class="fa-solid fa-circle-check"></i> Logo personalizado activo
+                                        </div>
+                                        <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#f87171;cursor:pointer;">
+                                            <input type="checkbox" name="EliminarLogo" value="true" />
+                                            <span>Quitar logo y usar ícono predeterminado</span>
+                                        </label>
+                                    }
+                                    else
+                                    {
+                                        <div style="color:var(--text-muted);font-size:12px;">
+                                            <i class="fa-solid fa-info-circle"></i> Usando ícono predeterminado de mancuerna
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        <input type="file" id="inputFotoLogo" name="FotoLogo" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="form-control" onchange="previewLogo(this)" />
+                        <small style="color:var(--text-muted);font-size:12px;">Formatos recomendados: <strong>PNG transparente</strong>, JPG, WEBP o SVG. Se mostrará en el menú lateral y en el inicio de sesión.</small>
+                    </div>
+                </div>
+                <div class="form-group" style="grid-column:1/-1;">
+                    <label class="form-label">Días de aviso de vencimiento</label>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <input name="MensajeVencimiento" type="number" min="1" max="365" value="@(Model.MensajeVencimiento ?? 5)" class="form-control" style="max-width:120px;" />
+                        <span style="font-size:13px;color:var(--text-muted);">días antes del vencimiento</span>
+                    </div>
+                </div>
+                <div class="form-group" style="grid-column:1/-1;">
+                    <label class="form-label">Imagen de fondo</label>
+                    @if (AppSettings.HasCustomBg)
+                    {
+                        <div style="margin-bottom:10px;border-radius:8px;overflow:hidden;height:90px;">
+                            <img src="/img/fondo-custom.jpg?v=@DateTime.Now.Ticks" style="width:100%;height:100%;object-fit:cover;opacity:0.8;" />
+                        </div>
+                        <small style="color:#4ade80;font-size:12px;"><i class="fa-solid fa-circle-check"></i> Imagen personalizada activa</small>
+                    }
+                    else
+                    {
+                        <div style="margin-bottom:10px;border-radius:8px;overflow:hidden;height:90px;">
+                            <img src="/img/gym.jpeg" style="width:100%;height:100%;object-fit:cover;opacity:0.5;" />
+                        </div>
+                        <small style="color:var(--text-muted);font-size:12px;">Imagen predeterminada activa</small>
+                    }
+                    <input type="file" name="FotoFondo" accept="image/jpeg,image/png,image/webp" class="form-control" style="margin-top:10px;" />
+                    <small style="color:var(--text-muted);font-size:12px;">Formatos: JPG, PNG, WEBP. Se mostrará de fondo en todo el sistema.</small>
+                </div>
+            </div>
+            <div style="margin-top:20px;">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fa-solid fa-floppy-disk"></i> Guardar Configuración
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ==========================================
+     PESTAÑA 2: LICENCIA Y ACTIVACIÓN
+     ========================================== -->
+<div id="tabContentLicencia" class="config-tab-content @(activeTab == "licencia" ? "" : "d-none")">
+    <div class="card" style="max-width:720px;">
+        <div class="card-header" style="margin-bottom:20px;">
+            <div class="card-title" style="display:flex;align-items:center;gap:10px;font-size:18px;">
+                <i class="fa-solid fa-key" style="color:#38bdf8;"></i> Estado y Licenciamiento
+            </div>
+        </div>
+
+        <!-- 1. ESTADO DE LA LICENCIA -->
+        @if (licStatus.IsLifetime)
+        {
+            <div class="license-status-card vitalicia" style="background:linear-gradient(135deg, rgba(16,185,129,0.12), rgba(15,23,42,0.95));border:1.5px solid rgba(16,185,129,0.4);border-radius:16px;padding:22px;margin-bottom:24px;">
+                <div style="display:flex;align-items:flex-start;gap:16px;">
+                    <div style="width:48px;height:48px;border-radius:12px;background:rgba(16,185,129,0.18);border:1px solid rgba(16,185,129,0.35);display:flex;align-items:center;justify-content:center;color:#10b981;font-size:24px;flex-shrink:0;">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                    <div style="flex:1;">
+                        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px;">
+                            <h3 style="color:#34d399;font-size:17px;font-weight:800;margin:0;">LICENCIA VITALICIA OFICIAL ACTIVADA</h3>
+                            <span style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.4);font-size:11px;font-weight:800;padding:2px 10px;border-radius:20px;letter-spacing:0.5px;">PERMANENTE</span>
+                        </div>
+                        <p style="color:#94a3b8;font-size:13px;line-height:1.5;margin:0;">
+                            Acceso permanente de por vida, 100% offline y base de datos persistente. Tu sistema está plenamente activado.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        }
+        else if (licStatus.IsTrialActive)
+        {
+            <div class="license-status-card trial" style="background:linear-gradient(135deg, rgba(16,185,129,0.12), rgba(15,23,42,0.95));border:1.5px solid rgba(16,185,129,0.4);border-radius:16px;padding:22px;margin-bottom:24px;">
+                <div style="display:flex;align-items:flex-start;gap:16px;">
+                    <div style="width:48px;height:48px;border-radius:12px;background:rgba(16,185,129,0.18);border:1px solid rgba(16,185,129,0.35);display:flex;align-items:center;justify-content:center;color:#10b981;font-size:24px;flex-shrink:0;">
+                        <i class="fa-solid fa-hourglass-half"></i>
+                    </div>
+                    <div style="flex:1;">
+                        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px;">
+                            <h3 style="color:#f8fafc;font-size:17px;font-weight:800;margin:0;">PRUEBA GRATUITA ACTIVA</h3>
+                            <span style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.4);font-size:11px;font-weight:800;padding:2px 10px;border-radius:20px;letter-spacing:0.5px;">@licStatus.DaysLeft DÍAS RESTANTES</span>
+                        </div>
+                        <p style="color:#94a3b8;font-size:13px;line-height:1.5;margin-bottom:10px;">
+                            Vigente hasta el <strong>@licStatus.ExpireDateFormatted</strong> (@licStatus.DaysLeft días restantes). Tienes todas las funciones y módulos 100% desbloqueados.
+                        </p>
+                        <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(16,185,129,0.1);padding:5px 12px;border-radius:8px;border:1px solid rgba(16,185,129,0.25);color:#34d399;font-size:12px;font-weight:600;">
+                            <i class="fa-solid fa-circle-check"></i> Todos los módulos 100% operativos
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+        else if (licStatus.IsFirstInstall)
+        {
+            <div class="license-status-card first-install" style="background:linear-gradient(135deg, rgba(2,132,199,0.14), rgba(15,23,42,0.95));border:1.5px solid rgba(56,189,248,0.45);border-radius:16px;padding:24px;margin-bottom:24px;box-shadow:0 8px 30px rgba(2,132,199,0.2);">
+                <div style="display:flex;align-items:flex-start;gap:16px;">
+                    <div style="width:50px;height:50px;border-radius:14px;background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.3);display:flex;align-items:center;justify-content:center;color:#38bdf8;font-size:24px;flex-shrink:0;">
+                        <i class="fa-solid fa-rocket"></i>
+                    </div>
+                    <div style="flex:1;">
+                        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+                            <h3 style="color:#f8fafc;font-size:18px;font-weight:800;margin:0;">¡Bienvenido a GymPro!</h3>
+                            <span style="background:rgba(56,189,248,0.2);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);font-size:11px;font-weight:800;padding:2px 10px;border-radius:20px;letter-spacing:0.5px;">PRUEBA DE 7 DÍAS DISPONIBLE</span>
+                        </div>
+                        <p style="color:#cbd5e1;font-size:13.5px;line-height:1.5;margin-bottom:16px;">
+                            Disfruta de 7 días de acceso completo a todas las funciones premium para la administración de tu gimnasio sin restricciones ni compromisos.
+                        </p>
+
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:8px;margin-bottom:20px;background:rgba(0,0,0,0.25);border-radius:12px;padding:12px 16px;border:1px solid rgba(255,255,255,0.06);">
+                            <div style="color:#cbd5e1;font-size:12.5px;display:flex;align-items:center;gap:8px;">
+                                <i class="fa-solid fa-circle-check" style="color:#38bdf8;"></i> Socios ilimitados con foto
+                            </div>
+                            <div style="color:#cbd5e1;font-size:12.5px;display:flex;align-items:center;gap:8px;">
+                                <i class="fa-solid fa-circle-check" style="color:#38bdf8;"></i> Control de membresías
+                            </div>
+                            <div style="color:#cbd5e1;font-size:12.5px;display:flex;align-items:center;gap:8px;">
+                                <i class="fa-solid fa-circle-check" style="color:#38bdf8;"></i> Registro de accesos
+                            </div>
+                            <div style="color:#cbd5e1;font-size:12.5px;display:flex;align-items:center;gap:8px;">
+                                <i class="fa-solid fa-circle-check" style="color:#38bdf8;"></i> Tienda y punto de venta
+                            </div>
+                            <div style="color:#cbd5e1;font-size:12.5px;display:flex;align-items:center;gap:8px;">
+                                <i class="fa-solid fa-circle-check" style="color:#38bdf8;"></i> Cortes de caja y reportes
+                            </div>
+                            <div style="color:#cbd5e1;font-size:12.5px;display:flex;align-items:center;gap:8px;">
+                                <i class="fa-solid fa-circle-check" style="color:#38bdf8;"></i> 100% Offline y seguro
+                            </div>
+                        </div>
+
+                        <form asp-action="IniciarPruebaGratuita" method="post" style="display:inline-block;">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-primary" style="background:linear-gradient(135deg, #0284c7, #00f2ff);color:#0B1120;font-size:14px;font-weight:800;padding:12px 26px;border-radius:10px;box-shadow:0 6px 20px rgba(0,242,255,0.35);border:none;cursor:pointer;display:inline-flex;align-items:center;gap:10px;">
+                                <i class="fa-solid fa-rocket" style="font-size:16px;"></i> ACTIVAR MI PRUEBA GRATUITA (7 DÍAS)
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="license-status-card demo" style="background:linear-gradient(135deg, rgba(239,68,68,0.14), rgba(15,23,42,0.95));border:1.5px solid rgba(239,68,68,0.45);border-radius:16px;padding:22px;margin-bottom:24px;box-shadow:0 8px 30px rgba(239,68,68,0.15);">
+                <div style="display:flex;align-items:flex-start;gap:16px;">
+                    <div style="width:48px;height:48px;border-radius:12px;background:rgba(239,68,68,0.18);border:1px solid rgba(239,68,68,0.35);display:flex;align-items:center;justify-content:center;color:#ef4444;font-size:24px;flex-shrink:0;">
+                        <i class="fa-solid fa-lock"></i>
+                    </div>
+                    <div style="flex:1;">
+                        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px;">
+                            <h3 style="color:#f87171;font-size:17px;font-weight:800;margin:0;">PERIODO DE PRUEBA FINALIZADO</h3>
+                            <span style="background:rgba(239,68,68,0.2);color:#fca5a5;border:1px solid rgba(239,68,68,0.4);font-size:11px;font-weight:800;padding:2px 10px;border-radius:20px;letter-spacing:0.5px;">EXPIRADO</span>
+                        </div>
+                        <p style="color:#cbd5e1;font-size:13px;line-height:1.5;margin:0;">
+                            Tu período de prueba de 7 días ha concluido. <strong>Tus datos, socios y registros están guardados y seguros.</strong> Activa tu licencia vitalicia para continuar usando el sistema sin límites.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- 2. HARDWARE PC ID DE ESTE EQUIPO -->
+        <div style="margin-top:20px;">
+            <label class="form-label" style="font-weight:700;font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">
+                Hardware PC ID de este Equipo
+            </label>
+            <div style="display:flex;gap:10px;align-items:center;margin-top:6px;flex-wrap:wrap;">
+                <input type="text" id="pcIdInput" value="@pcId" readonly class="form-control hardware-id-box" style="flex:1;min-width:260px;" />
+                <button type="button" id="btnCopyPcId" onclick="copiarPcId()" class="btn" style="background:#1e293b;border:1.5px solid #334155;color:#f8fafc;padding:12px 18px;border-radius:10px;font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px;white-space:nowrap;cursor:pointer;transition:all 0.2s ease;">
+                    <i class="fa-solid fa-clipboard"></i> Copiar ID
+                </button>
+                @if (licStatus.IsFirstInstall)
+                {
+                    <button type="button" onclick="solicitarPorWhatsApp('prueba')" class="btn" style="background:#25D366;border:none;color:#0B1120;padding:12px 18px;border-radius:10px;font-weight:800;font-size:13px;display:flex;align-items:center;gap:7px;white-space:nowrap;cursor:pointer;box-shadow:0 4px 14px rgba(37,211,102,0.35);transition:all 0.2s ease;">
+                        <i class="fa-brands fa-whatsapp" style="font-size:17px;color:#0B1120;"></i> Solicitar Prueba por WhatsApp
+                    </button>
+                }
+                else if (licStatus.IsTrialExpired)
+                {
+                    <button type="button" onclick="solicitarPorWhatsApp('compra')" class="btn" style="background:#25D366;border:none;color:#0B1120;padding:12px 18px;border-radius:10px;font-weight:800;font-size:13px;display:flex;align-items:center;gap:7px;white-space:nowrap;cursor:pointer;box-shadow:0 4px 14px rgba(37,211,102,0.35);transition:all 0.2s ease;">
+                        <i class="fa-brands fa-whatsapp" style="font-size:17px;color:#0B1120;"></i> Comprar Licencia Vitalicia por WhatsApp
+                    </button>
+                }
+                else
+                {
+                    <button type="button" onclick="solicitarPorWhatsApp('compra')" class="btn" style="background:#25D366;border:none;color:#0B1120;padding:12px 18px;border-radius:10px;font-weight:800;font-size:13px;display:flex;align-items:center;gap:7px;white-space:nowrap;cursor:pointer;box-shadow:0 4px 14px rgba(37,211,102,0.35);transition:all 0.2s ease;">
+                        <i class="fa-brands fa-whatsapp" style="font-size:17px;color:#0B1120;"></i> Contactar por WhatsApp
+                    </button>
+                }
+            </div>
+            <p style="font-size:12px;color:var(--text-muted);margin-top:8px;">
+                Este identificador único vincula la licencia a tu computadora de forma segura.
+            </p>
+        </div>
+
+        <!-- 3. FORMULARIO DE ACTIVACIÓN DE CLAVE -->
+        <div style="margin-top:28px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:12px;padding:22px;">
+            <h4 style="font-size:14px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;color:#f8fafc;">
+                <i class="fa-solid fa-bolt" style="color:var(--accent);"></i> 
+                @(licStatus.IsFirstInstall ? "¿Ya compraste tu licencia o tienes una clave? Actívala aquí:" : (licStatus.IsTrialExpired ? "Ingresar Clave Vitalicia para reactivar el sistema:" : "Activar o Actualizar Licencia:"))
+            </h4>
+            <form asp-action="ActivarLicencia" method="post">
+                @Html.AntiForgeryToken()
+                <div class="form-group">
+                    <label class="form-label">Clave de Activación</label>
+                    <input type="text" name="ClaveActivacion" id="claveActivacionInput"
+                           placeholder="GYM-XXXX-XXXX-XXXX-XXXX o GYM7-YYYYMMDD-XXXX-XXXX"
+                           class="form-control"
+                           style="font-family:'JetBrains Mono','Courier New',Courier,monospace;letter-spacing:1px;font-size:15px;text-transform:uppercase;"
+                           autocomplete="off" required />
+                    <small style="color:var(--text-muted);font-size:11.5px;margin-top:4px;">
+                        Pega la clave oficial generada para tu equipo (Vitalicia o Prueba Real de 7 Días).
+                    </small>
+                </div>
+                <div style="margin-top:16px;">
+                    <button type="submit" class="btn btn-primary" style="padding:12px 24px;font-weight:700;display:flex;align-items:center;gap:8px;">
+                        <i class="fa-solid fa-check-circle"></i> Activar Licencia
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ==========================================
+     PESTAÑA 3: TEMA
+     ========================================== -->
+<div id="tabContentTema" class="config-tab-content @(activeTab == "tema" ? "" : "d-none")">
+    <div class="card" style="max-width:650px;">
+        <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-palette"></i> Color del Tema del Sistema</div>
+        </div>
+        <p style="color:var(--text-muted);font-size:13px;margin-bottom:18px;">
+            Personaliza el color de acento principal del sistema. Puedes cambiarlo aquí o directamente desde la barra superior:
+        </p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:12px;">
+            <button type="button" class="theme-color-opt" data-color="cyan" style="--swatch:#00f2ff;display:flex;align-items:center;gap:10px;width:100%;height:auto;padding:10px 14px;border-radius:10px;background:rgba(0,242,255,0.08);border:1px solid rgba(0,242,255,0.3);text-align:left;">
+                <span style="width:18px;height:18px;border-radius:50%;background:#00f2ff;display:inline-block;flex-shrink:0;"></span>
+                <span style="font-size:13px;color:#f0f0f0;font-weight:500;">Cian Neón</span>
+            </button>
+            <button type="button" class="theme-color-opt" data-color="emerald" style="--swatch:#10b981;display:flex;align-items:center;gap:10px;width:100%;height:auto;padding:10px 14px;border-radius:10px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);text-align:left;">
+                <span style="width:18px;height:18px;border-radius:50%;background:#10b981;display:inline-block;flex-shrink:0;"></span>
+                <span style="font-size:13px;color:#f0f0f0;font-weight:500;">Esmeralda</span>
+            </button>
+            <button type="button" class="theme-color-opt" data-color="orange" style="--swatch:#f97316;display:flex;align-items:center;gap:10px;width:100%;height:auto;padding:10px 14px;border-radius:10px;background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.3);text-align:left;">
+                <span style="width:18px;height:18px;border-radius:50%;background:#f97316;display:inline-block;flex-shrink:0;"></span>
+                <span style="font-size:13px;color:#f0f0f0;font-weight:500;">Naranja</span>
+            </button>
+            <button type="button" class="theme-color-opt" data-color="purple" style="--swatch:#a855f7;display:flex;align-items:center;gap:10px;width:100%;height:auto;padding:10px 14px;border-radius:10px;background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.3);text-align:left;">
+                <span style="width:18px;height:18px;border-radius:50%;background:#a855f7;display:inline-block;flex-shrink:0;"></span>
+                <span style="font-size:13px;color:#f0f0f0;font-weight:500;">Púrpura</span>
+            </button>
+            <button type="button" class="theme-color-opt" data-color="red" style="--swatch:#ef4444;display:flex;align-items:center;gap:10px;width:100%;height:auto;padding:10px 14px;border-radius:10px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);text-align:left;">
+                <span style="width:18px;height:18px;border-radius:50%;background:#ef4444;display:inline-block;flex-shrink:0;"></span>
+                <span style="font-size:13px;color:#f0f0f0;font-weight:500;">Rojo</span>
+            </button>
+            <button type="button" class="theme-color-opt" data-color="gold" style="--swatch:#eab308;display:flex;align-items:center;gap:10px;width:100%;height:auto;padding:10px 14px;border-radius:10px;background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.3);text-align:left;">
+                <span style="width:18px;height:18px;border-radius:50%;background:#eab308;display:inline-block;flex-shrink:0;"></span>
+                <span style="font-size:13px;color:#f0f0f0;font-weight:500;">Dorado</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast flotante para avisos de copiado -->
+<div id="licenseToast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(120px);background:#10b981;color:#fff;font-weight:800;font-size:13.5px;padding:10px 22px;border-radius:30px;box-shadow:0 10px 30px rgba(0,0,0,0.6);transition:transform 0.3s cubic-bezier(0.175,0.885,0.32,1.275);z-index:99999;pointer-events:none;">
+    ✓ Hardware PC ID copiado al portapapeles
+</div>
+
+@section Scripts {
+<script>
+    // Gestión de pestañas de Configuración
+    document.querySelectorAll('.config-tab-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const tab = this.getAttribute('data-tab');
+            switchTab(tab);
+        });
+    });
+
+    function switchTab(tab) {
+        document.querySelectorAll('.config-tab-btn').forEach(b => b.classList.remove('active'));
+        const activeBtn = document.querySelector(`.config-tab-btn[data-tab="${tab}"]`);
+        if (activeBtn) activeBtn.classList.add('active');
+
+        document.getElementById('tabContentGeneral').classList.add('d-none');
+        document.getElementById('tabContentLicencia').classList.add('d-none');
+        document.getElementById('tabContentTema').classList.add('d-none');
+
+        if (tab === 'licencia') {
+            document.getElementById('tabContentLicencia').classList.remove('d-none');
+            window.location.hash = 'licencia';
+        } else if (tab === 'tema') {
+            document.getElementById('tabContentTema').classList.remove('d-none');
+            window.location.hash = 'tema';
+        } else {
+            document.getElementById('tabContentGeneral').classList.remove('d-none');
+            window.location.hash = 'general';
+        }
+    }
+
+    // Comprobar hash o query param al cargar
+    (function() {
+        const hash = window.location.hash.replace('#', '');
+        const urlParams = new URLSearchParams(window.location.search);
+        const tabParam = urlParams.get('tab');
+        if (hash === 'licencia' || tabParam === 'licencia') {
+            switchTab('licencia');
+        } else if (hash === 'tema' || tabParam === 'tema') {
+            switchTab('tema');
+        }
+    })();
+
+    // Copiar Hardware PC ID
+    function copiarPcId() {
+        const input = document.getElementById('pcIdInput');
+        if (!input) return;
+        const texto = input.value.trim();
+
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(texto).then(() => {
+                mostrarToast('✓ Hardware PC ID copiado al portapapeles');
+            }).catch(() => fallbackCopy(texto));
+        } else {
+            fallbackCopy(texto);
+        }
+    }
+
+    function fallbackCopy(texto) {
+        const input = document.getElementById('pcIdInput');
+        input.select();
+        document.execCommand('copy');
+        mostrarToast('✓ Hardware PC ID copiado al portapapeles');
+    }
+
+    function solicitarPorWhatsApp(tipo) {
+        const input = document.getElementById('pcIdInput');
+        const pcId = input ? input.value.trim() : '';
+        let msg = '';
+        if (tipo === 'prueba') {
+            msg = `Hola, quiero activar mi prueba gratuita de 7 días de GymPro.\n\n*Hardware PC ID:*\n${pcId}\n\nMuchas gracias.`;
+        } else if (tipo === 'compra') {
+            msg = `Hola, deseo adquirir la licencia vitalicia definitiva de GymPro.\n\n*Hardware PC ID:*\n${pcId}\n\nMuchas gracias.`;
+        } else if (tipo === 'ya_compre') {
+            msg = `Hola, ya realicé la compra de GymPro y requiero mi clave de activación.\n\n*Hardware PC ID:*\n${pcId}\n\nMuchas gracias.`;
+        } else {
+            msg = `Hola, solicito información sobre la licencia de GymPro.\n\n*Hardware PC ID:*\n${pcId}\n\nMuchas gracias.`;
+        }
+
+        const phone = '@AppSettings.LicenseWhatsApp';
+        let url = 'https://api.whatsapp.com/send?';
+        if (phone && phone.trim() !== '') {
+            url += 'phone=' + encodeURIComponent(phone.trim().replace(/[^0-9]/g, '')) + '&';
+        }
+        url += 'text=' + encodeURIComponent(msg);
+        window.open(url, '_blank');
+    }
+
+    function mostrarToast(msg) {
+        const toast = document.getElementById('licenseToast');
+        if (!toast) return;
+        toast.innerText = msg;
+        toast.style.transform = 'translateX(-50%) translateY(0)';
+        setTimeout(() => {
+            toast.style.transform = 'translateX(-50%) translateY(120px)';
+        }, 2600);
+    }
+    function previewLogo(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const preview = document.getElementById('logoPreviewImg');
+                const placeholder = document.getElementById('logoPlaceholder');
+                const status = document.getElementById('logoPreviewStatus');
+                if (preview) {
+                    preview.src = e.target.result;
+                    preview.style.display = 'inline-block';
+                }
+                if (placeholder) {
+                    placeholder.style.display = 'none';
+                }
+                if (status) {
+                    status.innerHTML = '<span style="color:#38bdf8;font-size:12px;font-weight:500;"><i class="fa-solid fa-eye"></i> Logo listo para guardar (haz clic en Guardar Configuración)</span>';
+                }
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+</script>
+}

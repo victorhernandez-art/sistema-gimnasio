@@ -1,0 +1,189 @@
+@model IEnumerable<GymWeb.Models.Registro>
+@{
+    var socios   = ViewBag.Socios   as List<GymWeb.Models.Socio> ?? new();
+    var socioSel = ViewBag.SocioSel as GymWeb.Models.Socio;
+    int? idSocio = ViewBag.IdSocio;
+    string desde = ViewBag.Desde ?? "";
+    string hasta = ViewBag.Hasta ?? "";
+
+    var dias = new[] { "Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado" };
+    var porDia = Model
+        .Where(r => r.FechaCreacion.HasValue)
+        .GroupBy(r => (int)r.FechaCreacion!.Value.DayOfWeek)
+        .ToDictionary(g => g.Key, g => g.Count());
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><i class="fa-solid fa-chart-bar"></i> Asistencia por Socio</h1>
+        <p class="page-subtitle">Consulta el historial de entradas de un socio en un período</p>
+    </div>
+</div>
+
+<div style="margin-bottom:16px;">
+    <a asp-action="Index" class="btn btn-outline btn-sm">
+        <i class="fa-solid fa-arrow-left"></i> Volver a Reportes
+    </a>
+</div>
+
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header"><div class="card-title"><i class="fa-solid fa-filter"></i> Filtros</div></div>
+    <form method="get" asp-action="Asistencia" style="padding:16px 20px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:16px;align-items:end;">
+            <div>
+                <label class="form-label">Socio</label>
+                <select name="idSocio" class="form-control" id="socioSelect">
+                    <option value="">— Seleccione un socio —</option>
+                    @foreach (var s in socios)
+                    {
+                        if (s.IdSocio == idSocio)
+                        {
+                            <option value="@s.IdSocio" selected>#@s.IdSocio — @s.Nombre @s.Paterno @s.Materno</option>
+                        }
+                        else
+                        {
+                            <option value="@s.IdSocio">#@s.IdSocio — @s.Nombre @s.Paterno @s.Materno</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div>
+                <label class="form-label">Desde</label>
+                <input type="date" name="desde" value="@desde" class="form-control" />
+            </div>
+            <div>
+                <label class="form-label">Hasta</label>
+                <input type="date" name="hasta" value="@hasta" class="form-control" />
+            </div>
+            <div>
+                <button type="submit" class="btn btn-primary" style="width:100%;">
+                    <i class="fa-solid fa-magnifying-glass"></i> Consultar
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+@if (idSocio.HasValue)
+{
+    if (socioSel != null)
+    {
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;">
+            <div class="card" style="padding:18px 20px;">
+                <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Socio</div>
+                <div style="font-size:15px;font-weight:600;">@socioSel.Nombre @socioSel.Paterno</div>
+                <div style="font-size:12px;color:var(--text-muted);">Clave #@socioSel.IdSocio</div>
+            </div>
+            <div class="card" style="padding:18px 20px;">
+                <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Total Visitas</div>
+                <div style="font-size:26px;font-weight:700;color:var(--accent);">@Model.Count()</div>
+            </div>
+            <div class="card" style="padding:18px 20px;">
+                <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Período</div>
+                <div style="font-size:14px;font-weight:600;">@desde.Replace("-","/") — @hasta.Replace("-","/")</div>
+            </div>
+            <div class="card" style="padding:18px 20px;">
+                <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Día más frecuente</div>
+                @if (porDia.Any())
+                {
+                    var maxDia = porDia.OrderByDescending(x => x.Value).First();
+                    <div style="font-size:15px;font-weight:600;">@dias[maxDia.Key]</div>
+                    <div style="font-size:12px;color:var(--text-muted);">@maxDia.Value visita(s)</div>
+                }
+                else
+                {
+                    <div class="text-muted" style="font-size:13px;">—</div>
+                }
+            </div>
+        </div>
+
+        @if (porDia.Any())
+        {
+            <div class="card" style="margin-bottom:20px;">
+                <div class="card-header"><div class="card-title"><i class="fa-solid fa-calendar-week"></i> Distribución por Día</div></div>
+                <div style="padding:16px 20px;display:flex;gap:10px;flex-wrap:wrap;">
+                @for (int d = 0; d < 7; d++)
+                {
+                    var cnt = porDia.ContainsKey(d) ? porDia[d] : 0;
+                    var max = porDia.Any() ? porDia.Values.Max() : 1;
+                    var pct = max > 0 ? (cnt * 100 / max) : 0;
+                    <div style="flex:1;min-width:70px;text-align:center;">
+                        <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">@dias[d]</div>
+                        <div style="background:var(--bg-tertiary);border-radius:6px;height:80px;display:flex;align-items:flex-end;justify-content:center;overflow:hidden;">
+                            <div style="width:100%;background:var(--accent);opacity:0.85;height:@(pct)%;min-height:@(cnt>0?"4px":"0");transition:height 0.3s;"></div>
+                        </div>
+                        <div style="font-size:16px;font-weight:700;margin-top:6px;">@cnt</div>
+                    </div>
+                }
+                </div>
+            </div>
+        }
+    }
+
+    @if (!Model.Any())
+    {
+        <div class="card" style="padding:32px;text-align:center;">
+            <div style="font-size:40px;color:var(--text-muted);margin-bottom:12px;"><i class="fa-solid fa-calendar-xmark"></i></div>
+            <p class="text-muted">No hay registros de asistencia en el período seleccionado.</p>
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title"><i class="fa-solid fa-list"></i> Registro de Entradas (@Model.Count())</div>
+            </div>
+            <div class="table-responsive">
+                <table class="gym-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Fecha y Hora</th>
+                            <th>Día</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @{ int n = Model.Count(); }
+                    @foreach (var r in Model)
+                    {
+                        <tr>
+                            <td class="text-muted" style="font-size:12px;">@n--</td>
+                            <td>
+                                @if (r.FechaCreacion.HasValue)
+                                {
+                                    <span style="font-weight:500;">@r.FechaCreacion.Value.ToString("dd/MM/yyyy")</span>
+                                    <span class="text-muted" style="font-size:12px;margin-left:8px;">@r.FechaCreacion.Value.ToString("HH:mm")</span>
+                                }
+                            </td>
+                            <td>
+                                @if (r.FechaCreacion.HasValue)
+                                {
+                                    <span class="badge badge-info">@dias[(int)r.FechaCreacion.Value.DayOfWeek]</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+}
+else
+{
+    <div class="card" style="padding:32px;text-align:center;">
+        <div style="font-size:40px;color:var(--text-muted);margin-bottom:12px;"><i class="fa-solid fa-user-magnifying-glass"></i></div>
+        <p class="text-muted">Selecciona un socio y un rango de fechas para ver su historial de asistencia.</p>
+    </div>
+}
+
+@section Scripts {
+<script>
+// Enhance select with simple search using datalist-like feel
+// (Keeping as native select for simplicity; upgrade to tom-select if desired)
+document.addEventListener('DOMContentLoaded', function() {
+    var sel = document.getElementById('socioSelect');
+    if (sel) sel.focus();
+});
+</script>
+}

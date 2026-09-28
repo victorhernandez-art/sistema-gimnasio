@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Generador de Licencias — Sistema Gimnasio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090E17;
+      --card-bg: #121A2A;
+      --card-border: #1E293B;
+      --primary: #00F2FF;
+      --primary-hover: #00C4CC;
+      --accent: #10B981;
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+      --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-main);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 540px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 28px 24px;
+      box-shadow: 0 24px 48px rgba(0,0,0,0.6);
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 22px;
+    }
+
+    .header .badge {
+      display: inline-block;
+      background: rgba(0, 242, 255, 0.12);
+      color: #00F2FF;
+      border: 1px solid rgba(0, 242, 255, 0.35);
+      padding: 5px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .header h1 {
+      font-size: 23px;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .header p {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .type-selector {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      background: #0B1120;
+      padding: 6px;
+      border-radius: 12px;
+      border: 1.5px solid var(--card-border);
+      margin-bottom: 18px;
+    }
+
+    .type-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 10px 8px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: var(--font-main);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .type-btn.active {
+      background: #00F2FF;
+      color: #090E17;
+      box-shadow: 0 4px 14px rgba(0, 242, 255, 0.35);
+    }
+
+    .type-btn.active.trial {
+      background: #0284C7;
+      color: #FFFFFF;
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      background: #0B1120;
+      border: 1.5px solid var(--card-border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 14px;
+      color: #FFFFFF;
+      font-family: var(--font-mono);
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    input[type="text"]:focus {
+      border-color: #00F2FF;
+      box-shadow: 0 0 0 3px rgba(0, 242, 255, 0.2);
+    }
+
+    .btn-main {
+      width: 100%;
+      background: linear-gradient(135deg, #00F2FF, #0284C7);
+      color: #090E17;
+      border: none;
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 15px;
+      font-weight: 800;
+      font-family: var(--font-main);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 16px rgba(0, 242, 255, 0.35);
+    }
+
+    .btn-main:active {
+      transform: scale(0.98);
+    }
+
+    .result-card {
+      display: none;
+      margin-top: 20px;
+      background: #0B1120;
+      border: 1.5px solid #10B981;
+      border-radius: 14px;
+      padding: 18px;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .result-card.trial {
+      border-color: #38BDF8;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .result-label {
+      font-size: 11.5px;
+      font-weight: 800;
+      color: #10B981;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    .result-label.trial {
+      color: #38BDF8;
+    }
+
+    .key-display {
+      background: #121A2A;
+      border: 1.5px solid #1E293B;
+      padding: 14px 10px;
+      border-radius: 10px;
+      font-family: var(--font-mono);
+      font-size: 20px;
+      font-weight: 800;
+      text-align: center;
+      color: #00F2FF;
+      letter-spacing: 1.5px;
+      margin-bottom: 8px;
+      user-select: all;
+      word-break: break-all;
+    }
+
+    .key-info-badge {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: center;
+      margin-bottom: 14px;
+    }
+
+    .action-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .btn-action {
+      border: none;
+      border-radius: 8px;
+      padding: 12px 10px;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: var(--font-main);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      text-align: center;
+    }
+
+    .btn-action:active {
+      transform: scale(0.97);
+    }
+
+    .btn-copy-key {
+      background: #1E293B;
+      color: #F8FAFC;
+    }
+
+    .btn-copy-wa {
+      background: #059669;
+      color: #FFFFFF;
+    }
+
+    .btn-direct-wa {
+      width: 100%;
+      background: #25D366;
+      color: #0F172A;
+      font-weight: 800;
+      padding: 12px;
+      border-radius: 8px;
+      border: none;
+      font-size: 13.5px;
+      font-family: var(--font-main);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3);
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(120px);
+      background: #10B981;
+      color: #FFFFFF;
+      font-weight: 800;
+      font-size: 14px;
+      padding: 12px 24px;
+      border-radius: 30px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      z-index: 9999;
+      text-align: center;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="header">
+      <div class="badge">🏋️ Sistema Gimnasio</div>
+      <h1>Generador de Licencias</h1>
+      <p>Genera claves oficiales vitalicias o de prueba de 7 días para Gimnasios</p>
+    </div>
+
+    <!-- Selector de Modalidad -->
+    <div class="type-selector">
+      <button type="button" id="btn-type-vitalicia" class="type-btn active" onclick="setTipo('vitalicia')">
+        ⭐ Licencia Vitalicia
+      </button>
+      <button type="button" id="btn-type-trial" class="type-btn" onclick="setTipo('trial')">
+        ⏳ Prueba Real (7 Días)
+      </button>
+    </div>
+
+    <div class="form-group">
+      <label for="client-name">Nombre del Gimnasio / Cliente (Opcional):</label>
+      <input type="text" id="client-name" placeholder="Ej. Power Gym / Carlos Gómez">
+    </div>
+
+    <div class="form-group">
+      <label for="pc-id">Hardware PC ID del Cliente:</label>
+      <input type="text" id="pc-id" placeholder="Pega el ID aquí (32 caracteres)..." autocomplete="off">
+    </div>
+
+    <button class="btn-main" id="btn-submit" onclick="generarLicencia()">
+      ⚡ Generar Clave GYM
+    </button>
+
+    <div class="result-card" id="result-box">
+      <div class="result-label" id="result-badge">✓ Clave Oficial Vitalicia Gimnasio</div>
+      <div class="key-display" id="key-output">GYM-XXXX-XXXX-XXXX-XXXX</div>
+      <div class="key-info-badge" id="key-info-text">Licencia Oficial Permanente · Sin vencimiento · 100% Offline</div>
+      
+      <div class="action-grid">
+        <button class="btn-action btn-copy-key" onclick="copiarSoloClave()">
+          📋 Copiar Clave
+        </button>
+        <button class="btn-action btn-copy-wa" onclick="copiarMensajeCompleto()">
+          💬 Copiar para WhatsApp
+        </button>
+      </div>
+
+      <button class="btn-direct-wa" onclick="abrirWhatsAppDirecto()">
+        📲 Enviar Directo por WhatsApp
+      </button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">✓ Mensaje copiado</div>
+
+  <script>
+    // Sal secreta oficial y exclusiva para el Sistema de Gimnasio
+    const LICENSE_SECRET = 'SistemaGymPro2025-OficialSalt!XZ9k';
+
+    let tipoActual = 'vitalicia';
+    let claveActual = '';
+    let idFormateado = '';
+    let clienteActual = '';
+    let fechaVenceStr = '';
+
+    function setTipo(tipo) {
+      tipoActual = tipo;
+      document.getElementById('btn-type-vitalicia').classList.toggle('active', tipo === 'vitalicia');
+      document.getElementById('btn-type-trial').classList.toggle('active', tipo === 'trial');
+      
+      if (tipo === 'trial') {
+        document.getElementById('btn-type-trial').classList.add('trial');
+      } else {
+        document.getElementById('btn-type-trial').classList.remove('trial');
+      }
+
+      if (document.getElementById('pc-id').value.trim()) {
+        generarLicencia();
+      }
+    }
+
+    async function hmacSha256(secret, message) {
+      if (window.crypto && crypto.subtle) {
+        try {
+          const enc = new TextEncoder();
+          const key = await crypto.subtle.importKey(
+            'raw',
+            enc.encode(secret),
+            { name: 'HMAC', hash: 'SHA-256' },
+            false,
+            ['sign']
+          );
+          const signature = await crypto.subtle.sign('HMAC', key, enc.encode(message));
+          const hashArray = Array.from(new Uint8Array(signature));
+          return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+        } catch (e) {
+          console.warn('SubtleCrypto error:', e);
+        }
+      }
+      return fallbackHmac(secret, message);
+    }
+
+    function fallbackHmac(key, message) {
+      function sha256(ascii) {
+        function rightRotate(value, amount) { return (value >>> amount) | (value << (32 - amount)); }
+        var mathPow = Math.pow;
+        var maxWord = mathPow(2, 32);
+        var lengthProperty = 'length';
+        var i, j;
+        var result = '';
+        var words = [];
+        var asciiBitLength = ascii[lengthProperty] * 8;
+        var hash = sha256.h = sha256.h || [];
+        var k = sha256.k = sha256.k || [];
+        var primeCounter = k[lengthProperty];
+        var isComposite = {};
+        for (var candidate = 2; primeCounter < 64; candidate++) {
+          if (!isComposite[candidate]) {
+            for (i = 0; i < 300; i += candidate) { isComposite[i] = candidate; }
+            hash[primeCounter] = (mathPow(candidate, .5) * maxWord) | 0;
+            k[primeCounter++] = (mathPow(candidate, 1 / 3) * maxWord) | 0;
+          }
+        }
+        ascii += '\x80';
+        while (ascii[lengthProperty] % 64 - 56) ascii += '\x00';
+        for (i = 0; i < ascii[lengthProperty]; i++) {
+          j = ascii.charCodeAt(i);
+          if (j >> 8) return;
+          words[i >> 2] |= j << ((3 - i) % 4) * 8;
+        }
+        words[words[lengthProperty]] = ((asciiBitLength / maxWord) | 0);
+        words[words[lengthProperty]] = (asciiBitLength);
+        for (j = 0; j < words[lengthProperty];) {
+          var w = words.slice(j, j += 16);
+          var oldHash = hash;
+          hash = hash.slice(0, 8);
+          for (i = 0; i < 64; i++) {
+            var w15 = w[i - 15], w2 = w[i - 2];
+            var a = hash[0], e = hash[4];
+            var temp1 = hash[7]
+              + (rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25))
+              + ((e & hash[5]) ^ ((~e) & hash[6]))
+              + k[i]
+              + (w[i] = (i < 16) ? w[i] : (
+                w[i - 16]
+                + (rightRotate(w15, 7) ^ rightRotate(w15, 18) ^ (w15 >>> 3))
+                + w[i - 7]
+                + (rightRotate(w2, 17) ^ rightRotate(w2, 19) ^ (w2 >>> 10))
+              ) | 0
+              );
+            var temp2 = (rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22))
+              + ((a & hash[1]) ^ (a & hash[2]) ^ (hash[1] & hash[2]));
+            hash = [(temp1 + temp2) | 0].concat(hash);
+            hash[4] = (hash[4] + temp1) | 0;
+          }
+          for (i = 0; i < 8; i++) { hash[i] = (hash[i] + oldHash[i]) | 0; }
+        }
+        for (i = 0; i < 8; i++) {
+          for (j = 3; j + 1; j--) {
+            var b = (hash[i] >> (j * 8)) & 255;
+            result += ((b < 16) ? 0 : '') + b.toString(16);
+          }
+        }
+        return result;
+      }
+
+      var blockSize = 64;
+      if (key.length > blockSize) { key = hexToBin(sha256(key)); }
+      while (key.length < blockSize) { key += '\x00'; }
+      var oKeyPad = '', iKeyPad = '';
+      for (var i = 0; i < blockSize; i++) {
+        oKeyPad += String.fromCharCode(key.charCodeAt(i) ^ 0x5c);
+        iKeyPad += String.fromCharCode(key.charCodeAt(i) ^ 0x36);
+      }
+      function hexToBin(hex) {
+        var str = '';
+        for (var i = 0; i < hex.length; i += 2) str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
+        return str;
+      }
+      return sha256(oKeyPad + hexToBin(sha256(iKeyPad + message))).toUpperCase();
+    }
+
+    async function generarLicencia() {
+      const rawId = document.getElementById('pc-id').value.trim();
+      const rawName = document.getElementById('client-name').value.trim() || 'Gimnasio';
+      const cleanId = rawId.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+
+      if (cleanId.length < 8) {
+        alert('Por favor pega un Hardware PC ID válido (32 caracteres).');
+        return;
+      }
+
+      const resultBox = document.getElementById('result-box');
+      const resultBadge = document.getElementById('result-badge');
+      const keyOutput = document.getElementById('key-output');
+      const keyInfo = document.getElementById('key-info-text');
+
+      idFormateado = cleanId.match(/.{1,4}/g)?.join('-') || cleanId;
+      clienteActual = rawName;
+
+      if (tipoActual === 'trial') {
+        const expDate = new Date();
+        expDate.setDate(expDate.getDate() + 7);
+        const yyyy = expDate.getFullYear();
+        const mm = String(expDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(expDate.getDate()).padStart(2, '0');
+        const dateStr = `${yyyy}${mm}${dd}`;
+
+        const hmacHex = await hmacSha256(LICENSE_SECRET, `${cleanId}:TRIAL:${dateStr}`);
+        const subHex = hmacHex.substring(0, 8).toUpperCase();
+        const g1 = subHex.substring(0, 4);
+        const g2 = subHex.substring(4, 8);
+        claveActual = `GYM7-${dateStr}-${g1}-${g2}`;
+        fechaVenceStr = `${dd}/${mm}/${yyyy}`;
+
+        resultBox.classList.add('trial');
+        resultBadge.classList.add('trial');
+        resultBadge.innerHTML = '⏳ Clave de Prueba (7 Días) Generada';
+        keyInfo.innerHTML = `Vigencia de 7 días completa hasta el <strong>${fechaVenceStr}</strong> (Todas las funciones 100% desbloqueadas)`;
+      } else {
+        const hmacHex = await hmacSha256(LICENSE_SECRET, cleanId);
+        const subHex = hmacHex.substring(0, 16).toUpperCase();
+        const grupos = subHex.match(/.{1,4}/g) || [];
+        claveActual = 'GYM-' + grupos.join('-');
+        fechaVenceStr = 'De por vida';
+
+        resultBox.classList.remove('trial');
+        resultBadge.classList.remove('trial');
+        resultBadge.innerHTML = '✓ Clave Oficial Vitalicia Generada';
+        keyInfo.innerHTML = 'Licencia Oficial Permanente · Sin vencimiento · 100% Offline';
+      }
+
+      keyOutput.innerText = claveActual;
+      resultBox.style.display = 'block';
+      resultBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function obtenerMensajeWhatsApp() {
+      const saludo = clienteActual && clienteActual !== 'Gimnasio' ? `*¡Hola ${clienteActual}!*` : `*¡Hola!*`;
+      
+      if (tipoActual === 'trial') {
+        return `${saludo} Te compartimos tu clave de activación para tu **Prueba Real de 7 Días** en el *Sistema de Gestión para Gimnasios*:
+
+⏳ *Clave de Prueba (7 Días):*
+\`${claveActual}\`
+
+💻 *Hardware PC ID registrado:*
+\`${idFormateado}\`
+
+📅 *Válida hasta:* ${fechaVenceStr} (7 días completos)
+
+*Instrucciones de activación:*
+1. Abre el sistema en tu computadora.
+2. Ve a *Configuración > Licencia*.
+3. Pega tu clave \`${claveActual}\` en la casilla de activación.
+4. Presiona el botón *Activar Licencia*.
+
+¡Listo! Todas las funciones del sistema quedan 100% desbloqueadas para registrar socios, asistencias, cobros de membresías y ventas sin límites. Al término de tu prueba podrás adquirir tu clave vitalicia conservando todos tus datos. 🚀🏋️`;
+      }
+
+      return `${saludo} Muchas gracias por tu compra y preferencia. 🙌🏋️
+
+Te compartimos tu clave de licencia oficial vitalicia para activar el *Sistema de Gestión para Gimnasios*:
+
+🔑 *Clave de Licencia Vitalicia:*
+\`${claveActual}\`
+
+💻 *Hardware PC ID registrado:*
+\`${idFormateado}\`
+
+*Instrucciones de activación:*
+1. Abre el sistema en tu computadora.
+2. Ve a *Configuración > Licencia*.
+3. Pega tu clave \`${claveActual}\` en la casilla de activación.
+4. Presiona el botón *Activar Licencia*.
+
+¡Listo! Tu sistema queda activado de por vida de forma 100% offline, permanente e ilimitada. Quedamos a tus órdenes para cualquier duda o soporte. 🚀`;
+    }
+
+    function copiarTextoUniversal(texto, toastMsg) {
+      if (!texto) return;
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(texto).then(function() {
+          mostrarToast(toastMsg);
+        }).catch(function() {
+          ejecutarFallback(texto, toastMsg);
+        });
+        return;
+      }
+      ejecutarFallback(texto, toastMsg);
+    }
+
+    function ejecutarFallback(texto, toastMsg) {
+      var textarea = document.createElement('textarea');
+      textarea.value = texto;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.top = '0';
+      textarea.style.left = '0';
+      textarea.style.opacity = '0';
+      textarea.style.pointerEvents = 'none';
+      document.body.appendChild(textarea);
+      
+      textarea.focus();
+      textarea.select();
+      textarea.setSelectionRange(0, textarea.value.length);
+
+      try {
+        var exito = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        if (exito) {
+          mostrarToast(toastMsg);
+        } else {
+          prompt('Copia manualmente:', texto);
+        }
+      } catch (err) {
+        document.body.removeChild(textarea);
+        prompt('Copia manualmente:', texto);
+      }
+    }
+
+    function mostrarToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.innerText = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2800);
+    }
+
+    function copiarSoloClave() {
+      if (!claveActual) return;
+      copiarTextoUniversal(claveActual, '✓ Clave ' + claveActual + ' copiada');
+    }
+
+    function copiarMensajeCompleto() {
+      if (!claveActual) return;
+      const msg = obtenerMensajeWhatsApp();
+      copiarTextoUniversal(msg, '✓ Mensaje para el cliente copiado');
+    }
+
+    function abrirWhatsAppDirecto() {
+      if (!claveActual) return;
+      const msg = obtenerMensajeWhatsApp();
+      const url = 'https://api.whatsapp.com/send?text=' + encodeURIComponent(msg);
+      window.open(url, '_blank');
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,426 @@
+@model IEnumerable<GymWeb.Models.Vwultimamembresiadetalladum>
+@using GymWeb.Helpers
+
+@* Token form for scan zone JS *@
+<form id="scanForm" asp-action="Registrar" method="post" style="display:none;">
+    @Html.AntiForgeryToken()
+    <input type="hidden" id="scanIdSocio" name="idSocio" />
+</form>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible">
+        <i class="fa-solid fa-circle-check"></i> @TempData["Success"]
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible">
+        <i class="fa-solid fa-circle-xmark"></i> @TempData["Error"]
+    </div>
+}
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title"><i class="fa-solid fa-clipboard-list"></i> Registro de Visitas</div>
+        <a asp-action="Historial" class="btn btn-outline btn-sm">
+            <i class="fa-solid fa-clock-rotate-left"></i> Historial
+        </a>
+    </div>
+
+    <div class="scan-zone">
+        <div class="scan-zone-title">
+            <i class="fa-solid fa-fingerprint"></i>
+            <div>
+                <div style="font-weight:600;font-size:15px;">Lector de huella / Clave de socio</div>
+                <div class="text-muted" style="font-size:12px;">Escanee la huella digital o ingrese la clave del socio y presione Enter</div>
+            </div>
+        </div>
+        <div class="scan-input-row">
+            <input type="number" id="scanInput" class="scan-input" placeholder="0000" autocomplete="off" min="1" />
+            <button type="button" class="btn btn-outline btn-sm" id="btnBuscar" style="height:48px;padding:0 18px;">
+                <i class="fa-solid fa-magnifying-glass"></i> Buscar
+            </button>
+        </div>
+        <div id="scanResult" style="display:none;" class="scan-result"></div>
+    </div>
+
+    @* ── Visita de día ── *@
+    <div class="visit-day-zone">
+        <div class="scan-zone-title" style="margin-bottom:10px;">
+            <i class="fa-solid fa-person-walking-arrow-right" style="font-size:22px;color:var(--accent-2,#a78bfa);"></i>
+            <div>
+                <div style="font-weight:600;font-size:14px;">
+                    Visita de día
+                    @if ((decimal)ViewBag.PrecioVisita > 0)
+                    {
+                        <span style="margin-left:8px;font-size:13px;font-weight:400;color:#4ade80;">
+                            — $@(((decimal)ViewBag.PrecioVisita).ToString("N2")) c/u
+                        </span>
+                    }
+                </div>
+                <div class="text-muted" style="font-size:12px;">Personas que no son socios — ingrese nombre y registre</div>
+            </div>
+        </div>
+        <form asp-action="RegistrarVisita" method="post" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            @Html.AntiForgeryToken()
+            <input type="text" name="nombreVisita" class="form-control"
+                   placeholder="Nombre del visitante" maxlength="150" required
+                   style="max-width:300px;" autocomplete="off" />
+            <button type="submit" class="btn btn-sm" style="background:rgba(167,139,250,0.15);border:1px solid rgba(167,139,250,0.4);color:#a78bfa;height:40px;padding:0 16px;white-space:nowrap;">
+                <i class="fa-solid fa-right-to-bracket"></i> Registrar Visita
+            </button>
+        </form>
+    </div>
+
+    <div class="toolbar">
+        <div class="search-box">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input id="tableSearch" type="text" placeholder="Buscar socio por nombre..." />
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="gym-table">
+            <thead>
+                <tr>
+                    <th>Clave</th>
+                    <th>Socio</th>
+                    <th>Membresía</th>
+                    <th>Vencimiento</th>
+                    <th>Teléfono</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var v in Model)
+            {
+                var vencido    = v.Vencimiento.HasValue && v.Vencimiento.Value < DateTime.Now;
+                int? diasRest  = v.Vencimiento.HasValue && !vencido
+                    ? (int)Math.Ceiling((v.Vencimiento.Value - DateTime.Now).TotalDays) : null;
+                var porVencer  = diasRest.HasValue && diasRest.Value <= AppSettings.DiasAviso;
+                <tr>
+                    <td><span class="badge badge-info" style="font-family:'Inter',monospace;">@v.IdSocio</span></td>
+                    <td>
+                        @if (v.IdSocio.HasValue)
+                        {
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <img src="/Socios/GetFoto/@v.IdSocio" class="socio-avatar"
+                                     onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';" />
+                                <span class="socio-avatar-icon" style="display:none;"><i class="fa-solid fa-user"></i></span>
+                                <span class="name-cell">@v.NombreSocio @v.Paterno @v.Materno</span>
+                            </div>
+                        }
+                    </td>
+                    <td style="font-size:13px;">@v.NombreMembresia</td>
+                    <td>
+                        @if (!v.Vencimiento.HasValue)
+                        {
+                            <span class="badge badge-info">Sin membresía</span>
+                        }
+                        else if (vencido)
+                        {
+                            <span class="badge badge-danger"><i class="fa-solid fa-circle-xmark"></i> Vencida @v.Vencimiento?.ToString("dd/MM/yy")</span>
+                        }
+                        else if (porVencer)
+                        {
+                            <span class="badge badge-warning" title="Vence en @diasRest día@(diasRest == 1 ? "" : "s")">
+                                <i class="fa-solid fa-triangle-exclamation"></i> @v.Vencimiento?.ToString("dd/MM/yy") &mdash; @diasRest día@(diasRest == 1 ? "" : "s")
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-success"><i class="fa-solid fa-circle-check"></i> @v.Vencimiento?.ToString("dd/MM/yy")</span>
+                        }
+                    </td>
+                    <td class="text-muted" style="font-size:13px;">@v.Telefono</td>
+                    <td>
+                        @if (!vencido && v.IdSocio.HasValue)
+                        {
+                            <form asp-action="Registrar" method="post" style="margin:0;">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="idSocio" value="@v.IdSocio" />
+                                <button type="submit" class="btn btn-primary btn-sm">
+                                    <i class="fa-solid fa-right-to-bracket"></i> Registrar
+                                </button>
+                            </form>
+                        }
+                        else
+                        {
+                            <span class="text-muted" style="font-size:12px;">—</span>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ── Biometric confirmation modal ── -->
+<div id="bioModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;align-items:center;justify-content:center;">
+    <div id="bioModalBox" style="background:#111827;border:1px solid var(--border);border-radius:20px;padding:36px 40px;width:100%;max-width:420px;text-align:center;box-shadow:0 32px 64px rgba(0,0,0,0.7);position:relative;">
+        <!-- Status bar top -->
+        <div id="bioStatus" style="position:absolute;top:0;left:0;right:0;height:5px;border-radius:20px 20px 0 0;background:var(--accent);transition:background 0.3s;"></div>
+
+        <img id="bioFoto" src="" alt=""
+             style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--accent);margin-bottom:16px;display:block;margin-left:auto;margin-right:auto;" />
+        <div id="bioAvatarIcon" style="display:none;width:100px;height:100px;border-radius:50%;background:rgba(0,242,255,0.1);border:3px solid var(--accent);align-items:center;justify-content:center;font-size:40px;color:var(--accent);margin:0 auto 16px;">
+            <i class="fa-solid fa-user"></i>
+        </div>
+
+        <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Acceso registrado</div>
+        <div id="bioNombre" style="font-size:22px;font-weight:700;margin-bottom:4px;"></div>
+        <div id="bioMembresia" style="font-size:13px;color:var(--text-muted);margin-bottom:12px;"></div>
+
+        <div id="bioBadge" style="margin-bottom:20px;"></div>
+
+        <div style="font-size:32px;font-weight:700;color:#4ade80;letter-spacing:2px;margin-bottom:8px;">
+            <i class="fa-solid fa-circle-check"></i> REGISTRADO
+        </div>
+        <div id="bioHora" style="font-size:13px;color:var(--text-muted);margin-bottom:20px;"></div>
+
+        <!-- Countdown bar -->
+        <div style="height:4px;background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden;">
+            <div id="bioCountdown" style="height:100%;background:var(--accent);width:100%;transition:width linear;"></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Cerrando automáticamente...</div>
+    </div>
+</div>
+
+<!-- Error modal -->
+<div id="bioErrorModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:#111827;border:1px solid rgba(239,68,68,0.4);border-radius:16px;padding:28px 32px;width:100%;max-width:360px;text-align:center;box-shadow:0 24px 48px rgba(0,0,0,0.7);">
+        <div style="font-size:40px;color:#f87171;margin-bottom:12px;"><i class="fa-solid fa-circle-xmark"></i></div>
+        <div id="bioErrorMsg" style="font-size:15px;font-weight:600;color:#f87171;margin-bottom:8px;"></div>
+        <div id="bioErrorSub" style="font-size:12px;color:var(--text-muted);margin-bottom:20px;"></div>
+        <button onclick="document.getElementById('bioErrorModal').style.display='none';document.getElementById('scanInput').value='';document.getElementById('scanInput').focus();" class="btn btn-outline btn-sm">Cerrar</button>
+    </div>
+</div>
+<!-- ── Modal confirmación segunda entrada ── -->
+<div id="bioSegundaModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10000;align-items:center;justify-content:center;">
+    <div style="background:#111827;border:1px solid rgba(251,191,36,0.4);border-radius:20px;padding:36px 40px;width:100%;max-width:420px;text-align:center;box-shadow:0 32px 64px rgba(0,0,0,0.7);">
+        <div style="font-size:48px;color:#fbbf24;margin-bottom:16px;"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <div style="font-size:13px;letter-spacing:2px;text-transform:uppercase;color:#fbbf24;margin-bottom:8px;">Segunda Entrada</div>
+        <div id="bioSegundaMsg" style="font-size:16px;font-weight:700;margin-bottom:6px;"></div>
+        <div style="font-size:13px;color:var(--text-muted);margin-bottom:28px;">Este socio ya fue registrado hoy.<br>¿Confirmas una segunda entrada?</div>
+        <div style="display:flex;gap:12px;justify-content:center;">
+            <button id="btnCancelarSegunda" class="btn btn-outline btn-sm" style="min-width:120px;">
+                <i class="fa-solid fa-xmark"></i> Cancelar
+            </button>
+            <button id="btnConfirmarSegunda" class="btn btn-primary btn-sm" style="min-width:150px;background:rgba(251,191,36,0.15);border-color:rgba(251,191,36,0.5);color:#fbbf24;">
+                <i class="fa-solid fa-right-to-bracket"></i> Sí, registrar
+            </button>
+        </div>
+    </div>
+</div>
+
+
+<script>
+(function(){
+    const scanInput  = document.getElementById('scanInput');
+    const scanResult = document.getElementById('scanResult');
+    // keep old scanForm / hiddenId for table-row Registrar fallback
+    const scanForm   = document.getElementById('scanForm');
+    const hiddenId   = document.getElementById('scanIdSocio');
+    const csrfToken  = document.querySelector('#scanForm input[name="__RequestVerificationToken"]')?.value ?? '';
+
+    scanInput.focus();
+
+    // ── Auto-register: search then immediately register, show modal ──
+    async function registrarBiometrico(id, forzar = false) {
+        scanResult.style.display = 'none';
+        if (!id || id < 1) return;
+        if (id == 1000) {
+            mostrarError('Clave de visita de día', 'Use el formulario "Visita de día" para registrar visitantes sin membresía');
+            return;
+        }
+        if (id < 1001) {
+            mostrarError('Clave inválida', `La clave ${id} no corresponde a ningún socio registrado`);
+            return;
+        }
+        try {
+            // Step 1: quick lookup (omitir si ya vamos a forzar)
+            if (!forzar) {
+                const resLookup = await fetch(`/Registro/BuscarSocio?id=${id}`);
+                const data = await resLookup.json();
+
+                if (!data.found) {
+                    mostrarError('Socio no encontrado', `Clave ingresada: ${id}`);
+                    return;
+                }
+                if (data.vencido || data.sinMembresia) {
+                    mostrarError(
+                        data.vencido ? 'Membresía vencida' : 'Sin membresía activa',
+                        `${data.nombre} — no puede registrar entrada`
+                    );
+                    return;
+                }
+            }
+
+            // Step 2: register via AJAX
+            const fd = new FormData();
+            fd.append('idSocio', id);
+            fd.append('__RequestVerificationToken', csrfToken);
+            if (forzar) fd.append('forzar', 'true');
+            const endpoint = forzar ? '/Registro/RegistrarAjaxForzado' : '/Registro/RegistrarAjax';
+            const resReg = await fetch(endpoint, { method: 'POST', body: fd });
+            const reg    = await resReg.json();
+
+            if (!reg.ok) {
+                // Doble check-in detectado → mostrar modal de confirmación
+                if (reg.yaRegistrado) {
+                    mostrarModalSegundaEntrada(id, reg.msg);
+                    return;
+                }
+                mostrarError('Error al registrar', reg.msg ?? '');
+                return;
+            }
+
+            mostrarModal(reg);
+        } catch(e) {
+            mostrarError('Error de conexión', 'No se pudo conectar al servidor.');
+        }
+    }
+
+    // ── Modal de confirmación de segunda entrada ──────────────────────
+    let _idPendiente = null;
+    function mostrarModalSegundaEntrada(id, msg) {
+        _idPendiente = id;
+        document.getElementById('bioSegundaMsg').textContent = msg || 'Socio ya registrado hoy';
+        document.getElementById('bioSegundaModal').style.display = 'flex';
+        scanInput.value = '';
+    }
+
+    document.getElementById('btnCancelarSegunda').addEventListener('click', () => {
+        document.getElementById('bioSegundaModal').style.display = 'none';
+        _idPendiente = null;
+        scanInput.value = '';
+        scanInput.focus();
+    });
+
+    document.getElementById('btnConfirmarSegunda').addEventListener('click', async () => {
+        document.getElementById('bioSegundaModal').style.display = 'none';
+        const id = _idPendiente;
+        _idPendiente = null;
+        if (id) await registrarBiometrico(id, true); // forzar = true
+    });
+
+    function mostrarError(titulo, sub) {
+        document.getElementById('bioErrorMsg').textContent = titulo;
+        document.getElementById('bioErrorSub').textContent = sub;
+        document.getElementById('bioErrorModal').style.display = 'flex';
+        scanInput.value = '';
+        setTimeout(() => {
+            document.getElementById('bioErrorModal').style.display = 'none';
+            scanInput.focus();
+        }, 3500);
+    }
+
+    function mostrarModal(reg) {
+        const modal    = document.getElementById('bioModal');
+        const foto     = document.getElementById('bioFoto');
+        const avatar   = document.getElementById('bioAvatarIcon');
+        const status   = document.getElementById('bioStatus');
+        const countdown = document.getElementById('bioCountdown');
+        const DURATION = 4000; // ms before auto-close
+
+        document.getElementById('bioNombre').textContent    = reg.nombre;
+        document.getElementById('bioMembresia').textContent = reg.membresia;
+        document.getElementById('bioHora').textContent      = 'Registrado el ' + new Date().toLocaleString('es-MX', {dateStyle:'short', timeStyle:'short'});
+
+        // Badge
+        let badgeHtml = '';
+        if (reg.yaRegistrado)
+            badgeHtml += '<div style="font-size:12px;color:#fbbf24;margin-bottom:6px;"><i class="fa-solid fa-triangle-exclamation"></i> Ya había registrado entrada hoy</div>';
+        if (reg.vencido)
+            badgeHtml = '<span class="badge badge-danger"><i class="fa-solid fa-circle-xmark"></i> Membresía vencida</span>';
+        else if (reg.sinMem)
+            badgeHtml = '<span class="badge badge-warning" style="font-size:13px;"><i class="fa-solid fa-triangle-exclamation"></i> Sin membresía</span>';
+        else if (reg.porVencer)
+            badgeHtml = `<span class="badge badge-warning" style="font-size:13px;padding:6px 14px;"><i class="fa-solid fa-triangle-exclamation"></i> Vence en ${reg.diasRestantes} día${reg.diasRestantes === 1 ? '' : 's'} — ${reg.vencimiento}</span>`;
+        else
+            badgeHtml = `<span class="badge badge-success" style="font-size:13px;padding:6px 14px;"><i class="fa-solid fa-circle-check"></i> Vigente hasta ${reg.vencimiento}</span>`;
+        document.getElementById('bioBadge').innerHTML = badgeHtml;
+
+        // Status bar color
+        status.style.background = reg.vencido || reg.sinMem ? '#ef4444' : reg.porVencer ? '#fbbf24' : '#4ade80';
+
+        // Photo
+        foto.src = `/Socios/GetFoto/${reg.idSocio}`;
+        foto.style.display = 'block';
+        avatar.style.display = 'none';
+        foto.onerror = () => { foto.style.display = 'none'; avatar.style.display = 'flex'; };
+
+        modal.style.display = 'flex';
+
+        // Countdown animation
+        countdown.style.transition = 'none';
+        countdown.style.width = '100%';
+        requestAnimationFrame(() => {
+            setTimeout(() => {
+                countdown.style.transition = `width ${DURATION}ms linear`;
+                countdown.style.width = '0%';
+            }, 50);
+        });
+
+        // Auto-close
+        setTimeout(() => {
+            modal.style.display = 'none';
+            scanInput.value = '';
+            scanInput.focus();
+            // Reload table row data softly
+            location.reload();
+        }, DURATION);
+    }
+
+    // ── Keyboard/HID input (numeric keypad or barcode scanner works the same) ──
+    document.getElementById('btnBuscar').addEventListener('click', () => registrarBiometrico(scanInput.value));
+    scanInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); registrarBiometrico(scanInput.value); }
+    });
+
+    // ── ZKTeco / SDK bridge via Server-Sent Events ──
+    // Listens to a local Node.js/Python bridge running at http://localhost:4500/finger
+    // Bridge sends: data: {"id": 1009}\n\n  when a fingerprint is matched
+    // See README for bridge setup instructions
+    (function connectFingerprintBridge() {
+        if (typeof EventSource === 'undefined') return;
+        try {
+            const es = new EventSource('http://localhost:4500/finger');
+            es.onmessage = function(e) {
+                try {
+                    const payload = JSON.parse(e.data);
+                    if (payload.id) registrarBiometrico(payload.id);
+                } catch(_) {}
+            };
+            es.onerror = function() {
+                // Bridge not running — silently ignore, HID mode still works
+                es.close();
+            };
+        } catch(_) {}
+    })();
+
+    // ── Close modals on Escape key ──
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+            document.getElementById('bioModal').style.display = 'none';
+            document.getElementById('bioErrorModal').style.display = 'none';
+            scanInput.value = '';
+            scanInput.focus();
+        }
+    });
+
+    // ── Validación formulario Visita de día ──
+    document.querySelector('.visit-day-zone form').addEventListener('submit', function(e) {
+        const val = this.querySelector('input[name="nombreVisita"]').value.trim();
+        if (/^\d+$/.test(val)) {
+            if (parseInt(val, 10) !== 1000) {
+                e.preventDefault();
+                mostrarError('Número no válido', 'Solo se permite el número 1000 o el nombre de la persona.');
+                return false;
+            }
+        }
+    });
+})();
+</script>

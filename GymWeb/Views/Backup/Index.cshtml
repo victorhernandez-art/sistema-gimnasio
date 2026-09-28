@@ -1,0 +1,330 @@
+@model List<GymWeb.Controllers.BackupFileInfo>
+@{
+    ViewData["Title"] = "Respaldo de Base de Datos";
+}
+
+<div class="page-header">
+    <h2><i class="fa-solid fa-database"></i> Respaldo de Base de Datos</h2>
+    <p style="color:var(--text-muted);margin-top:4px;font-size:14px;">Genera y descarga copias de seguridad del sistema para proteger tu información.</p>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success" style="margin-bottom:20px;">
+        <i class="fa-solid fa-circle-check"></i> @TempData["Success"]
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger" style="margin-bottom:20px;">
+        <i class="fa-solid fa-circle-exclamation"></i> @TempData["Error"]
+    </div>
+}
+
+@if (ViewData["IsMySql"] is true)
+{
+    <!-- Migration card destacada arriba -->
+    <div class="card" style="max-width:700px;margin-bottom:28px;border:1.5px solid #3b82f6;background:linear-gradient(135deg, rgba(37,99,235,0.14), rgba(15,23,42,0.95));border-radius:14px;padding:24px;box-shadow:0 8px 25px rgba(37,99,235,0.22);">
+        <div style="display:flex;align-items:flex-start;gap:18px;">
+            <div style="width:48px;height:48px;border-radius:12px;background:rgba(59,130,246,0.2);border:1px solid rgba(59,130,246,0.4);display:flex;align-items:center;justify-content:center;color:#60a5fa;font-size:24px;flex-shrink:0;">
+                <i class="fa-solid fa-arrows-rotate"></i>
+            </div>
+            <div style="flex:1;">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+                    <h3 style="font-size:17px;font-weight:800;margin:0;color:#f8fafc;">
+                        Modo Autónomo — Migrar de MySQL a SQLite
+                    </h3>
+                    <span style="background:rgba(59,130,246,0.25);color:#93c5fd;border:1px solid rgba(59,130,246,0.4);font-size:11px;font-weight:800;padding:2px 10px;border-radius:20px;">Recomendado</span>
+                </div>
+                <p style="color:#cbd5e1;font-size:13px;line-height:1.5;margin-bottom:14px;">
+                    Actualmente el sistema está conectado a <strong>MySQL (XAMPP)</strong>.<br>
+                    Haz clic en el botón de abajo para transferir <strong>el 100% de tus datos actuales</strong> (socios, fotos, huellas dactilares, membresías, pagos, ventas y configuración) al archivo local autónomo <code>gym.db</code>.
+                    <br><strong style="color:#38bdf8;"><i class="fa-solid fa-shield-check"></i> Tus datos en MySQL quedan 100% seguros y respaldados. Después de migrar, el sistema no volverá a requerir XAMPP.</strong>
+                </p>
+                <form method="post" asp-action="MigrarASqlite" onsubmit="return confirm('¿Deseas transferir todos tus datos de MySQL a SQLite ahora? Se preservará una copia idéntica de seguridad.');">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-primary" style="background:linear-gradient(135deg, #2563eb, #00f2ff);color:#0B1120;font-weight:800;font-size:14px;padding:12px 24px;border-radius:10px;display:inline-flex;align-items:center;gap:8px;border:none;cursor:pointer;box-shadow:0 4px 14px rgba(0,242,255,0.35);">
+                        <i class="fa-solid fa-bolt"></i> Transferir Datos a SQLite Ahora (1 Clic)
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Generate backup card -->
+<div class="card" style="max-width:600px;margin-bottom:28px;">
+    <h3 style="font-size:16px;font-weight:600;margin-bottom:8px;"><i class="fa-solid fa-floppy-disk" style="color:var(--accent);margin-right:8px;"></i>Generar nuevo respaldo</h3>
+    <p style="color:var(--text-muted);font-size:13px;margin-bottom:18px;">
+        Se exportará toda la base de datos @(ViewData["IsMySql"] is true ? "en formato .sql (MySQL)" : "en formato .db (SQLite)"). Puedes descargarlo y guardarlo en un lugar seguro.
+    </p>
+    <form method="post" asp-action="Generate">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="btn btn-primary" style="gap:8px;">
+            <i class="fa-solid fa-download"></i> Generar respaldo ahora
+        </button>
+    </form>
+</div>
+
+<!-- Import / Restore from PC card -->
+<div class="card" style="max-width:600px;margin-bottom:28px;border:1px solid rgba(16,185,129,0.35);background:rgba(16,185,129,0.04);">
+    <h3 style="font-size:16px;font-weight:600;margin-bottom:8px;color:#34d399;">
+        <i class="fa-solid fa-file-import" style="margin-right:8px;"></i>Importar y Restaurar Respaldo
+    </h3>
+    <p style="color:var(--text-muted);font-size:13px;margin-bottom:16px;line-height:1.5;">
+        Sube un archivo de respaldo <strong>@(ViewData["IsMySql"] is true ? ".sql (MySQL)" : ".db (SQLite)")</strong> desde tu computadora para restablecer el sistema.
+        <br><span style="color:#38bdf8;font-size:12px;"><i class="fa-solid fa-shield-halved"></i> <strong>Máxima Seguridad:</strong> El sistema genera automáticamente un punto de respaldo preventivo antes de restaurar para proteger tus datos actuales.</span>
+    </p>
+
+    <form method="post" asp-action="UploadAndRestore" enctype="multipart/form-data" id="formUploadRestore">
+        @Html.AntiForgeryToken()
+        <div style="margin-bottom:14px;">
+            <input type="file" name="archivoRespaldo" id="inputArchivoRespaldo" accept="@(ViewData["IsMySql"] is true ? ".sql" : ".db,.sqlite,.sqlite3")" style="display:none;" onchange="onFileRespaldoSelected(this)" />
+            <div onclick="document.getElementById('inputArchivoRespaldo').click()"
+                 id="dropZoneRespaldo"
+                 style="border:2px dashed rgba(52,211,153,0.35);border-radius:12px;padding:22px;text-align:center;cursor:pointer;background:rgba(15,23,42,0.4);transition:all 0.2s;"
+                 onmouseover="this.style.borderColor='#34d399';this.style.background='rgba(16,185,129,0.08)';"
+                 onmouseout="this.style.borderColor='rgba(52,211,153,0.35)';this.style.background='rgba(15,23,42,0.4)';">
+                <i class="fa-solid fa-cloud-arrow-up" style="font-size:32px;color:#34d399;margin-bottom:8px;display:block;"></i>
+                <span style="font-size:13.5px;color:#f8fafc;font-weight:600;" id="labelNombreArchivo">Haz clic para seleccionar el archivo @(ViewData["IsMySql"] is true ? ".sql" : ".db") desde tu PC</span>
+                <div style="font-size:11.5px;color:var(--text-muted);margin-top:4px;" id="labelDetalleArchivo">o arrastra tu archivo de respaldo aquí</div>
+            </div>
+        </div>
+        <button type="button" id="btnIniciarRestauracion" onclick="confirmarRestauracionArchivo()" class="btn btn-sm"
+                style="background:linear-gradient(135deg, #10b981 0%, #059669 100%);color:#fff;font-weight:700;gap:8px;padding:10px 20px;display:none;box-shadow:0 4px 14px rgba(16,185,129,0.3);">
+            <i class="fa-solid fa-rotate-left"></i> Restaurar base de datos ahora
+        </button>
+    </form>
+</div>
+
+<!-- Backup list -->
+<div class="card">
+    <h3 style="font-size:16px;font-weight:600;margin-bottom:16px;"><i class="fa-solid fa-clock-rotate-left" style="color:var(--accent);margin-right:8px;"></i>Respaldos generados</h3>
+
+    @if (!Model.Any())
+    {
+        <div style="text-align:center;padding:40px 0;color:var(--text-muted);">
+            <i class="fa-solid fa-box-open" style="font-size:36px;display:block;margin-bottom:12px;opacity:0.4;"></i>
+            <p>No hay respaldos aún. Genera el primero.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrapper">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Archivo</th>
+                        <th>Tamaño</th>
+                        <th>Fecha</th>
+                        <th style="text-align:right;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var f in Model)
+                    {
+                        <tr>
+                            <td>
+                                <i class="fa-solid fa-file-code" style="color:var(--accent);margin-right:6px;"></i>
+                                @f.FileName
+                            </td>
+                            <td style="color:var(--text-muted);">
+                                @if (f.SizeKb >= 1024)
+                                {
+                                    <span>@((f.SizeKb / 1024.0).ToString("0.0")) MB</span>
+                                }
+                                else
+                                {
+                                    <span>@f.SizeKb KB</span>
+                                }
+                            </td>
+                            <td style="color:var(--text-muted);">@f.Created.ToString("dd/MM/yyyy HH:mm")</td>
+                            <td style="text-align:right;white-space:nowrap;">
+                                <button type="button" class="btn btn-sm"
+                                        style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.35);margin-right:6px;font-weight:600;"
+                                        onclick="confirmarRestauracionExistente('@f.FileName')"
+                                        title="Restaurar base de datos a este respaldo">
+                                    <i class="fa-solid fa-rotate-left"></i> Restaurar
+                                </button>
+                                <a asp-action="Download" asp-route-fileName="@f.FileName"
+                                   class="btn btn-sm btn-secondary" style="margin-right:6px;" title="Descargar archivo a tu PC">
+                                    <i class="fa-solid fa-download"></i> Descargar
+                                </a>
+                                <form method="post" asp-action="Delete" style="display:inline;"
+                                      onsubmit="return confirm('¿Eliminar este respaldo?');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="fileName" value="@f.FileName" />
+                                    <button type="submit" class="btn btn-sm" style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);" title="Eliminar respaldo">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<!-- Danger zone -->
+<div class="card" style="max-width:600px;margin-top:28px;border:1px solid rgba(239,68,68,0.35);background:rgba(239,68,68,0.05);">
+    <h3 style="font-size:16px;font-weight:600;margin-bottom:8px;color:#f87171;">
+        <i class="fa-solid fa-triangle-exclamation" style="margin-right:8px;"></i>Zona de peligro — Limpiar base de datos
+    </h3>
+    <p style="color:var(--text-muted);font-size:13px;margin-bottom:18px;">
+        Esta acción <strong style="color:#f87171;">eliminará todos los registros</strong> del sistema: socios, membresías, productos, pagos, visitas y más.<br>
+        La configuración y los usuarios <strong>no se borrarán</strong>.<br>
+        <span style="color:#f87171;font-weight:600;">Esta acción es irreversible.</span> Se recomienda generar un respaldo antes de continuar.
+    </p>
+    <button type="button" class="btn btn-sm" onclick="document.getElementById('modalLimpiar').style.display='flex'"
+            style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.4);font-weight:600;">
+        <i class="fa-solid fa-trash-can"></i> Limpiar todos los registros
+    </button>
+</div>
+
+<!-- Form oculto para restaurar respaldo existente -->
+<form method="post" asp-action="RestoreFile" id="formRestoreExisting" style="display:none;">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="fileName" id="hiddenRestoreFileName" />
+</form>
+
+<!-- Modal Confirmar Restauración -->
+<div id="modalRestaurar" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:99999;align-items:center;justify-content:center;backdrop-filter:blur(3px);">
+    <div style="background:#161f30;border:1px solid rgba(52,211,153,0.4);border-radius:16px;padding:32px;max-width:460px;width:90%;box-shadow:0 24px 80px rgba(0,0,0,0.8);text-align:center;">
+        <div style="width:58px;height:58px;border-radius:50%;background:rgba(16,185,129,0.15);color:#34d399;font-size:26px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px auto;border:2px solid #34d399;">
+            <i class="fa-solid fa-rotate-left"></i>
+        </div>
+        <h3 style="font-size:18px;font-weight:700;color:#ffffff;margin-bottom:8px;">¿Confirmas restaurar este respaldo?</h3>
+        
+        <div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:12px;margin:16px 0;word-break:break-all;">
+            <span style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px;">Archivo que se restaurará:</span>
+            <strong id="restaurarTargetText" style="color:#38bdf8;font-size:13px;">—</strong>
+        </div>
+
+        <p style="color:#cbd5e1;font-size:12.5px;line-height:1.5;margin-bottom:20px;text-align:left;">
+            <i class="fa-solid fa-shield-halved" style="color:#34d399;margin-right:6px;"></i>
+            <strong>Punto preventivo:</strong> Se creará una copia automática de tus datos actuales antes de aplicar los cambios.
+            <br><br>
+            <i class="fa-solid fa-triangle-exclamation" style="color:#fbbf24;margin-right:6px;"></i>
+            Los registros actuales se reemplazarán por el contenido del archivo de respaldo.
+        </p>
+
+        <div style="display:flex;gap:12px;justify-content:center;">
+            <button type="button" onclick="cerrarModalRestaurar()" class="btn btn-secondary" style="flex:1;">
+                <i class="fa-solid fa-xmark"></i> Cancelar
+            </button>
+            <button type="button" id="btnEjecutarRestauracionFinal" onclick="ejecutarRestauracion()" class="btn"
+                    style="flex:1.2;background:linear-gradient(135deg, #10b981 0%, #059669 100%);color:#fff;font-weight:700;padding:10px;">
+                <i class="fa-solid fa-check"></i> Sí, restaurar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm modal limpiar -->
+<div id="modalLimpiar" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:#1a1c24;border:1px solid rgba(239,68,68,0.5);border-radius:16px;padding:36px;max-width:440px;width:90%;box-shadow:0 24px 80px rgba(0,0,0,0.7);">
+        <div style="text-align:center;margin-bottom:20px;">
+            <i class="fa-solid fa-triangle-exclamation" style="font-size:48px;color:#f87171;display:block;margin-bottom:12px;"></i>
+            <h3 style="font-size:18px;font-weight:700;color:#f87171;margin-bottom:8px;">¿Estás completamente seguro?</h3>
+            <p style="color:var(--text-muted);font-size:13px;line-height:1.6;">
+                Se eliminarán <strong style="color:#f0f0f0;">TODOS</strong> los socios, membresías, productos, pagos y registros del sistema.<br>
+                <strong style="color:#f87171;">Esta acción NO se puede deshacer.</strong>
+            </p>
+        </div>
+        <form method="post" asp-action="Limpiar">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="confirmacion" value="LIMPIAR" />
+            <div style="display:flex;gap:12px;justify-content:center;">
+                <button type="button" onclick="document.getElementById('modalLimpiar').style.display='none'"
+                        class="btn btn-secondary" style="flex:1;">
+                    <i class="fa-solid fa-xmark"></i> Cancelar
+                </button>
+                <button type="submit" class="btn btn-sm" style="flex:1;background:rgba(239,68,68,0.2);color:#f87171;border:1px solid rgba(239,68,68,0.5);font-weight:700;padding:10px;">
+                    <i class="fa-solid fa-trash-can"></i> Sí, eliminar todo
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+let accionRestaurarTipo = ''; // 'existente' o 'upload'
+
+function onFileRespaldoSelected(input) {
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+        document.getElementById('labelNombreArchivo').innerHTML = `<i class="fa-solid fa-circle-check" style="color:#4ade80;"></i> Archivo listo: <strong>${file.name}</strong>`;
+        document.getElementById('labelDetalleArchivo').textContent = `Tamaño: ${sizeMb} MB — Clic en el botón verde abajo para iniciar`;
+        document.getElementById('btnIniciarRestauracion').style.display = 'inline-flex';
+    } else {
+        document.getElementById('labelNombreArchivo').textContent = 'Haz clic para seleccionar el archivo de respaldo desde tu PC';
+        document.getElementById('labelDetalleArchivo').textContent = 'o arrastra tu archivo de respaldo aquí';
+        document.getElementById('btnIniciarRestauracion').style.display = 'none';
+    }
+}
+
+function confirmarRestauracionExistente(fileName) {
+    accionRestaurarTipo = 'existente';
+    document.getElementById('hiddenRestoreFileName').value = fileName;
+    document.getElementById('restaurarTargetText').textContent = fileName;
+    document.getElementById('modalRestaurar').style.display = 'flex';
+}
+
+function confirmarRestauracionArchivo() {
+    const input = document.getElementById('inputArchivoRespaldo');
+    if (!input.files || !input.files[0]) {
+        alert('Por favor selecciona un archivo de respaldo primero.');
+        return;
+    }
+    accionRestaurarTipo = 'upload';
+    document.getElementById('restaurarTargetText').textContent = input.files[0].name;
+    document.getElementById('modalRestaurar').style.display = 'flex';
+}
+
+function cerrarModalRestaurar() {
+    document.getElementById('modalRestaurar').style.display = 'none';
+}
+
+function ejecutarRestauracion() {
+    const btn = document.getElementById('btnEjecutarRestauracionFinal');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Restaurando...';
+
+    if (accionRestaurarTipo === 'existente') {
+        document.getElementById('formRestoreExisting').submit();
+    } else if (accionRestaurarTipo === 'upload') {
+        document.getElementById('formUploadRestore').submit();
+    }
+}
+
+// Drag & drop en la zona de subida de archivo
+const dropZone = document.getElementById('dropZoneRespaldo');
+if (dropZone) {
+    ['dragenter', 'dragover'].forEach(eName => {
+        dropZone.addEventListener(eName, e => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.style.borderColor = '#10b981';
+            dropZone.style.background = 'rgba(16,185,129,0.12)';
+        });
+    });
+    ['dragleave', 'drop'].forEach(eName => {
+        dropZone.addEventListener(eName, e => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.style.borderColor = 'rgba(52,211,153,0.35)';
+            dropZone.style.background = 'rgba(15,23,42,0.4)';
+        });
+    });
+    dropZone.addEventListener('drop', e => {
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+            const input = document.getElementById('inputArchivoRespaldo');
+            input.files = e.dataTransfer.files;
+            onFileRespaldoSelected(input);
+        }
+    });
+}
+</script>

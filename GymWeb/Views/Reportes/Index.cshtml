@@ -1,0 +1,29 @@
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:20px;">
+    <a asp-action="Visitas" style="text-decoration:none;">
+        <div class="stat-card" style="cursor:pointer;">
+            <div class="stat-icon orange"><i class="fa-solid fa-clipboard-list"></i></div>
+            <div>
+                <div class="stat-value" style="font-size:18px;">Visitas</div>
+                <div class="stat-label">Asistencias por periodo</div>
+            </div>
+        </div>
+    </a>
+    <a asp-action="CorteDia" style="text-decoration:none;">
+        <div class="stat-card" style="cursor:pointer;border:1px solid rgba(74,222,128,0.3);">
+            <div class="stat-icon green"><i class="fa-solid fa-cash-register"></i></div>
+            <div>
+                <div class="stat-value" style="font-size:18px;">Corte del Día</div>
+                <div class="stat-label">Visitas + ventas del día</div>
+            </div>
+        </div>
+    </a>
+    <a asp-action="Asistencia" style="text-decoration:none;">
+        <div class="stat-card" style="cursor:pointer;border:1px solid rgba(99,179,237,0.3);">
+            <div class="stat-icon" style="background:rgba(99,179,237,0.15);color:#63b3ed;"><i class="fa-solid fa-chart-bar"></i></div>
+            <div>
+                <div class="stat-value" style="font-size:18px;">Asistencia</div>
+                <div class="stat-label">Historial por socio</div>
+            </div>
+        </div>
+    </a>
+</div>

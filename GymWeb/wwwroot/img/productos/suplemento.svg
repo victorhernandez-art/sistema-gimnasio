@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <defs>
+    <radialGradient id="supGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00f2ff" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#070c12" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="tubGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1e2430"/>
+      <stop offset="35%" stop-color="#2d3748"/>
+      <stop offset="70%" stop-color="#1a202c"/>
+      <stop offset="100%" stop-color="#0f131a"/>
+    </linearGradient>
+    <linearGradient id="lidGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00e5ff"/>
+      <stop offset="50%" stop-color="#0284c7"/>
+      <stop offset="100%" stop-color="#00b4d8"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="#0c121d" rx="16"/>
+  <circle cx="200" cy="220" r="140" fill="url(#supGlow)"/>
+
+  <!-- Tapa Tarro -->
+  <rect x="135" y="90" width="130" height="32" rx="6" fill="#111827" stroke="#00e5ff" stroke-width="2"/>
+  <line x1="145" y1="98" x2="145" y2="114" stroke="#374151" stroke-width="3" stroke-linecap="round"/>
+  <line x1="155" y1="98" x2="155" y2="114" stroke="#374151" stroke-width="3" stroke-linecap="round"/>
+  <line x1="245" y1="98" x2="245" y2="114" stroke="#374151" stroke-width="3" stroke-linecap="round"/>
+  <line x1="255" y1="98" x2="255" y2="114" stroke="#374151" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Cuello -->
+  <rect x="145" y="120" width="110" height="15" fill="#1f2937"/>
+
+  <!-- Cuerpo Tarro -->
+  <rect x="125" y="132" width="150" height="185" rx="18" fill="url(#tubGrad)" stroke="#1f2937" stroke-width="2"/>
+
+  <!-- Etiqueta -->
+  <rect x="132" y="155" width="136" height="135" fill="#0d141f" rx="6"/>
+  <text x="200" y="185" font-family="system-ui, sans-serif" font-weight="900" font-size="18" fill="#ffffff" text-anchor="middle" letter-spacing="2">WHEY</text>
+  <text x="200" y="208" font-family="system-ui, sans-serif" font-weight="900" font-size="14" fill="#00e5ff" text-anchor="middle" letter-spacing="3">PROTEIN</text>
+  <line x1="155" y1="218" x2="245" y2="218" stroke="#00e5ff" stroke-width="2" stroke-linecap="round"/>
+  <text x="200" y="238" font-family="system-ui, sans-serif" font-weight="700" font-size="10" fill="#94a3b8" text-anchor="middle">24G PROTEIN • 5.5G BCAA</text>
+  <text x="200" y="260" font-family="system-ui, sans-serif" font-weight="900" font-size="11" fill="#38bdf8" text-anchor="middle">100% ISOLATE</text>
+
+  <!-- Reflejo -->
+  <path d="M138,145 L145,145 L145,305 L138,305 Z" fill="#ffffff" opacity="0.08"/>
+</svg>

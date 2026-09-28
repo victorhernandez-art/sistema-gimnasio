@@ -1,0 +1,721 @@
+@model IEnumerable<GymWeb.Models.Pago>
+@{
+    ViewData["Title"] = "Pagos";
+    var socios     = ViewBag.Socios     as IEnumerable<GymWeb.Models.Socio>       ?? Enumerable.Empty<GymWeb.Models.Socio>();
+    var membresias = ViewBag.Membresias as IEnumerable<GymWeb.Models.Membresium> ?? Enumerable.Empty<GymWeb.Models.Membresium>();
+    decimal ingresosMes = ViewBag.IngresosMes ?? 0;
+    int totalPagos  = ViewBag.TotalPagos  ?? 0;
+    int pagosMes    = ViewBag.PagosMes    ?? 0;
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><i class="fa-solid fa-dollar-sign"></i> Pagos</h1>
+        <p class="page-subtitle">Registro y control de pagos de membresías</p>
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success" style="background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.3);color:#4ade80;padding:12px 16px;border-radius:8px;margin-bottom:20px;">
+        <i class="fa-solid fa-circle-check"></i> @TempData["Success"]
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#f87171;padding:12px 16px;border-radius:8px;margin-bottom:20px;">
+        <i class="fa-solid fa-triangle-exclamation"></i> @TempData["Error"]
+    </div>
+}
+@if (TempData["Warning"] != null)
+{
+    <div style="background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.35);color:#fbbf24;padding:12px 16px;border-radius:8px;margin-bottom:20px;">
+        <i class="fa-solid fa-triangle-exclamation"></i> @TempData["Warning"]
+    </div>
+}
+
+<!-- Stats -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px;">
+    <div class="card" style="padding:20px;">
+        <div class="text-muted" style="font-size:13px;margin-bottom:8px;">Ingresos del Mes</div>
+        <div style="font-size:28px;font-weight:700;color:var(--accent);">$@ingresosMes.ToString("N2")</div>
+    </div>
+    <div class="card" style="padding:20px;">
+        <div class="text-muted" style="font-size:13px;margin-bottom:8px;">Pagos del Mes</div>
+        <div style="font-size:28px;font-weight:700;">@pagosMes</div>
+    </div>
+    <div class="card" style="padding:20px;">
+        <div class="text-muted" style="font-size:13px;margin-bottom:8px;">Total de Pagos</div>
+        <div style="font-size:28px;font-weight:700;">@totalPagos</div>
+    </div>
+</div>
+
+<!-- Action buttons row -->
+<div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:20px;">
+    <a asp-action="ExportCsv" asp-route-formato="excel"
+       asp-route-search="@Context.Request.Query["search"]"
+       asp-route-metodo="@Context.Request.Query["metodo"]"
+       asp-route-desde="@Context.Request.Query["desde"]"
+       asp-route-hasta="@Context.Request.Query["hasta"]"
+       class="btn btn-sm" style="background:#16a34a;color:#fff;" title="Descargar historial formal en Excel con Logo">
+        <i class="fa-solid fa-file-excel"></i> Excel
+    </a>
+    <button class="btn btn-primary btn-sm" onclick="document.getElementById('modalPago').style.display='flex'">
+        <i class="fa-solid fa-plus"></i> Registrar Pago
+    </button>
+</div>
+<div class="card" style="margin-bottom:20px;padding:16px 20px;">
+    <form method="get" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+        <div style="flex:1;min-width:180px;">
+            <label class="form-label" style="font-size:12px;">Buscar socio</label>
+            <input type="text" name="search" value="@Context.Request.Query["search"]" class="form-control" placeholder="Nombre del socio..." />
+        </div>
+        <div style="min-width:150px;">
+            <label class="form-label" style="font-size:12px;">Método de Pago</label>
+            <select name="metodo" class="form-control">
+                <option value="">Todos</option>
+                @foreach (var m in new[]{"Efectivo","Tarjeta","Transferencia","Otro"})
+                {
+                    <option value="@m" selected="@(Context.Request.Query["metodo"].ToString() == m ? "selected" : null)">@m</option>
+                }
+            </select>
+        </div>
+        <div style="min-width:140px;">
+            <label class="form-label" style="font-size:12px;">Desde</label>
+            <input type="date" name="desde" value="@Context.Request.Query["desde"]" class="form-control" />
+        </div>
+        <div style="min-width:140px;">
+            <label class="form-label" style="font-size:12px;">Hasta</label>
+            <input type="date" name="hasta" value="@Context.Request.Query["hasta"]" class="form-control" />
+        </div>
+        <button type="submit" class="btn btn-outline btn-sm" style="height:38px;">
+            <i class="fa-solid fa-filter"></i> Filtrar
+        </button>
+        <a asp-action="Index" class="btn btn-outline btn-sm" style="height:38px;">
+            <i class="fa-solid fa-xmark"></i> Limpiar
+        </a>
+    </form>
+</div>
+
+<!-- Table -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title"><i class="fa-solid fa-clock-rotate-left"></i> Historial de Pagos</div>
+        <span class="text-muted" style="font-size:13px;">@Model.Count() registro(s)</span>
+    </div>
+    @if (!Model.Any())
+    {
+        <p class="text-muted" style="font-size:13px;padding:20px 0;">Sin pagos registrados.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="gym-table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Socio</th>
+                        <th>Plan / Membresía</th>
+                        <th>Método</th>
+                        <th>Monto</th>
+                        <th>Notas</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var p in Model)
+                {
+                    <tr>
+                        <td class="text-muted" style="font-size:12px;">@p.FechaPago.ToString("dd/MM/yyyy")</td>
+                        <td><span class="name-cell">@p.IdSocioNavigation?.Nombre @p.IdSocioNavigation?.Paterno</span></td>
+                        <td>
+                            @if (p.IdMembresiaNavigation != null)
+                            { <span class="badge badge-info">@p.IdMembresiaNavigation.Nombre</span> }
+                            else
+                            { <span class="text-muted" style="font-size:12px;">—</span> }
+                        </td>
+                        <td>
+                            @{
+                                var iconMetodo = p.MetodoPago switch {
+                                    "Tarjeta"      => "fa-credit-card",
+                                    "Transferencia" => "fa-building-columns",
+                                    _              => "fa-money-bill-wave"
+                                };
+                            }
+                            <span style="font-size:13px;"><i class="fa-solid @iconMetodo" style="margin-right:5px;opacity:0.7;"></i>@p.MetodoPago</span>
+                        </td>
+                        <td><span class="text-accent" style="font-weight:600;">$@p.Monto.ToString("N2")</span></td>
+                        <td class="text-muted" style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="@p.Notas">@(p.Notas ?? "—")</td>
+                        <td style="white-space:nowrap;text-align:right;">
+                            <button type="button" class="btn btn-sm"
+                                style="background:rgba(16,185,129,0.12);color:#34d399;border:1px solid rgba(16,185,129,0.3);margin-right:6px;"
+                                onclick="imprimirTicketPagoDirecto(@p.IdPago)" title="Imprimir comprobante en impresora de tickets POS">
+                                <i class="fa-solid fa-print"></i>
+                            </button>
+                            <form asp-action="Delete" method="post" style="display:inline;"
+                                  onsubmit="return confirm('¿Eliminar este pago?')">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@p.IdPago" />
+                                <button type="submit" class="btn btn-sm"
+                                    style="background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.25);"
+                                    title="Eliminar">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+        <div style="text-align:right;padding:12px 0 0;font-size:13px;">
+            <strong>Total mostrado:</strong>
+            <span class="text-accent" style="font-size:15px;font-weight:700;margin-left:8px;">
+                $@Model.Sum(p => p.Monto).ToString("N2")
+            </span>
+        </div>
+    }
+</div>
+
+<!-- Modal Registrar Pago -->
+<div id="modalPago" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:#1a1b2e;border:1px solid var(--border);border-radius:16px;padding:32px;width:100%;max-width:520px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,0.6);">
+        <button onclick="document.getElementById('modalPago').style.display='none'"
+            style="position:absolute;top:16px;right:16px;background:none;border:none;color:var(--text-muted);font-size:18px;cursor:pointer;">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+        <h3 style="margin-bottom:24px;font-size:18px;">
+            <i class="fa-solid fa-dollar-sign" style="color:var(--accent);margin-right:8px;"></i>Registrar Pago
+        </h3>
+        <form asp-action="Create" method="post">
+            @Html.AntiForgeryToken()
+            <div style="display:grid;gap:16px;">
+                <div style="position:relative;">
+                    <label class="form-label">Socio <span style="color:#f87171;">*</span></label>
+                    <input type="hidden" name="idSocio" id="hiddenSocio" required />
+                    <div style="position:relative;">
+                        <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;">
+                            <i class="fa-solid fa-magnifying-glass" style="font-size:13px;"></i>
+                        </span>
+                        <input type="text" id="socioSearch" class="form-control" autocomplete="off"
+                               placeholder="Buscar por clave o nombre..."
+                               style="padding-left:34px;"
+                               oninput="filtrarSocios(this.value)"
+                               onfocus="mostrarDropdown()" />
+                    </div>
+                    <div id="socioDropdown"
+                         style="display:none;position:absolute;top:100%;left:0;right:0;background:#1e2035;border:1px solid var(--border);border-radius:8px;max-height:220px;overflow-y:auto;z-index:10000;box-shadow:0 8px 24px rgba(0,0,0,0.5);margin-top:4px;">
+                    </div>
+                    <div id="socioSeleccionado" style="display:none;margin-top:6px;padding:8px 12px;background:rgba(0,242,255,0.07);border:1px solid rgba(0,242,255,0.25);border-radius:8px;font-size:13px;display:flex;align-items:center;justify-content:space-between;">
+                        <span id="socioSelNombre" style="color:var(--accent);font-weight:600;"></span>
+                        <button type="button" onclick="limpiarSocio()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:13px;padding:0 0 0 8px;"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                </div>
+                <div>
+                    <label class="form-label">Plan (opcional — para renovar)</label>
+                    <select name="idMembresia" class="form-control" id="selectPlan" onchange="onPlanChange(this)">
+                        <option value="">— Sin cambio de plan —</option>
+                        @foreach (var m in membresias)
+                        {
+                            <option value="@m.IdMembresia" data-precio="@m.Precio">@m.Nombre — $@m.Precio?.ToString("N2")</option>
+                        }
+                    </select>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div>
+                        <label class="form-label">Monto (MXN) <span style="color:#f87171;">*</span></label>
+                        <input type="number" name="monto" id="inputMonto" class="form-control" placeholder="0.00"
+                               step="0.01" min="0.01" required />
+                    </div>
+                    <div>
+                        <label class="form-label">Método de Pago</label>
+                        <select name="metodoPago" class="form-control">
+                            @foreach (var m in new[]{"Efectivo","Tarjeta","Transferencia","Otro"})
+                            {
+                                <option value="@m">@m</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="form-label">Fecha de Pago</label>
+                    <input type="date" name="fechaPago" class="form-control"
+                           value="@DateTime.Today.ToString("yyyy-MM-dd")" required />
+                </div>
+                <div>
+                    <label class="form-label">Notas</label>
+                    <textarea name="notas" class="form-control" rows="3" placeholder="Notas opcionales..."></textarea>
+                </div>
+                <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:8px;">
+                    <button type="button" class="btn btn-outline"
+                        onclick="document.getElementById('modalPago').style.display='none'">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-solid fa-check"></i> Registrar Pago
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// ── Datos de socios para búsqueda ──
+const sociosData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(socios.Select(s => new {
+    id    = s.IdSocio,
+    clave = s.IdSocio.ToString(),
+    nombre = (s.Paterno + " " + s.Materno + ", " + s.Nombre).Trim()
+})));
+
+function filtrarSocios(q) {
+    const drop = document.getElementById('socioDropdown');
+    q = q.trim().toLowerCase();
+    const resultados = q.length === 0
+        ? sociosData.slice(0, 50)
+        : sociosData.filter(s =>
+            s.clave.startsWith(q) ||
+            s.nombre.toLowerCase().includes(q)
+          ).slice(0, 50);
+    renderDropdown(resultados);
+    drop.style.display = 'block';
+}
+
+function mostrarDropdown() {
+    const q = document.getElementById('socioSearch').value.trim().toLowerCase();
+    const lista = q.length === 0 ? sociosData.slice(0, 50)
+        : sociosData.filter(s => s.clave.startsWith(q) || s.nombre.toLowerCase().includes(q)).slice(0, 50);
+    renderDropdown(lista);
+    document.getElementById('socioDropdown').style.display = 'block';
+}
+
+function renderDropdown(lista) {
+    const drop = document.getElementById('socioDropdown');
+    if (lista.length === 0) {
+        drop.innerHTML = '<div style="padding:12px 16px;color:var(--text-muted);font-size:13px;">Sin resultados</div>';
+        return;
+    }
+    drop.innerHTML = lista.map(s =>
+        `<div onclick="seleccionarSocio(${s.id},'${s.nombre.replace(/'/g,"\\'")}',event)"
+              style="padding:10px 16px;cursor:pointer;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;gap:10px;"
+              onmouseover="this.style.background='rgba(0,242,255,0.08)'"
+              onmouseout="this.style.background=''"
+         >
+            <span style="background:rgba(0,242,255,0.12);color:var(--accent);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700;min-width:42px;text-align:center;">${s.clave}</span>
+            <span>${s.nombre}</span>
+         </div>`
+    ).join('');
+}
+
+function seleccionarSocio(id, nombre, e) {
+    e.stopPropagation();
+    document.getElementById('hiddenSocio').value = id;
+    document.getElementById('socioSearch').value = '';
+    document.getElementById('socioDropdown').style.display = 'none';
+    const tag = document.getElementById('socioSeleccionado');
+    document.getElementById('socioSelNombre').textContent = `#${id} — ${nombre}`;
+    tag.style.display = 'flex';
+}
+
+function limpiarSocio() {
+    document.getElementById('hiddenSocio').value = '';
+    document.getElementById('socioSeleccionado').style.display = 'none';
+    document.getElementById('socioSearch').value = '';
+    document.getElementById('socioSearch').focus();
+}
+
+// Cerrar dropdown al hacer clic fuera
+document.addEventListener('click', function(e) {
+    const drop = document.getElementById('socioDropdown');
+    const input = document.getElementById('socioSearch');
+    if (drop && !drop.contains(e.target) && e.target !== input) {
+        drop.style.display = 'none';
+    }
+});
+
+function onPlanChange(sel) {
+    const precio = sel.options[sel.selectedIndex]?.dataset?.precio;
+    if (precio) document.getElementById('inputMonto').value = precio;
+}
+function onSocioChange(sel) {
+    // legacy – no longer used
+}
+// Close modal on backdrop click
+document.getElementById('modalPago').addEventListener('click', function(e) {
+    if (e.target === this) {
+        this.style.display = 'none';
+        limpiarSocio();
+    }
+});
+// Limpiar búsqueda al cerrar modal
+document.querySelector('#modalPago button[onclick*="none"]').addEventListener('click', limpiarSocio);
+
+// ══════════════════════════════════════════════════════════════════════
+// IMPRESIÓN DE TICKET DE PAGO (Membresías - Térmico POS 80mm / 58mm)
+// ══════════════════════════════════════════════════════════════════════
+let ultimoPagoData = null;
+
+function ejecutarImpresionTicketPago(data) {
+    if (!data) return;
+
+    const folio      = data.folio || ('#PAG-' + (data.idPago || '0').toString().padStart(6, '0'));
+    const fecha      = data.fecha || new Date().toLocaleString();
+    const cajero     = data.cajero || 'Recepción';
+    const metodo     = data.metodoPago || 'Efectivo';
+    const socio      = data.socio || 'Socio';
+    const socioClave = data.socioId ? `#${data.socioId}` : '';
+    const plan       = data.plan || 'Membresía';
+    const vigencia   = data.vigencia || '';
+    const monto      = Number(data.monto || 0).toFixed(2);
+    const notas      = data.notas || '';
+
+    const gymNom = data.gymNombre || '@Html.Raw(ViewBag.GymNombre ?? "MI GIMNASIO")';
+    const gymDom = data.gymDomicilio || '@Html.Raw(ViewBag.GymDomicilio ?? "")';
+    const gymTel = data.gymTelefono || '@Html.Raw(ViewBag.GymTelefono ?? "")';
+    const pie    = data.gymPieTicket || '@Html.Raw(ViewBag.GymPieTicket ?? "¡Gracias por su preferencia!")';
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Recibo ${folio}</title>
+    <style>
+        @@page {
+            size: auto;
+            margin: 0mm;
+        }
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            -webkit-font-smoothing: antialiased;
+            text-rendering: geometricPrecision;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            background: #ffffff;
+            color: #000000;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-size: 11.5px;
+            line-height: 1.3;
+        }
+        .ticket-wrapper {
+            width: 100%;
+            max-width: 72mm;
+            margin: 0 auto;
+            padding: 2mm 2.5mm 6mm 2.5mm;
+            box-sizing: border-box;
+        }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
+        .fw-bold { font-weight: 700; }
+        .fw-black { font-weight: 800; }
+
+        .logo-wrap {
+            text-align: center;
+            margin-bottom: 4px;
+        }
+        .logo-img {
+            max-width: 120px;
+            max-height: 50px;
+            object-fit: contain;
+            filter: grayscale(100%) contrast(180%);
+            margin: 0 auto;
+            display: block;
+        }
+        .gym-name {
+            font-size: 14px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin: 2px 0 3px 0;
+            line-height: 1.2;
+            color: #000000;
+        }
+        .gym-info {
+            font-size: 10.5px;
+            font-weight: 600;
+            color: #000000;
+            margin-bottom: 2px;
+            line-height: 1.25;
+            word-break: break-word;
+        }
+        .receipt-badge {
+            font-size: 11.5px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin: 4px 0 2px 0;
+            color: #000000;
+        }
+        .divider {
+            border-top: 1px dashed #000000;
+            margin: 5px 0;
+            width: 100%;
+        }
+        .meta-table, .totals-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            color: #000000;
+        }
+        .meta-table td {
+            padding: 1.5px 0;
+            vertical-align: top;
+        }
+        .meta-label {
+            font-weight: 600;
+            color: #000000;
+            width: 32%;
+        }
+        .meta-val {
+            font-weight: 700;
+            color: #000000;
+            text-align: right;
+            word-break: break-word;
+        }
+        .total-big {
+            font-size: 15px;
+            font-weight: 900;
+            border-top: 1.5px dashed #000000;
+            border-bottom: 1.5px dashed #000000;
+            padding: 4px 0 !important;
+            color: #000000;
+        }
+        .footer-note {
+            margin-top: 7px;
+            text-align: center;
+            color: #000000;
+        }
+        .footer-note .pie-msg {
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1.25;
+            margin-bottom: 2px;
+        }
+        .footer-note .pie-sub {
+            font-size: 9.5px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="ticket-wrapper">
+        <div class="logo-wrap">
+            <img class="logo-img" src="/img/logo-custom.png?v=${Date.now()}" onerror="this.style.display='none'" />
+        </div>
+
+        <div class="text-center">
+            <div class="gym-name">${gymNom}</div>
+            ${gymDom ? `<div class="gym-info">${gymDom}</div>` : ''}
+            ${gymTel ? `<div class="gym-info">Tel / WhatsApp: ${gymTel}</div>` : ''}
+            <div class="receipt-badge">COMPROBANTE DE PAGO</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <table class="meta-table">
+            <tr>
+                <td class="meta-label">FOLIO:</td>
+                <td class="meta-val">${folio}</td>
+            </tr>
+            <tr>
+                <td class="meta-label">FECHA:</td>
+                <td class="meta-val">${fecha}</td>
+            </tr>
+            <tr>
+                <td class="meta-label">SOCIO:</td>
+                <td class="meta-val">${socio} ${socioClave ? '(' + socioClave + ')' : ''}</td>
+            </tr>
+            <tr>
+                <td class="meta-label">CONCEPTO:</td>
+                <td class="meta-val">${plan}</td>
+            </tr>
+            ${vigencia ? `<tr><td class="meta-label">VIGENCIA:</td><td class="meta-val" style="font-weight:800;">Hasta ${vigencia}</td></tr>` : ''}
+            <tr>
+                <td class="meta-label">MÉTODO:</td>
+                <td class="meta-val">${metodo}</td>
+            </tr>
+            <tr>
+                <td class="meta-label">ATENDIÓ:</td>
+                <td class="meta-val">${cajero}</td>
+            </tr>
+            ${notas ? `<tr><td class="meta-label">NOTAS:</td><td class="meta-val">${notas}</td></tr>` : ''}
+        </table>
+
+        <div class="divider"></div>
+
+        <table class="totals-table">
+            <tr class="total-big">
+                <td>TOTAL PAGADO:</td>
+                <td class="text-right">$${monto}</td>
+            </tr>
+        </table>
+
+        <div class="footer-note">
+            <div class="pie-msg">${pie}</div>
+            <div class="pie-sub">Conserve este comprobante para cualquier aclaración o acceso</div>
+        </div>
+    </div>
+
+    <script>
+        window.onload = function() {
+            setTimeout(function() {
+                window.focus();
+                window.print();
+            }, 200);
+        };
+    <\/script>
+</body>
+</html>
+    `;
+
+    let iframe = document.getElementById('iframeImpresionTicketPago');
+    if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = 'iframeImpresionTicketPago';
+        iframe.style.position = 'fixed';
+        iframe.style.top = '-9999px';
+        iframe.style.left = '-9999px';
+        iframe.style.width = '0px';
+        iframe.style.height = '0px';
+        iframe.style.border = 'none';
+        document.body.appendChild(iframe);
+    }
+
+    const doc = iframe.contentWindow || iframe.contentDocument;
+    if (doc.document) {
+        const d = doc.document;
+        d.open();
+        d.write(html);
+        d.close();
+    } else {
+        doc.open();
+        doc.write(html);
+        doc.close();
+    }
+}
+
+async function imprimirTicketPagoDirecto(idPago) {
+    try {
+        const resp = await fetch(`/Pagos/GetDetallePago?idPago=${idPago}`);
+        const data = await resp.json();
+        if (data.ok) {
+            ultimoPagoData = data;
+            ejecutarImpresionTicketPago(data);
+        } else {
+            alert(data.msg || 'No se pudo obtener la información para imprimir.');
+        }
+    } catch (e) {
+        alert('Error de conexión al cargar el ticket de pago.');
+    }
+}
+
+function imprimirTicketPagoActual() {
+    if (ultimoPagoData) {
+        ejecutarImpresionTicketPago(ultimoPagoData);
+    } else {
+        alert('No hay información de pago para imprimir.');
+    }
+}
+
+function cerrarModalConfirmacionPago() {
+    document.getElementById('modalConfirmacionPago').style.display = 'none';
+}
+
+async function abrirModalConfirmacionNuevoPago(idPago) {
+    try {
+        const resp = await fetch(`/Pagos/GetDetallePago?idPago=${idPago}`);
+        const data = await resp.json();
+        if (!data.ok) return;
+
+        ultimoPagoData = data;
+        document.getElementById('confPagoFolio').textContent = data.folio;
+        document.getElementById('confPagoSocio').textContent = data.socio;
+        document.getElementById('confPagoPlan').textContent  = data.plan;
+
+        const vigRow = document.getElementById('confPagoVigenciaRow');
+        if (data.vigencia) {
+            document.getElementById('confPagoVigencia').textContent = 'Hasta ' + data.vigencia;
+            vigRow.style.display = 'flex';
+        } else {
+            vigRow.style.display = 'none';
+        }
+
+        document.getElementById('confPagoMetodo').textContent = data.metodoPago;
+        document.getElementById('confPagoMonto').textContent  = '$' + Number(data.monto || 0).toFixed(2);
+
+        document.getElementById('modalConfirmacionPago').style.display = 'flex';
+    } catch (e) { }
+}
+
+@if (TempData["UltimoPagoId"] != null)
+{
+    <text>
+    window.addEventListener('DOMContentLoaded', function() {
+        abrirModalConfirmacionNuevoPago(@TempData["UltimoPagoId"]);
+    });
+    </text>
+}
+</script>
+
+<!-- Modal Confirmación de Pago de Membresía -->
+<div id="modalConfirmacionPago" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:99999;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+    <div style="background:#161f30;border:1px solid #23354d;border-radius:18px;padding:32px;width:100%;max-width:440px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,0.8);text-align:center;">
+        <div style="width:64px;height:64px;border-radius:50%;background:rgba(16,185,129,0.15);color:#10b981;font-size:28px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px auto;border:2px solid #10b981;">
+            <i class="fa-solid fa-check"></i>
+        </div>
+        <h3 style="margin-bottom:6px;font-size:20px;font-weight:800;color:#ffffff;">¡Pago Registrado con Éxito!</h3>
+        <div id="confPagoFolio" style="display:inline-block;background:rgba(6,182,212,0.15);color:#38bdf8;border:1px solid rgba(6,182,212,0.3);padding:3px 12px;border-radius:20px;font-size:12px;font-weight:700;margin-bottom:20px;">#PAG-000000</div>
+
+        <div style="background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:16px;text-align:left;margin-bottom:20px;font-size:13px;display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;justify-content:space-between;gap:8px;">
+                <span style="color:#94a3b8;flex-shrink:0;">Socio:</span>
+                <strong id="confPagoSocio" style="color:#ffffff;text-align:right;word-break:break-word;">—</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:8px;">
+                <span style="color:#94a3b8;flex-shrink:0;">Membresía / Concepto:</span>
+                <strong id="confPagoPlan" style="color:#38bdf8;text-align:right;">—</strong>
+            </div>
+            <div id="confPagoVigenciaRow" style="display:flex;justify-content:space-between;gap:8px;">
+                <span style="color:#94a3b8;flex-shrink:0;">Vigencia:</span>
+                <strong id="confPagoVigencia" style="color:#4ade80;text-align:right;">—</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:8px;">
+                <span style="color:#94a3b8;flex-shrink:0;">Método de Pago:</span>
+                <strong id="confPagoMetodo" style="color:#ffffff;text-align:right;">—</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between;border-top:1px solid #1e293b;padding-top:8px;font-size:15px;">
+                <span style="color:#ffffff;font-weight:700;">Total Pagado:</span>
+                <strong id="confPagoMonto" style="color:#4ade80;font-weight:800;">$0.00</strong>
+            </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:10px;">
+            <button type="button" onclick="imprimirTicketPagoActual()" class="btn"
+                    style="background:linear-gradient(135deg, #10b981 0%, #059669 100%);color:#ffffff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 12px rgba(16,185,129,0.3);">
+                <i class="fa-solid fa-print"></i> Imprimir Ticket de Pago
+            </button>
+            <div style="display:flex;gap:10px;">
+                <button type="button" onclick="cerrarModalConfirmacionPago(); document.getElementById('modalPago').style.display='flex';" class="btn btn-outline"
+                        style="flex:1;border-radius:10px;padding:10px;font-size:13px;">
+                    <i class="fa-solid fa-plus"></i> Otro pago
+                </button>
+                <button type="button" onclick="cerrarModalConfirmacionPago()" class="btn btn-outline"
+                        style="flex:1;border-radius:10px;padding:10px;font-size:13px;">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+
+        <div style="margin-top:14px;padding:9px 12px;background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.22);border-radius:9px;font-size:11.5px;color:#94a3b8;line-height:1.4;display:flex;align-items:center;gap:8px;text-align:left;">
+            <i class="fa-solid fa-circle-info text-cyan" style="font-size:13px;flex-shrink:0;"></i>
+            <span>Para cerrar la ventana de impresión presiona <strong>Cancelar</strong> o la tecla <strong>Esc</strong> (la <strong>X</strong> superior cierra todo el sistema).</span>
+        </div>
+    </div>
+</div>
+

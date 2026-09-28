@@ -1,0 +1,93 @@
+@model IEnumerable<GymWeb.Models.Pago>
+@{
+    var socio = ViewBag.Socio as GymWeb.Models.Socio;
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><i class="fa-solid fa-dollar-sign"></i> Pagos del Socio</h1>
+        <p class="page-subtitle">@socio?.Nombre @socio?.Paterno @socio?.Materno — Clave #@socio?.IdSocio</p>
+    </div>
+</div>
+
+<div style="display:flex;gap:10px;margin-bottom:20px;">
+    <a asp-action="Index" class="btn btn-outline btn-sm">
+        <i class="fa-solid fa-arrow-left"></i> Volver a Socios
+    </a>
+    <a asp-action="Membresia" asp-route-id="@socio?.IdSocio" class="btn btn-outline btn-sm">
+        <i class="fa-solid fa-id-card"></i> Ver Membresías
+    </a>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="card" style="padding:32px;text-align:center;">
+        <div style="font-size:40px;color:var(--text-muted);margin-bottom:12px;"><i class="fa-solid fa-dollar-sign"></i></div>
+        <p class="text-muted">Este socio no tiene pagos registrados.</p>
+        <a asp-controller="Pagos" asp-action="Index" class="btn btn-primary btn-sm" style="margin-top:12px;">
+            <i class="fa-solid fa-plus"></i> Registrar Pago
+        </a>
+    </div>
+}
+else
+{
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px;">
+        <div class="card" style="padding:18px 20px;">
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Total Pagado</div>
+            <div style="font-size:26px;font-weight:700;color:var(--accent);">$@Model.Sum(p => p.Monto).ToString("N2")</div>
+        </div>
+        <div class="card" style="padding:18px 20px;">
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Número de Pagos</div>
+            <div style="font-size:26px;font-weight:700;">@Model.Count()</div>
+        </div>
+        <div class="card" style="padding:18px 20px;">
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Último Pago</div>
+            <div style="font-size:18px;font-weight:600;">@Model.First().FechaPago.ToString("dd/MM/yyyy")</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-clock-rotate-left"></i> Historial de Pagos</div>
+        </div>
+        <div class="table-responsive">
+            <table class="gym-table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Plan / Membresía</th>
+                        <th>Método</th>
+                        <th>Monto</th>
+                        <th>Notas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var p in Model)
+                {
+                    <tr>
+                        <td class="text-muted" style="font-size:12px;">@p.FechaPago.ToString("dd/MM/yyyy")</td>
+                        <td>
+                            @if (p.IdMembresiaNavigation != null)
+                            { <span class="badge badge-info">@p.IdMembresiaNavigation.Nombre</span> }
+                            else
+                            { <span class="text-muted" style="font-size:12px;">—</span> }
+                        </td>
+                        <td>
+                            @{
+                                var icon = p.MetodoPago switch {
+                                    "Tarjeta"       => "fa-credit-card",
+                                    "Transferencia" => "fa-building-columns",
+                                    _               => "fa-money-bill-wave"
+                                };
+                            }
+                            <span style="font-size:13px;"><i class="fa-solid @icon" style="margin-right:5px;opacity:0.7;"></i>@p.MetodoPago</span>
+                        </td>
+                        <td><span style="font-weight:600;color:var(--accent);">$@p.Monto.ToString("N2")</span></td>
+                        <td class="text-muted" style="font-size:12px;">@(p.Notas ?? "—")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}

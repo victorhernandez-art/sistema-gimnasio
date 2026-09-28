@@ -1,0 +1,146 @@
+@model IEnumerable<GymWeb.Models.Vwsociomembresia>
+@{
+    var socio = ViewBag.Socio as GymWeb.Models.Socio;
+    var membresias = ViewBag.Membresias as IEnumerable<GymWeb.Models.Membresium>;
+    var actual = Model.OrderByDescending(v => v.FechaCreacion).FirstOrDefault(v => v.IdEstado == 1);
+    bool vencida = actual != null && actual.Vencimiento.HasValue && actual.Vencimiento.Value < DateTime.Today;
+    DateTime fechaSugerida = (actual != null && actual.Vencimiento.HasValue && actual.Vencimiento.Value >= DateTime.Today)
+        ? actual.Vencimiento.Value.AddDays(1)
+        : DateTime.Today;
+}
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible">
+        <i class="fa-solid fa-circle-check"></i> @TempData["Success"]
+    </div>
+}
+@if (TempData["Warning"] != null)
+{
+    <div class="alert" style="background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.35);color:#fbbf24;padding:12px 16px;border-radius:8px;margin-bottom:16px;">
+        <i class="fa-solid fa-triangle-exclamation"></i> @TempData["Warning"]
+    </div>
+}
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
+    <!-- Assign / Renew membership -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">
+                @if (vencida)
+                {
+                    <i class="fa-solid fa-rotate" style="color:#f87171;"></i>
+                    <span style="color:#f87171;">@socio?.Nombre @socio?.Paterno — Renovar Membresía</span>
+                }
+                else if (!Model.Any())
+                {
+                    <i class="fa-solid fa-id-card"></i>
+                    <span>@socio?.Nombre @socio?.Paterno — Asignar Membresía</span>
+                }
+                else
+                {
+                    <i class="fa-solid fa-id-card"></i>
+                    <span>@socio?.Nombre @socio?.Paterno — Nueva Membresía</span>
+                }
+            </div>
+            <a asp-action="Index" class="btn btn-outline btn-sm"><i class="fa-solid fa-arrow-left"></i></a>
+        </div>
+
+        @if (vencida)
+        {
+            <div class="alert alert-danger" style="margin-bottom:16px;">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                La membresía <strong>@actual!.NombreMembresia</strong> venció el <strong>@actual.Vencimiento?.ToString("dd/MM/yyyy")</strong>.
+                Selecciona una nueva membresía para renovar.
+            </div>
+        }
+        else if (actual != null)
+        {
+            <div class="alert alert-success" style="margin-bottom:16px;font-size:13px;">
+                <i class="fa-solid fa-circle-check"></i>
+                Membresía activa: <strong>@actual.NombreMembresia</strong> — vence el <strong>@actual.Vencimiento?.ToString("dd/MM/yyyy")</strong>.
+                Puedes asignar una nueva para cuando concluya.
+            </div>
+        }
+
+        <form asp-action="AsignarMembresia" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="idSocio" value="@socio?.IdSocio" />
+            <div class="form-grid">
+                <div class="form-group" style="grid-column:1/-1;">
+                    <label class="form-label">Membresía</label>
+                    <select name="idMembresia" class="form-select" required>
+                        <option value="">Seleccionar...</option>
+                        @foreach (var m in membresias ?? Enumerable.Empty<GymWeb.Models.Membresium>())
+                        {
+                            <option value="@m.IdMembresia">@m.Nombre — @m.Meses mes(es) — $@m.Precio</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group" style="grid-column:1/-1;">
+                    <label class="form-label">Fecha Inicio</label>
+                    <input type="date" name="fechaInicio" class="form-control"
+                           value="@fechaSugerida.ToString("yyyy-MM-dd")" required />
+                </div>
+            </div>
+            <div style="margin-top:16px;">
+                <button type="submit" class="btn @(vencida ? "btn-danger" : "btn-primary")">
+                    <i class="fa-solid @(vencida ? "fa-rotate" : "fa-plus")"></i>
+                    @(vencida ? "Renovar Membresía" : "Asignar")
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- History -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-clock-rotate-left"></i> Historial</div>
+        </div>
+        @if (!Model.Any())
+        {
+            <p class="text-muted" style="font-size:13px;padding:8px 0;">Sin membresías registradas.</p>
+        }
+        else
+        {
+            <table class="gym-table">
+                <thead>
+                    <tr>
+                        <th>Membresía</th>
+                        <th>Inicio</th>
+                        <th>Vencimiento</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var v in Model)
+                {
+                    bool esVencida = v.IdEstado == 1 && v.Vencimiento.HasValue && v.Vencimiento.Value < DateTime.Today;
+                    <tr>
+                        <td style="font-size:13px;">@(v.NombreMembresia ?? $"Mem. #{v.IdMembresia}")</td>
+                        <td style="font-size:12px;" class="text-muted">@v.FechaInicioMembresia?.ToString("dd/MM/yy")</td>
+                        <td style="font-size:12px;" class="@(esVencida ? "" : "text-muted")">
+                            @if (v.Vencimiento.HasValue)
+                            {
+                                if (esVencida)
+                                { <span style="color:#f87171;font-weight:600;">@v.Vencimiento.Value.ToString("dd/MM/yy")</span> }
+                                else
+                                { <span>@v.Vencimiento.Value.ToString("dd/MM/yy")</span> }
+                            }
+                            else { <span class="text-muted">—</span> }
+                        </td>
+                        <td>
+                            @if (esVencida)
+                            { <span class="badge badge-danger"><i class="fa-solid fa-clock"></i> Vencida</span> }
+                            else if (v.IdEstado == 1)
+                            { <span class="badge badge-success">Activa</span> }
+                            else
+                            { <span class="badge" style="background:rgba(255,255,255,0.07);color:#8b8fa8;">Inactiva</span> }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>

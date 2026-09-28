@@ -1,0 +1,84 @@
+# Windows image file caches
+Thumbs.db
+ehthumbs.db
+
+# Folder config file
+Desktop.ini
+
+# Recycle Bin used on file shares
+$RECYCLE.BIN/
+
+# Windows Installer files
+*.cab
+*.msi
+*.msm
+*.msp
+
+# Windows shortcuts
+*.lnk
+
+# =========================
+# Operating System Files
+# =========================
+
+# OSX
+# =========================
+
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Thumbnails
+._*
+
+# Files that might appear in the root of a volume
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+
+# Directories potentially created on remote AFP share
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# ============================================
+# .NET / ASP.NET Core
+# ============================================
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.log
+
+# ============================================
+# Archivos de distribución compilados (pesados)
+# No se suben al repo, se generan localmente
+# ============================================
+dist/
+Publish/wwwroot/
+GymApp/bin/
+GymApp/obj/
+
+# ============================================
+# Base de datos y datos sensibles del cliente
+# ============================================
+gym.db
+gym.db-shm
+gym.db-wal
+wwwroot/img/socios/
+wwwroot/img/logo-custom.png
+wwwroot/img/fondo-custom.jpg
+wwwroot/backups/
+license.json
+
+# ============================================
+# Logs y temporales
+# ============================================
+logs/
+*.log

@@ -1,0 +1,440 @@
+@model IEnumerable<GymWeb.Models.Socio>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible">
+        <i class="fa-solid fa-circle-check"></i> @TempData["Success"]
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible">
+        <i class="fa-solid fa-circle-xmark"></i> @TempData["Error"]
+    </div>
+}
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title"><i class="fa-solid fa-users"></i> Lista de Socios</div>
+        <div style="display:flex;gap:8px;">
+            <a asp-action="ExportCsv" asp-route-formato="excel" class="btn btn-sm" style="background:#16a34a;color:#fff;" title="Descargar directorio formal en Excel con Logo">
+                <i class="fa-solid fa-file-excel"></i> Excel
+            </a>
+            <a asp-action="Create" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-plus"></i> Nuevo Socio
+            </a>
+        </div>
+    </div>
+
+    <div class="toolbar">
+        <div class="toolbar-left">
+            <div class="search-box">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input id="tableSearch" type="text" placeholder="Buscar socio..." />
+            </div>
+        </div>
+        <div class="toolbar-right">
+            <span class="text-muted" style="font-size:13px;">Total: @Model.Count() socios</span>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="gym-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th></th>
+                    <th>Nombre</th>
+                    <th>Clave</th>
+                    <th>Teléfono</th>
+                    <th>Estado</th>
+                    <th>Registro</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+            @{ int num = 0; }
+            @foreach (var s in Model)
+            {
+                num++;
+                <tr>
+                    <td class="text-muted">@num</td>
+                    <td style="padding:8px 6px;">
+                        @if (s.Foto != null && s.Foto.Length > 0)
+                        {
+                            <img src="/Socios/GetFoto/@s.IdSocio" class="socio-avatar" />
+                        }
+                        else
+                        {
+                            <span class="socio-avatar-icon"><i class="fa-solid fa-user"></i></span>
+                        }
+                    </td>
+                    <td>
+                        <span class="name-cell">@s.Nombre @s.Paterno @s.Materno</span>
+                        @if (s.SocioHuella != null && s.SocioHuella.Template != null)
+                        {
+                            <span class="badge" style="font-size:10px;padding:2px 7px;margin-left:6px;background:rgba(0,242,100,0.12);color:#00f264;border:1px solid rgba(0,242,100,0.3);font-family:'Inter',monospace;" title="Huella y PIN activos">
+                                <i class="fa-solid fa-fingerprint"></i> PIN @s.SocioHuella.Pin
+                            </span>
+                        }
+                    </td>
+                    <td><span class="badge badge-info" style="font-family:'Inter',monospace;letter-spacing:1px;">@s.IdSocio</span></td>
+                    <td>@s.Telefono</td>
+                    <td>
+                        @if (s.IdEstado == 1)
+                        { <span class="badge badge-success"><i class="fa-solid fa-circle"></i> Activo</span> }
+                        else
+                        { <span class="badge badge-danger"><i class="fa-solid fa-circle"></i> Inactivo</span> }
+                    </td>
+                    <td class="text-muted" style="font-size:12px;">@s.FechaCreacion?.ToString("dd/MM/yyyy")</td>
+                    <td>
+                        <div style="display:flex;gap:6px;">
+                            <a asp-action="Membresia" asp-route-id="@s.IdSocio" class="btn btn-outline btn-sm" title="Membresía / Renovar">
+                                <i class="fa-solid fa-id-card"></i>
+                            </a>
+                            <a asp-action="PagosSocio" asp-route-id="@s.IdSocio" class="btn btn-outline btn-sm" title="Historial de pagos">
+                                <i class="fa-solid fa-dollar-sign"></i>
+                            </a>
+                            <button type="button" class="btn btn-outline btn-sm"
+                                    onclick="abrirBiometrico(@s.IdSocio)"
+                                    style="@(s.SocioHuella != null && s.SocioHuella.Template != null ? "border-color:rgba(0,242,100,0.5);background:rgba(0,242,100,0.12);" : "")"
+                                    title="@(s.SocioHuella != null && s.SocioHuella.Template != null ? $"✓ Huella Registrada (PIN: {s.SocioHuella.Pin})" : "Acceso Biométrico — Registrar Huella")">
+                                <i class="fa-solid fa-fingerprint" style="@(s.SocioHuella != null && s.SocioHuella.Template != null ? "color:#00f264;" : "")"></i>
+                            </button>
+                            <a asp-action="Edit" asp-route-id="@s.IdSocio" class="btn btn-outline btn-sm" title="Editar">
+                                <i class="fa-solid fa-pen"></i>
+                            </a>
+                            @if (s.IdEstado == 1)
+                            {
+                                <form asp-action="Delete" method="post" style="margin:0;" onsubmit="return confirm('¿Inactivar este socio?')">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@s.IdSocio" />
+                                    <button type="submit" class="btn btn-sm" style="background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.3);" title="Inactivar">
+                                        <i class="fa-solid fa-user-slash"></i>
+                                    </button>
+                                </form>
+                            }
+                            else
+                            {
+                                <form asp-action="Activate" method="post" style="margin:0;" onsubmit="return confirm('¿Activar este socio?')">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@s.IdSocio" />
+                                    <button type="submit" class="btn btn-sm" style="background:rgba(0,242,100,0.15);color:#00f264;border:1px solid rgba(0,242,100,0.3);" title="Activar">
+                                        <i class="fa-solid fa-rotate-left"></i>
+                                    </button>
+                                </form>
+                                <form asp-action="PermanentDelete" method="post" style="margin:0;" onsubmit="return confirm('⚠️ ELIMINAR PERMANENTEMENTE\n\nEsto eliminará al socio y todos sus datos del sistema.\n\nEsta acción NO se puede deshacer.\n\n¿Continuar?')">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@s.IdSocio" />
+                                    <button type="submit" class="btn btn-sm" style="background:rgba(220,38,38,0.20);color:#f87171;border:1px solid rgba(220,38,38,0.45);" title="Eliminar permanentemente">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </form>
+                            }
+                        </div>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@Html.AntiForgeryToken()
+
+<!-- ═══════════════════════════════════════════════════════════════
+     MODAL ACCESO BIOMÉTRICO
+═══════════════════════════════════════════════════════════════ -->
+<div id="bioRegModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:9990;align-items:flex-start;justify-content:center;padding-top:60px;">
+    <div style="background:#111827;border:1px solid var(--border);border-radius:16px;width:100%;max-width:500px;box-shadow:0 32px 80px rgba(0,0,0,0.8);overflow:hidden;">
+
+        <!-- Header -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px 16px;border-bottom:1px solid var(--border);">
+            <div>
+                <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin-bottom:2px;"><i class="fa-solid fa-fingerprint"></i> Acceso Biométrico</div>
+                <div id="bioRegNombre" style="font-size:17px;font-weight:700;">—</div>
+            </div>
+            <button onclick="cerrarBiometrico()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;padding:4px 8px;">✕</button>
+        </div>
+
+        <!-- Warning si bridge offline -->
+        <div id="bioRegWarning" style="display:none;margin:16px 24px 0;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.35);border-radius:10px;padding:12px 14px;font-size:12px;color:#fcd34d;">
+            <i class="fa-solid fa-circle-exclamation"></i>
+            <strong>Servicio biométrico no activo.</strong> Inicia el sistema con <code>Iniciar Gym.bat</code> o ejecuta <code>INICIAR-BioService.bat</code> en la carpeta de instalación.
+        </div>
+
+        <!-- Barra de Estado de Hardware USB en tiempo real -->
+        <div id="bioHardwareBar" style="margin:14px 24px 0;padding:10px 14px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid var(--border);font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+            <div style="display:flex;align-items:center;gap:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                <span id="bioHwDot" style="width:8px;height:8px;border-radius:50%;background:#fbbf24;display:inline-block;flex-shrink:0;"></span>
+                <span id="bioHwText" style="color:var(--text-muted);">Detectando lector USB...</span>
+            </div>
+            <button type="button" onclick="detectarLectorUsb()" title="Volver a escanear puertos USB"
+                    style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;font-weight:600;display:flex;align-items:center;gap:4px;padding:2px 6px;border-radius:4px;">
+                <i class="fa-solid fa-rotate"></i> Escanear
+            </button>
+        </div>
+
+        <!-- Config existente -->
+        <div id="bioRegExistente" style="display:none;margin:14px 24px 0;background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.25);border-radius:10px;padding:10px 14px;font-size:12px;color:#4ade80;">
+            <i class="fa-solid fa-circle-check"></i> <strong>Huella registrada</strong>
+            — PIN: <span id="bioRegPinExistente" style="font-weight:700;"></span>
+            &nbsp;·&nbsp; <span id="bioRegFechaExist" style="color:var(--text-muted);"></span>
+        </div>
+
+        <div style="padding:20px 24px;">
+
+            <!-- PASO 1: Captura -->
+            <div style="margin-bottom:22px;">
+                <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">1. Capturar huella dactilar</div>
+                <button id="btnCaptura" type="button" onclick="iniciarCaptura()"
+                        style="width:100%;padding:14px;border-radius:10px;border:1px dashed rgba(0,242,255,0.3);background:rgba(0,242,255,0.04);color:var(--text-primary);font-size:14px;cursor:pointer;transition:all 0.2s;"
+                        onmouseover="this.style.background='rgba(0,242,255,0.08)'" onmouseout="this.style.background='rgba(0,242,255,0.04)'">
+                    <i class="fa-solid fa-fingerprint" style="color:var(--accent);margin-right:8px;"></i>
+                    <span id="btnCapturaText">Iniciar captura (3 escaneos)</span>
+                </button>
+                <div id="capturaStatus" style="display:none;margin-top:10px;font-size:12px;text-align:center;color:var(--text-muted);"></div>
+                <div id="capturaOk" style="display:none;margin-top:10px;font-size:12px;text-align:center;color:#4ade80;"><i class="fa-solid fa-circle-check"></i> Huella capturada correctamente</div>
+            </div>
+
+            <!-- PASO 2: Dispositivo + PIN -->
+            <div>
+                <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">2. Asignar a dispositivo</div>
+
+                <div style="margin-bottom:12px;">
+                    <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px;">Dispositivo</label>
+                    <select id="bioDispositivo" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:#1e2533;color:var(--text-primary);font-size:13px;">
+                        <option value="">Seleccionar dispositivo...</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom:6px;">
+                    <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px;">
+                        PIN en el dispositivo
+                    </label>
+                    <input id="bioPin" type="number" min="1" max="999999" placeholder="Ej. 1001"
+                           style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:#1e2533;color:var(--text-primary);font-size:13px;box-sizing:border-box;" />
+                    <div id="bioPinHint" style="font-size:11px;color:var(--accent);margin-top:5px;">
+                        <i class="fa-solid fa-circle-info"></i> Se usa la clave del socio como PIN — es única y no necesitas recordar otro número.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="padding:0 24px 20px;">
+            <div id="bioRegMsg" style="display:none;font-size:12px;margin-bottom:10px;"></div>
+            <button id="btnGuardar" type="button" onclick="guardarBiometrico()"
+                    style="width:100%;padding:13px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--accent),#00c9ff);color:#0a0b14;font-size:14px;font-weight:700;cursor:pointer;">
+                <i class="fa-solid fa-plus"></i> Guardar y sincronizar con dispositivo
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function(){
+    const CSRF      = document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
+    const modal     = document.getElementById('bioRegModal');
+    let   idSocioActivo = null;
+    let   templateCapturado = null;
+
+    // ── Abrir modal ────────────────────────────────────────────────
+    window.abrirBiometrico = async function(idSocio) {
+        idSocioActivo = idSocio;
+        templateCapturado = null;
+        resetModal();
+        modal.style.display = 'flex';
+
+        // Cargar datos del socio
+        const r    = await fetch(`/Biometrico/Config?idSocio=${idSocio}`);
+        const data = await r.json();
+        document.getElementById('bioRegNombre').textContent = data.nombre;
+
+        // Auto-rellenar PIN con la clave del socio (sugerencia por defecto)
+        document.getElementById('bioPin').value = data.pin;
+        // Si ya está configurado ocultar el hint, si no mostrarlo
+        document.getElementById('bioPinHint').style.display = data.configurado ? 'none' : 'block';
+
+        if (data.configurado) {
+            document.getElementById('bioRegExistente').style.display = 'block';
+            document.getElementById('bioRegPinExistente').textContent = data.pin;
+            document.getElementById('bioRegFechaExist').textContent   = 'Registrado: ' + (data.fechaRegistro ?? '');
+            document.getElementById('bioPin').value = data.pin;
+            document.getElementById('bioDispositivo').value = data.idDispositivo ?? '';
+        }
+
+        // Detectar lector USB y listar dispositivos
+        detectarLectorUsb();
+        try {
+            const dr   = await fetch('/Biometrico/Dispositivos');
+            const ddat = await dr.json();
+            if (ddat.error === 'bridge_offline') throw new Error();
+
+            const sel = document.getElementById('bioDispositivo');
+            sel.innerHTML = '<option value="">Seleccionar dispositivo...</option>';
+            (ddat.devices ?? []).forEach(d => {
+                const opt = document.createElement('option');
+                opt.value       = d.id ?? d;
+                opt.textContent = d.nombre ?? d;
+                if (data.idDispositivo && opt.value === data.idDispositivo) opt.selected = true;
+                sel.appendChild(opt);
+            });
+        } catch {
+            document.getElementById('bioRegWarning').style.display = 'block';
+        }
+    };
+
+    // ── Detección en vivo de hardware USB ──────────────────────────
+    window.detectarLectorUsb = async function() {
+        const dot  = document.getElementById('bioHwDot');
+        const text = document.getElementById('bioHwText');
+        dot.style.background = '#fbbf24';
+        text.textContent     = 'Escaneando puertos USB...';
+
+        try {
+            const r    = await fetch('/Biometrico/Diagnostico');
+            const data = await r.json();
+
+            if (data.error === 'bridge_offline') {
+                dot.style.background = '#f87171';
+                text.textContent     = 'Servicio biométrico desconectado';
+                document.getElementById('bioRegWarning').style.display = 'block';
+                return;
+            }
+
+            document.getElementById('bioRegWarning').style.display = 'none';
+            const diag = data.diag || {};
+
+            if (diag.hasWbfSensor || (diag.devices && diag.devices.some(d => d.status === 'Ready'))) {
+                dot.style.background = '#4ade80';
+                const dev = (diag.devices || []).find(d => d.status === 'Ready');
+                text.textContent = dev ? `🟢 ${dev.name} (Listo)` : '🟢 Lector biométrico listo';
+            } else if (diag.hasPhysicalUsbDevice && diag.devices && diag.devices.length > 0) {
+                dot.style.background = '#fbbf24';
+                const dev = diag.devices[0];
+                text.textContent = `🟡 ${dev.name} (Requiere driver)`;
+                text.title = dev.recommendation || '';
+            } else {
+                dot.style.background = '#94a3b8';
+                text.textContent = '⚪ Sin lector USB — Modo PIN / Teclado activo';
+            }
+        } catch {
+            dot.style.background = '#f87171';
+            text.textContent     = 'No se pudo consultar el hardware';
+        }
+    };
+
+    window.cerrarBiometrico = function() {
+        modal.style.display = 'none';
+        idSocioActivo = null;
+        templateCapturado = null;
+    };
+
+    // ── Captura de huella ──────────────────────────────────────────
+    window.iniciarCaptura = async function() {
+        const btn  = document.getElementById('btnCaptura');
+        const txt  = document.getElementById('btnCapturaText');
+        const stat = document.getElementById('capturaStatus');
+        const ok   = document.getElementById('capturaOk');
+
+        btn.disabled = true;
+        ok.style.display   = 'none';
+        stat.style.display = 'block';
+        stat.textContent   = 'Coloca el dedo en el lector...';
+
+        try {
+            const fd = new FormData();
+            fd.append('__RequestVerificationToken', CSRF);
+            const r    = await fetch('/Biometrico/IniciarCaptura', { method: 'POST', body: fd });
+            const data = await r.json();
+
+            if (data.error === 'bridge_offline') {
+                stat.textContent = 'Servicio no disponible.';
+                document.getElementById('bioRegWarning').style.display = 'block';
+            } else if (data.ok) {
+                templateCapturado = data.template || null;
+                stat.style.display = 'none';
+                ok.style.display   = 'block';
+            } else {
+                stat.textContent = data.msg ?? 'Error en captura.';
+            }
+        } catch {
+            stat.textContent = 'Error de conexión con el servicio.';
+        } finally {
+            btn.disabled = false;
+            txt.textContent = 'Reintentar captura';
+        }
+    };
+
+    // ── Guardar PIN + sincronizar ──────────────────────────────────
+    window.guardarBiometrico = async function() {
+        const pin  = document.getElementById('bioPin').value;
+        const disp = document.getElementById('bioDispositivo').value;
+        const msg  = document.getElementById('bioRegMsg');
+
+        if (!pin || parseInt(pin) < 1) {
+            mostrarMsg('Ingresa un PIN válido.', '#f87171');
+            return;
+        }
+        if (!idSocioActivo) return;
+
+        const fd = new FormData();
+        fd.append('idSocio', idSocioActivo);
+        fd.append('pin', pin);
+        fd.append('idDispositivo', disp);
+        if (templateCapturado) {
+            fd.append('templateBase64', templateCapturado);
+        }
+        fd.append('__RequestVerificationToken', CSRF);
+
+        const r    = await fetch('/Biometrico/Guardar', { method: 'POST', body: fd });
+        const data = await r.json();
+
+        if (!data.ok) {
+            mostrarMsg(data.msg ?? 'Error al guardar.', '#f87171');
+            return;
+        }
+
+        // Intentar sincronizar con el dispositivo
+        if (disp) {
+            const nombre = document.getElementById('bioRegNombre').textContent;
+            try {
+                await fetch('/Biometrico/Sincronizar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pin: parseInt(pin), nombre, dispositivo: disp })
+                });
+            } catch { /* el bridge puede no estar activo al guardar */ }
+        }
+
+        mostrarMsg('\u2713 Configuración guardada correctamente.', '#4ade80');
+        setTimeout(cerrarBiometrico, 1500);
+    };
+
+    function mostrarMsg(texto, color) {
+        const el       = document.getElementById('bioRegMsg');
+        el.textContent = texto;
+        el.style.color = color;
+        el.style.display = 'block';
+    }
+
+    function resetModal() {
+        document.getElementById('bioRegWarning').style.display   = 'none';
+        document.getElementById('bioRegExistente').style.display = 'none';
+        document.getElementById('capturaStatus').style.display   = 'none';
+        document.getElementById('capturaOk').style.display       = 'none';
+        document.getElementById('bioRegMsg').style.display       = 'none';
+        document.getElementById('bioPinHint').style.display      = 'block';
+        document.getElementById('btnCapturaText').textContent    = 'Iniciar captura (3 escaneos)';
+        document.getElementById('bioPin').value         = '';
+        document.getElementById('bioDispositivo').innerHTML = '<option value="">Seleccionar dispositivo...</option>';
+    }
+
+    // Cerrar con clic en fondo
+    modal.addEventListener('click', e => { if (e.target === modal) cerrarBiometrico(); });
+
+    // Cerrar con Escape
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarBiometrico(); });
+})();
+</script>

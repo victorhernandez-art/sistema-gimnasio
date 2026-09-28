@@ -1,0 +1,167 @@
+@model GymWeb.Models.Socio
+
+<div class="card" style="max-width:680px;">
+    <div class="card-header">
+        <div class="card-title"><i class="fa-solid fa-user-plus"></i> Nuevo Socio</div>
+        <a asp-action="Index" class="btn btn-outline btn-sm"><i class="fa-solid fa-arrow-left"></i> Volver</a>
+    </div>
+
+    <form asp-action="Create" method="post">
+        @Html.AntiForgeryToken()
+
+        <div class="foto-wrap">
+            <div class="foto-box" id="fotoBox">
+                <div class="foto-icon">
+                    <i class="fa-solid fa-user fa-2x"></i>
+                    <span>Sin foto</span>
+                </div>
+            </div>
+            <div class="foto-controls">
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button type="button" class="btn btn-outline btn-sm" id="btnOpenCamera">
+                        <i class="fa-solid fa-camera"></i> Cámara
+                    </button>
+                    <button type="button" class="btn btn-outline btn-sm" id="btnUploadPhoto">
+                        <i class="fa-solid fa-upload"></i> Subir foto
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" id="btnCapture" style="display:none;">
+                        <i class="fa-solid fa-circle"></i> Capturar
+                    </button>
+                    <button type="button" class="btn btn-outline btn-sm" id="btnRetake" style="display:none;">
+                        <i class="fa-solid fa-rotate-left"></i> Retomar
+                    </button>
+                </div>
+                <input type="hidden" name="FotoBase64" id="FotoBase64" />
+                <input type="file" id="filePhotoInput" accept="image/*" style="display:none;" />
+                <video id="cameraVideo" style="display:none;" autoplay playsinline></video>
+                <canvas id="cameraCanvas" style="display:none;"></canvas>
+                <p class="text-muted" style="font-size:11px;margin-top:8px;">Toma una foto con la cámara o sube una imagen desde tu equipo.</p>
+            </div>
+        </div>
+
+        <div class="form-grid" style="margin-top:20px;">
+            <div class="form-group">
+                <label class="form-label">Nombre</label>
+                <input asp-for="Nombre" class="form-control" placeholder="Nombre(s)" required />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Apellido Paterno</label>
+                <input asp-for="Paterno" class="form-control" placeholder="Paterno" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Apellido Materno</label>
+                <input asp-for="Materno" class="form-control" placeholder="Materno" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Teléfono</label>
+                <input asp-for="Telefono" class="form-control" placeholder="555-1234" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Plan / Membresía</label>
+                <select name="IdMembresia" class="form-control">
+                    <option value="">— Sin membresía —</option>
+                    @foreach (var m in (IEnumerable<GymWeb.Models.Membresium>)ViewBag.Membresias)
+                    {
+                        <option value="@m.IdMembresia">@m.Nombre (@m.Precio?.ToString("C", new System.Globalization.CultureInfo("es-MX")))</option>
+                    }
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Fecha de Inicio</label>
+                <input type="date" name="FechaInicioMembresia" class="form-control" value="@DateTime.Now.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="form-group" style="grid-column:1/-1;">
+                <label class="form-label">Observaciones</label>
+                <textarea asp-for="Observaciones" class="form-control" rows="2" placeholder="Notas adicionales..."></textarea>
+            </div>
+        </div>
+
+        <div style="margin-top:20px;display:flex;gap:10px;">
+            <button type="submit" class="btn btn-primary">
+                <i class="fa-solid fa-floppy-disk"></i> Guardar
+            </button>
+            <a asp-action="Index" class="btn btn-outline">Cancelar</a>
+        </div>
+    </form>
+</div>
+
+<script>
+(function(){
+    const fotoBox  = document.getElementById('fotoBox');
+    const video    = document.getElementById('cameraVideo');
+    const canvas   = document.getElementById('cameraCanvas');
+    const fotoInp  = document.getElementById('FotoBase64');
+    const btnOpen  = document.getElementById('btnOpenCamera');
+    const btnCap   = document.getElementById('btnCapture');
+    const btnRet   = document.getElementById('btnRetake');
+    let stream = null;
+
+    btnOpen.addEventListener('click', async () => {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: { width:320, height:400, facingMode:'user' } });
+            video.srcObject = stream;
+            fotoBox.innerHTML = '';
+            fotoBox.appendChild(video);
+            video.style.display = 'block';
+            btnOpen.style.display = 'none';
+            btnCap.style.display  = 'inline-flex';
+        } catch(e) { alert('No se pudo acceder a la cámara: ' + e.message); }
+    });
+
+    btnCap.addEventListener('click', () => {
+        canvas.width  = 320;
+        canvas.height = 400;
+        canvas.getContext('2d').drawImage(video, 0, 0, 320, 400);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        fotoInp.value = dataUrl;
+        if (stream) stream.getTracks().forEach(t => t.stop());
+        video.style.display = 'none';
+        const img = document.createElement('img');
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+        img.src = dataUrl;
+        fotoBox.innerHTML = '';
+        fotoBox.appendChild(img);
+        btnCap.style.display = 'none';
+        btnRet.style.display = 'inline-flex';
+    });
+
+    btnRet.addEventListener('click', () => {
+        fotoInp.value = '';
+        if (stream) stream.getTracks().forEach(t => t.stop());
+        fotoBox.innerHTML = '<div class="foto-icon"><i class="fa-solid fa-user fa-2x"></i><span>Sin foto</span></div>';
+        btnRet.style.display    = 'none';
+        btnCap.style.display    = 'none';
+        btnOpen.style.display   = 'inline-flex';
+        btnUpload.style.display = 'inline-flex';
+    });
+
+    // Upload from device
+    const btnUpload   = document.getElementById('btnUploadPhoto');
+    const fileInput   = document.getElementById('filePhotoInput');
+
+    btnUpload.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', () => {
+        const file = fileInput.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const dataUrl = e.target.result;
+            fotoInp.value = dataUrl;
+            if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+            video.style.display = 'none';
+            const img = document.createElement('img');
+            img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:8px;';
+            img.src = dataUrl;
+            fotoBox.innerHTML = '';
+            fotoBox.appendChild(img);
+            btnCap.style.display    = 'none';
+            btnOpen.style.display   = 'none';
+            btnUpload.style.display = 'none';
+            btnRet.style.display    = 'inline-flex';
+        };
+        reader.readAsDataURL(file);
+    });
+})();
+</script>
+
