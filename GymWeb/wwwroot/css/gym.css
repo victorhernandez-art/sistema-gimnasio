@@ -300,6 +300,27 @@ body::before {
 .sidebar.collapsed .logout-link span { opacity: 0; width: 0; overflow: hidden; }
 .sidebar.collapsed .logout-link { justify-content: center; }
 
+.sidebar-version {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.65;
+  letter-spacing: 0.6px;
+  font-family: var(--font-mono, monospace);
+  transition: opacity var(--transition);
+  user-select: none;
+}
+.sidebar.collapsed .sidebar-version {
+  opacity: 0;
+  height: 0;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
 /* ── Main content area ── */
 .main-content {
   margin-left: var(--sidebar-w);
