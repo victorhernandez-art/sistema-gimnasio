@@ -438,17 +438,14 @@ else
     const SESSION_KEY = 'gym_update_checked';
     const DISMISS_KEY = 'gym_update_dismissed';
 
-    // Limpiar dismiss expirado (24h) al cargar
+    // Limpiar dismiss huérfano (sin fecha) o expirado (24h)
     const exp = localStorage.getItem('gym_update_dismissed_exp');
-    if (exp && new Date() > new Date(exp)) {
+    if (!exp || isNaN(Date.parse(exp)) || new Date() > new Date(exp)) {
         localStorage.removeItem(DISMISS_KEY);
         localStorage.removeItem('gym_update_dismissed_exp');
     }
 
-    const lastCheck = parseInt(sessionStorage.getItem(SESSION_KEY) || '0');
-    const now = Date.now();
-    if (lastCheck > 0 && (now - lastCheck) < 10 * 60 * 1000) return;
-    sessionStorage.setItem(SESSION_KEY, now.toString());
+    if (sessionStorage.getItem(SESSION_KEY) === 'shown') return;
 
     setTimeout(async function(){
         try {
@@ -483,6 +480,7 @@ else
             });
 
             localStorage.setItem(DISMISS_KEY + '_seen', data.latest);
+            sessionStorage.setItem(SESSION_KEY, 'shown');
         } catch(e) {}
     }, 3000);
 
