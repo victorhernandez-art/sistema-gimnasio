@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="utf-8" />
@@ -445,8 +445,10 @@ else
         localStorage.removeItem('gym_update_dismissed_exp');
     }
 
-    if (sessionStorage.getItem(SESSION_KEY)) return;
-    sessionStorage.setItem(SESSION_KEY, '1');
+    const lastCheck = parseInt(sessionStorage.getItem(SESSION_KEY) || '0');
+    const now = Date.now();
+    if (lastCheck > 0 && (now - lastCheck) < 10 * 60 * 1000) return;
+    sessionStorage.setItem(SESSION_KEY, now.toString());
 
     setTimeout(async function(){
         try {
