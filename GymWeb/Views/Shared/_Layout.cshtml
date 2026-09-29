@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="utf-8" />
@@ -145,7 +145,7 @@
                 <li>
                     <a href="/Configuracion/Index?tab=licencia" class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Configuracion" ? "active" : "") @(licBloqueada ? "sidebar-lic-active-btn" : "")"
                        style="@(licBloqueada ? "background:rgba(239,68,68,0.12);border:1px solid #ef4444;color:#ef4444;font-weight:700;" : (primerUso ? "background:rgba(0,242,255,0.12);border:1px solid #00f2ff;color:#00f2ff;font-weight:700;" : ""))">
-                        <i class="fa-solid @(licBloqueada ? "fa-key" : (primerUso ? "fa-rocket" : "fa-gear"))"></i>
+                        <i class="fa-solid @(licBloqueada ? "fa-key" : (primerUso ? "fa-circle-check" : "fa-gear"))"></i>
                         <span>@(licBloqueada ? "Activar Licencia" : (primerUso ? "Activar Prueba" : "Configuración"))</span>
                     </a>
                 </li>
@@ -188,11 +188,11 @@
         {
             <div style="background:linear-gradient(90deg, #0284c7, #0369a1);color:#ffffff;padding:12px 20px;font-size:13.5px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:14px;box-shadow:0 4px 14px rgba(2,132,199,0.35);position:relative;z-index:100;">
                 <div style="display:flex;align-items:center;gap:10px;">
-                    <i class="fa-solid fa-wand-magic-sparkles" style="font-size:18px;color:#7dd3fc;"></i>
-                    <span><strong>¡Bienvenido a GymPro!</strong> Disfruta de 7 días de prueba completa sin compromiso ni restricciones.</span>
+                    <i class="fa-solid fa-circle-info" style="font-size:18px;color:#7dd3fc;"></i>
+                    <span><strong>Bienvenido a GymPro:</strong> Dispones de 7 días de prueba completa sin restricciones.</span>
                 </div>
                 <a href="/Configuracion/Index?tab=licencia" class="btn btn-sm" style="background:#ffffff;color:#0369a1;font-weight:800;white-space:nowrap;padding:6px 14px;border-radius:8px;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,0.2);">
-                    <i class="fa-solid fa-rocket"></i> Activar Prueba Gratuita
+                    <i class="fa-solid fa-circle-check"></i> Activar Prueba Gratuita
                 </a>
             </div>
         }
@@ -274,7 +274,7 @@
                         <i class="fa-solid fa-palette"></i>
                     </button>
                     <div class="theme-palette-dropdown" id="themePaletteDropdown">
-                        <div class="theme-palette-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Color del Sistema</div>
+                        <div class="theme-palette-title"><i class="fa-solid fa-palette"></i> Color del Sistema</div>
                         <div class="theme-colors-grid">
                             <button type="button" class="theme-color-opt" data-color="cyan" title="Cian Neón" style="--swatch:#00f2ff;"></button>
                             <button type="button" class="theme-color-opt" data-color="emerald" title="Verde Esmeralda" style="--swatch:#10b981;"></button>
