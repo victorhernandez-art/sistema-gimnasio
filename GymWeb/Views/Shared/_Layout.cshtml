@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="utf-8" />
@@ -359,99 +359,148 @@ else
     </div>
 </div>
 
-@* ── Toast de Actualización Disponible (GitHub Releases API) ── *@
+@* ── Modal de Actualización Disponible (GitHub Releases API) ── *@
 @if (Context.Session.GetString("UsuarioRol") == "superadmin")
 {
-<!-- Toast actualización -->
-<div id="updateToast" style="display:none;position:fixed;bottom:24px;left:24px;z-index:99998;max-width:340px;background:linear-gradient(135deg,#0f1628,#1a2035);border:1px solid rgba(0,242,255,0.35);border-radius:16px;padding:0;box-shadow:0 12px 40px rgba(0,0,0,0.7),0 0 0 1px rgba(0,242,255,0.08);overflow:hidden;animation:slideInUpdate 0.4s cubic-bezier(0.34,1.56,0.64,1);">
-    <!-- Barra superior de color -->
-    <div style="height:3px;background:linear-gradient(90deg,#00f2ff,#0891b2);"></div>
-    <div style="padding:16px 18px 14px;">
-        <div style="display:flex;align-items:flex-start;gap:12px;">
-            <!-- Icono -->
-            <div style="width:40px;height:40px;border-radius:12px;background:rgba(0,242,255,0.12);border:1px solid rgba(0,242,255,0.25);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                <i class="fa-solid fa-rocket" style="color:#00f2ff;font-size:17px;"></i>
+<!-- Backdrop del modal -->
+<div id="updateBackdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);backdrop-filter:blur(4px);z-index:99990;"></div>
+
+<!-- Modal de Actualización -->
+<div id="updateModal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.92);z-index:99999;width:min(520px,94vw);background:linear-gradient(160deg,#0d1526 0%,#111827 100%);border:1px solid rgba(0,242,255,0.3);border-radius:20px;box-shadow:0 24px 64px rgba(0,0,0,0.8),0 0 0 1px rgba(0,242,255,0.06);overflow:hidden;opacity:0;transition:opacity 0.3s ease, transform 0.3s cubic-bezier(0.34,1.56,0.64,1);">
+    <div style="height:4px;background:linear-gradient(90deg,#00f2ff,#0284c7,#6366f1);"></div>
+    <div style="padding:20px 22px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:14px;border-bottom:1px solid rgba(255,255,255,0.06);">
+        <div style="display:flex;align-items:center;gap:14px;">
+            <div style="width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,rgba(0,242,255,0.15),rgba(0,242,255,0.05));border:1px solid rgba(0,242,255,0.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="fa-solid fa-rocket" style="color:#00f2ff;font-size:20px;"></i>
             </div>
-            <!-- Contenido -->
-            <div style="flex:1;min-width:0;">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;">
-                    <span style="font-size:13px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">Actualización disponible</span>
-                    <button onclick="gymDismissUpdate()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:16px;line-height:1;padding:0 0 0 8px;" title="Cerrar">&times;</button>
+            <div>
+                <div style="font-size:15px;font-weight:700;color:#ffffff;letter-spacing:0.2px;">Actualización disponible</div>
+                <div style="font-size:12px;color:#64748b;margin-top:2px;">
+                    Versión actual: <span id="upCurrent" style="color:#94a3b8;font-weight:600;"></span>
+                    &nbsp;<i class="fa-solid fa-arrow-right" style="font-size:10px;color:#00f2ff;"></i>&nbsp;
+                    Nueva versión: <span id="upLatest" style="color:#00f2ff;font-weight:700;"></span>
                 </div>
-                <div style="font-size:12px;color:#94a3b8;margin-bottom:10px;">
-                    Versión <span id="updateCurrentBadge" style="color:#64748b;font-weight:600;"></span>
-                    <i class="fa-solid fa-arrow-right" style="font-size:10px;margin:0 4px;"></i>
-                    <span id="updateLatestBadge" style="color:#00f2ff;font-weight:700;"></span> ya está lista.
-                </div>
-                <a id="updateDownloadBtn" href="#" target="_blank"
-                   style="display:inline-flex;align-items:center;gap:7px;background:linear-gradient(135deg,#00f2ff,#0891b2);color:#000000;font-size:12px;font-weight:700;padding:7px 14px;border-radius:8px;text-decoration:none;letter-spacing:0.3px;box-shadow:0 4px 12px rgba(0,242,255,0.3);transition:opacity 0.2s;"
-                   onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
-                    <i class="fa-solid fa-download"></i> Descargar parche
-                </a>
             </div>
         </div>
+        <button onclick="gymDismissUpdate('later')" style="background:none;border:none;color:#475569;cursor:pointer;font-size:22px;line-height:1;padding:2px;flex-shrink:0;" title="Cerrar">&times;</button>
+    </div>
+    <div style="padding:18px 22px;max-height:52vh;overflow-y:auto;">
+        <div id="upNotesSection" style="display:none;margin-bottom:18px;">
+            <div style="font-size:11px;font-weight:700;color:#00f2ff;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:8px;">
+                <i class="fa-solid fa-list-check" style="margin-right:5px;"></i>¿Qué incluye esta actualización?
+            </div>
+            <div id="upNotes" style="font-size:12.5px;color:#cbd5e1;line-height:1.7;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:12px 14px;white-space:pre-wrap;"></div>
+        </div>
+        <div>
+            <div style="font-size:11px;font-weight:700;color:#f59e0b;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:10px;">
+                <i class="fa-solid fa-screwdriver-wrench" style="margin-right:5px;"></i>Cómo instalar el parche
+            </div>
+            <div style="display:flex;flex-direction:column;gap:9px;">
+                <div style="display:flex;align-items:flex-start;gap:10px;">
+                    <div style="width:22px;height:22px;border-radius:50%;background:rgba(0,242,255,0.15);border:1px solid rgba(0,242,255,0.35);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#00f2ff;flex-shrink:0;margin-top:1px;">1</div>
+                    <div style="font-size:12.5px;color:#cbd5e1;line-height:1.5;">Haz clic en <strong style="color:#ffffff;">"Descargar parche"</strong> y guarda el archivo <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px;font-size:11.5px;">Parche_Ligero_GymWeb.zip</code></div>
+                </div>
+                <div style="display:flex;align-items:flex-start;gap:10px;">
+                    <div style="width:22px;height:22px;border-radius:50%;background:rgba(0,242,255,0.15);border:1px solid rgba(0,242,255,0.35);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#00f2ff;flex-shrink:0;margin-top:1px;">2</div>
+                    <div style="font-size:12.5px;color:#cbd5e1;line-height:1.5;"><strong style="color:#ffffff;">Descomprime</strong> el ZIP. Obtendrás una carpeta llamada <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px;font-size:11.5px;">Parche-Ligero</code></div>
+                </div>
+                <div style="display:flex;align-items:flex-start;gap:10px;">
+                    <div style="width:22px;height:22px;border-radius:50%;background:rgba(0,242,255,0.15);border:1px solid rgba(0,242,255,0.35);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#00f2ff;flex-shrink:0;margin-top:1px;">3</div>
+                    <div style="font-size:12.5px;color:#cbd5e1;line-height:1.5;"><strong style="color:#ffffff;">Copia todos los archivos</strong> de la carpeta descomprimida dentro de la carpeta donde instalaste GymWeb (generalmente <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px;font-size:11.5px;">C:\GymWeb\</code>)</div>
+                </div>
+                <div style="display:flex;align-items:flex-start;gap:10px;">
+                    <div style="width:22px;height:22px;border-radius:50%;background:rgba(245,158,11,0.2);border:1px solid rgba(245,158,11,0.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#f59e0b;flex-shrink:0;margin-top:1px;">4</div>
+                    <div style="font-size:12.5px;color:#cbd5e1;line-height:1.5;">Haz <strong style="color:#ffffff;">clic derecho</strong> en <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px;font-size:11.5px;">ACTUALIZAR.bat</code> → <strong style="color:#f59e0b;">"Ejecutar como administrador"</strong>. El sistema se reinicia automáticamente.</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;background:rgba(16,185,129,0.07);border:1px solid rgba(16,185,129,0.2);border-radius:8px;padding:8px 12px;margin-top:2px;">
+                    <i class="fa-solid fa-shield-check" style="color:#10b981;font-size:13px;flex-shrink:0;"></i>
+                    <span style="font-size:11.5px;color:#6ee7b7;">Tus socios, cobros y configuración <strong>no se borran</strong>. El parche solo actualiza el código.</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div style="padding:16px 22px 20px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid rgba(255,255,255,0.06);">
+        <button onclick="gymDismissUpdate('later')" style="padding:9px 20px;border-radius:10px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);color:#94a3b8;font-size:13px;font-weight:600;cursor:pointer;">
+            <i class="fa-regular fa-clock"></i>&nbsp; Más tarde
+        </button>
+        <a id="upDownloadBtn" href="#" target="_blank" style="display:inline-flex;align-items:center;gap:8px;padding:9px 22px;border-radius:10px;background:linear-gradient(135deg,#00f2ff,#0284c7);color:#000000;font-size:13px;font-weight:700;text-decoration:none;box-shadow:0 4px 16px rgba(0,242,255,0.35);">
+            <i class="fa-solid fa-download"></i> Descargar parche
+        </a>
     </div>
 </div>
 
 <style>
-@@keyframes slideInUpdate {
-    from { opacity:0; transform:translateX(-24px) scale(0.96); }
-    to   { opacity:1; transform:translateX(0) scale(1); }
-}
+@@keyframes gymFadeInBackdrop { from{opacity:0} to{opacity:1} }
 </style>
 
 <script>
 (function(){
-    // Verificar solo 1 vez por sesión del navegador (no molestar en cada recarga)
     const SESSION_KEY = 'gym_update_checked';
     const DISMISS_KEY = 'gym_update_dismissed';
+
+    // Limpiar dismiss expirado (24h) al cargar
+    const exp = localStorage.getItem('gym_update_dismissed_exp');
+    if (exp && new Date() > new Date(exp)) {
+        localStorage.removeItem(DISMISS_KEY);
+        localStorage.removeItem('gym_update_dismissed_exp');
+    }
 
     if (sessionStorage.getItem(SESSION_KEY)) return;
     sessionStorage.setItem(SESSION_KEY, '1');
 
-    // Esperar 3 segundos después de cargar para no impactar rendimiento
     setTimeout(async function(){
         try {
             const res  = await fetch('/Home/CheckUpdate');
             if (!res.ok) return;
             const data = await res.json();
-
             if (!data.hasUpdate) return;
 
-            // No mostrar si el usuario ya descartó esta versión específica
             const dismissed = localStorage.getItem(DISMISS_KEY);
             if (dismissed === data.latest) return;
 
-            // Rellenar datos del toast
-            const toast = document.getElementById('updateToast');
-            document.getElementById('updateCurrentBadge').textContent = data.current;
-            document.getElementById('updateLatestBadge').textContent  = data.latest;
-            document.getElementById('updateDownloadBtn').href         = data.downloadUrl || '#';
+            document.getElementById('upCurrent').textContent = data.current;
+            document.getElementById('upLatest').textContent  = data.latest;
+            document.getElementById('upDownloadBtn').href    = data.downloadUrl || '#';
 
-            // Mostrar con animación
-            toast.style.display = 'block';
+            const notes = (data.releaseNotes || '').trim();
+            if (notes) {
+                document.getElementById('upNotes').textContent         = notes;
+                document.getElementById('upNotesSection').style.display = 'block';
+            }
 
-            // Guardar la última versión vista para no mostrar la misma notificación infinitamente
+            const backdrop = document.getElementById('updateBackdrop');
+            const modal    = document.getElementById('updateModal');
+            backdrop.style.display = 'block';
+            modal.style.display    = 'block';
+            requestAnimationFrame(function(){
+                requestAnimationFrame(function(){
+                    backdrop.style.animation = 'gymFadeInBackdrop 0.25s ease forwards';
+                    modal.style.opacity      = '1';
+                    modal.style.transform    = 'translate(-50%,-50%) scale(1)';
+                });
+            });
+
             localStorage.setItem(DISMISS_KEY + '_seen', data.latest);
-
-        } catch(e) {
-            // Sin internet o error — silencio total
-        }
+        } catch(e) {}
     }, 3000);
 
-    // Función global para cerrar y recordar que ya se vio esta versión
-    window.gymDismissUpdate = function() {
-        const toast = document.getElementById('updateToast');
-        if (toast) {
-            toast.style.animation = 'none';
-            toast.style.transition = 'opacity 0.25s, transform 0.25s';
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateX(-24px)';
-            setTimeout(function(){ toast.style.display = 'none'; }, 260);
+    window.gymDismissUpdate = function(reason) {
+        const backdrop = document.getElementById('updateBackdrop');
+        const modal    = document.getElementById('updateModal');
+        if (modal) {
+            modal.style.opacity   = '0';
+            modal.style.transform = 'translate(-50%,-50%) scale(0.92)';
+            setTimeout(function(){ modal.style.display = 'none'; backdrop.style.display = 'none'; }, 280);
         }
-        // Guardar en localStorage la versión descartada para no volver a mostrarla
-        var latest = document.getElementById('updateLatestBadge')?.textContent;
-        if (latest) localStorage.setItem('gym_update_dismissed', latest);
+        if (reason === 'later') {
+            const latest = document.getElementById('upLatest')?.textContent;
+            if (latest) {
+                const expiry = new Date();
+                expiry.setHours(expiry.getHours() + 24);
+                localStorage.setItem(DISMISS_KEY, latest);
+                localStorage.setItem('gym_update_dismissed_exp', expiry.toISOString());
+            }
+        }
     };
 })();
 </script>

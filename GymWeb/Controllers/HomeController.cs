@@ -15,6 +15,8 @@ public class HomeController : AuthController
     // Cache en memoria para no llamar a GitHub en cada recarga de página
     private static string? _cachedLatestVersion;
     private static string? _cachedDownloadUrl;
+    private static string? _cachedReleaseNotes;
+    private static string? _cachedReleaseTitle;
     private static DateTime _cacheExpiry = DateTime.MinValue;
 
     public HomeController(GymContext db, IHttpClientFactory http, IConfiguration config)
@@ -72,7 +74,9 @@ public class HomeController : AuthController
                     hasUpdate    = cachedHasUpdate,
                     current      = AppSettings.CurrentVersion,
                     latest       = _cachedLatestVersion,
-                    downloadUrl  = _cachedDownloadUrl
+                    downloadUrl  = _cachedDownloadUrl,
+                    releaseNotes = _cachedReleaseNotes ?? "",
+                    releaseTitle = _cachedReleaseTitle ?? ""
                 });
             }
 
@@ -97,7 +101,9 @@ public class HomeController : AuthController
             var root = doc.RootElement;
 
             // Obtener el tag del último release (ej: "v2.1", "v2.2")
-            var latestTag = root.GetProperty("tag_name").GetString() ?? "";
+            var latestTag    = root.GetProperty("tag_name").GetString() ?? "";
+            var releaseTitle = root.TryGetProperty("name", out var nameEl)  ? nameEl.GetString() ?? "" : "";
+            var releaseNotes = root.TryGetProperty("body", out var bodyEl)  ? bodyEl.GetString() ?? "" : "";
 
             // Construir URL de descarga del parche ligero
             // Convención: el asset del parche se llama Parche_Ligero_GymWeb.zip
@@ -125,6 +131,8 @@ public class HomeController : AuthController
             // Guardar en cache por 24 horas
             _cachedLatestVersion = latestTag;
             _cachedDownloadUrl   = downloadUrl;
+            _cachedReleaseNotes  = releaseNotes;
+            _cachedReleaseTitle  = releaseTitle;
             _cacheExpiry         = DateTime.UtcNow.AddHours(24);
 
             bool hasUpdate = !string.Equals(latestTag, AppSettings.CurrentVersion,
@@ -132,10 +140,12 @@ public class HomeController : AuthController
 
             return Json(new
             {
-                hasUpdate   = hasUpdate,
-                current     = AppSettings.CurrentVersion,
-                latest      = latestTag,
-                downloadUrl = downloadUrl
+                hasUpdate    = hasUpdate,
+                current      = AppSettings.CurrentVersion,
+                latest       = latestTag,
+                downloadUrl  = downloadUrl,
+                releaseNotes = releaseNotes,
+                releaseTitle = releaseTitle
             });
         }
         catch
