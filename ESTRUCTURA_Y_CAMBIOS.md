@@ -367,7 +367,7 @@ Todo agente o desarrollador que trabaje en este proyecto **DEBE RESPETAR ESTRICT
   * Nuevos scripts de instalación de servicios de Windows.
 * **Herramienta:** Ejecutar [`GENERAR-PARCHE.bat`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/GENERAR-PARCHE.bat) o `generar_parche.ps1`. Genera `dist/Parche_GymWeb_v2.1.zip`.
 
-#### Tipo C: Instalador Completo para Clientes Nuevos (~120 MB)
+#### Tipo C: Instalador Completo para Clientes Nuevos (~129 MB)
 * **¿Cuándo usarlo?** Para entregar el sistema a un cliente nuevo que lo instalará desde cero.
 * **Características obligatorias:**
   * 100% Autocontenido x64 (no requiere instalar .NET, XAMPP ni MySQL).
@@ -375,6 +375,122 @@ Todo agente o desarrollador que trabaje en este proyecto **DEBE RESPETAR ESTRICT
   * Sin archivo `gym.db` (autogenera base virgen de 0 socios).
   * Sin logos ni fotos de prueba.
 * **Herramienta:** Ejecutar `generar_instalador.ps1`. Genera `dist/Instalador_GymWeb_Windows_v2.1.zip`.
+
+---
+
+## 🔄 ACTUALIZACIÓN v2.2 — SISTEMA AUTÓNOMO DE NOTIFICACIONES, PARCHES Y DESPLIEGUE
+
+### 1. Arquitectura de Actualizaciones Vía GitHub Releases API
+Para evitar tener que enviar manualmente archivos o enlaces a cada gimnasio cuando se corrigen errores o se agregan funciones, se implementó un sistema de actualización cliente-servidor descentralizado utilizando la **API pública de GitHub Releases**:
+
+* **Endpoint Backend:** `GET /Home/CheckUpdate` en `HomeController.cs`.
+  * Consulta: `https://api.github.com/repos/victorhernandez-art/sistema-gimnasio/releases/latest`.
+  * Header obligatorio: `User-Agent: GymWeb-UpdateChecker/2.1` (requerido por GitHub para autorizar peticiones).
+  * Parámetros extraídos del Release de GitHub:
+    * `tag_name`: Identificador de la última versión (ej: `v2.2`).
+    * `name`: Título del release publicado.
+    * `body`: Notas de la versión escritas por el desarrollador en GitHub (lo que incluye la actualización).
+    * `assets`: Busca automáticamente cualquier asset cuyo nombre contenga `"Parche"` o `"Instalador"` y extrae su `browser_download_url` directo.
+  * **Caché en Memoria (24 horas):** `_cachedLatestVersion`, `_cachedDownloadUrl`, `_cachedReleaseNotes`, `_cachedReleaseTitle` y `_cacheExpiry`. Protege contra el rate limit de GitHub (60 peticiones/hora por IP) evitando consultas en cada recarga de página.
+  * **Comparación de Versiones:** Compara `latestTag` contra `AppSettings.CurrentVersion`. Si son distintos, devuelve `hasUpdate: true`.
+  * **Blindaje por Fallo:** Si no hay internet o la API de GitHub no responde, retorna `{ hasUpdate: false }` silenciosamente sin romper el sistema.
+
+---
+
+### 2. Modal Interactivo de Actualización en Pantalla (`_Layout.cshtml`)
+En lugar de un toast pequeño o avisos intrusivos, se diseñó un **modal centrado con estética glassmorphism premium**:
+* **Ubicación:** `GymWeb/Views/Shared/_Layout.cshtml`.
+* **Condición de Renderizado:** `@if (Context.Session.GetString("UsuarioRol") == "superadmin" && GymWeb.Helpers.LicenseService.GetStatus().Valid)`. Solo se muestra al Administrador/Super Administrador y **únicamente si el sistema ya cuenta con licencia válida o prueba activa** (no confunde a clientes nuevos que aún no activan su clave).
+* **Elementos del Modal:**
+  1. **Encabezado:** Badge de versión con gradiente cian (`Versión actual: v2.1 ➔ Nueva versión: v2.2`).
+  2. **Notas del Parche Dinámicas:** Contenedor `#upNotesSection` que renderiza automáticamente el texto `body` del release de GitHub en la sección *"¿Qué incluye esta actualización?"*.
+  3. **Instrucciones Paso a Paso:** 4 pasos numerados con iconos claros que guían al cliente para descomprimir el archivo en su carpeta de instalación y ejecutar `ACTUALIZAR.bat` como administrador.
+  4. **Aviso de Seguridad:** Mensaje en verde confirmando que los socios, cobros y configuración **no se borran**.
+  5. **Botones de Acción:**
+     * `Descargar parche`: Descarga directamente el ZIP (`Parche_Ligero_GymWeb.zip`) desde GitHub Releases.
+     * `Más tarde`: Cierra el modal y activa una posposición de 24 horas.
+
+---
+
+### 3. Ciclo de Vida de Almacenamiento y Sesión (WebView2 y Navegadores)
+La aplicación de escritorio (`Gym.exe`) utiliza el motor **WebView2** de Microsoft Edge, el cual almacena datos en `%LOCALAPPDATA%\GymAppCache`. Para evitar que el modal se bloquee o moleste en cada navegación:
+
+* **Posposición ("Más tarde" o cierre):** Al hacer clic en *"Más tarde"* o en la `X`, se guardan dos claves en `localStorage`:
+  * `gym_update_dismissed`: La versión descartada (ej: `v2.2`).
+  * `gym_update_dismissed_exp`: Fecha/hora de expiración en formato ISO (+24 horas).
+* **Limpieza Automática:** Al cargar `_Layout.cshtml`, si no existe fecha de expiración válida (`!exp || isNaN(Date.parse(exp))`) o si la fecha ya venció (`new Date() > new Date(exp)`), las marcas de descarte se eliminan automáticamente.
+* **Control de Sesión:** Para evitar que el modal se vuelva a disparar al navegar entre pestañas (Socios, Membresías, Cobros), se utiliza `sessionStorage`:
+  * Solo se marca `sessionStorage.setItem('gym_update_checked', 'shown')` **después** de que el modal se dibuja exitosamente en pantalla.
+  * Si el modal nunca se mostró (ej. fallo temporal o navegación rápida), no se bloquea.
+
+---
+
+### 4. Indicador de Versión en el Sidebar
+Para que tanto el usuario como el soporte técnico puedan validar en todo momento la versión instalada:
+* Ubicado en `_Layout.cshtml` dentro de `.sidebar-footer`, inmediatamente debajo del botón *"Cerrar Sesión"*.
+* Renderiza: `Versión @GymWeb.Helpers.AppSettings.CurrentVersion`.
+* Estilos en `wwwroot/css/gym.css` (`.sidebar-version`): Tipografía monospace sutil, color muted y centrado.
+* Al colapsar la barra lateral (`.sidebar.collapsed`), el texto se oculta automáticamente para preservar la armonía visual.
+
+---
+
+### 5. Estética Corporativa Limpia (Eliminación de Iconos/Emojis "Estilo IA")
+Se realizó una depuración visual completa para eliminar elementos que dieran impresión de "plantilla generada por IA":
+* **Varita mágica (`fa-wand-magic-sparkles`):** Eliminada del banner de bienvenida y del selector de colores. En el selector de temas se reemplazó por una paleta formal (`fa-palette`).
+* **Emojis informales (`👋`, `🎉`, etc.):** Removidos de los avisos y banners de bienvenida.
+* **Cajas de Cohetes gigantes (`fa-rocket`):** Eliminadas de la tarjeta de activación de prueba; los botones de activación ahora utilizan el icono corporativo de confirmación (`fa-circle-check`).
+* **Dashboard:** En el aviso de prueba activa se sustituyeron los destellos (`sparkles`) por un escudo de seguridad sobrio (`fa-shield-halved`) y redacción empresarial.
+
+---
+
+### 6. Mecánica de Trabajo, Repositorio GitHub y Vercel
+
+```
+[ PÁGINA WEB EN VERCEL ]
+       │
+       ▼ (Botón: Descargar Instalador)
+[ REPO GITHUB: Releases ]
+  ├── Tag v2.1 ─── Asset: Instalador_GymWeb_Windows_v2.1.zip  (~129 MB, Instalador Completo)
+  │                * URL fija para el botón de Vercel.
+  │                * Por dentro ya contiene la versión v2.2 precompilada.
+  │
+  └── Tag v2.2 ─── Asset: Parche_Ligero_GymWeb.zip           (~9.88 MB, Micro-Parche)
+                   * Contiene GymWeb.dll + ACTUALIZAR.bat + wwwroot.
+                   * Lo descarga automáticamente el cliente existente desde el Modal.
+```
+
+#### Regla de Oro con el botón de Vercel:
+El botón de descarga en tu landing page de Vercel tiene configurada una URL directa que apunta al release `v2.1`:
+`https://github.com/victorhernandez-art/sistema-gimnasio/releases/download/v2.1/Instalador_GymWeb_Windows_v2.1.zip`
+
+* **NUNCA cambiar el nombre del archivo ni el tag en GitHub para clientes nuevos.**
+* Si generas un instalador nuevo, **se debe conservar el nombre `Instalador_GymWeb_Windows_v2.1.zip`**.
+* Al subirlo con ese mismo nombre al release `v2.1`, reemplaza el ZIP anterior y **tu página en Vercel seguirá funcionando de inmediato sin tener que modificar ni redesplegar nada en Vercel**.
+
+---
+
+### 7. Guía Paso a Paso para Desarrolladores / Agentes (Futuras Versiones v2.3, v2.4, etc.)
+
+Cuando se hagan nuevas mejoras o correcciones en el sistema:
+
+1. **Modificar Código:** Realizar los cambios correspondientes en controladores, vistas o estilos.
+2. **Actualizar Número de Versión:** En [`GymWeb/Helpers/AppSettings.cs`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/GymWeb/Helpers/AppSettings.cs):
+   ```csharp
+   public const string CurrentVersion = "v2.3"; // Incrementar aquí
+   ```
+3. **Generar el Parche Ligero:**
+   * Ejecutar [`GENERAR-PARCHE-LIGERO.bat`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/GENERAR-PARCHE-LIGERO.bat) (o `powershell -File generar_parche_ligero.ps1`).
+   * Produce: `dist/Parche_Ligero_GymWeb.zip` (~9.88 MB).
+4. **Publicar en GitHub:**
+   * Crear un nuevo Release en GitHub con el Tag `v2.3` (ej. *"Sistema para Gimnasios v2.3"*).
+   * En las notas de la versión (descripción del release), redactar en viñetas lo que incluye (ej: `✅ Nuevo módulo X`, `✅ Corrección de Y`). **Este texto aparecerá textualmente dentro del modal del cliente**.
+   * Adjuntar el archivo `dist/Parche_Ligero_GymWeb.zip` como asset.
+   * Publicar el release.
+5. **(Opcional) Actualizar el Instalador de Clientes Nuevos:**
+   * Ejecutar `powershell -File generar_instalador.ps1`.
+   * Produce: `dist/Instalador_GymWeb_Windows_v2.1.zip` (~129 MB).
+   * Reemplazar este archivo dentro del release `v2.1` en GitHub para que el botón de Vercel entregue la versión nueva a los que compren por primera vez.
+6. **Efecto Inmediato:** Todos los clientes con versiones anteriores verán el modal a los 3 segundos de entrar al Dashboard y podrán actualizarse con un solo clic.
 
 
 
