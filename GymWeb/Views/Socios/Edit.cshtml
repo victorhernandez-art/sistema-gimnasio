@@ -36,15 +36,11 @@
                 </button>
                 @if (Model.Foto != null && Model.Foto.Length > 0)
                 {
-                    <form asp-action="EliminarFoto" method="post" style="display:inline;"
-                          onsubmit="return confirm('\u00bfEliminar la foto del socio?')">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="id" value="@Model.IdSocio" />
-                        <button type="submit" class="btn btn-sm"
-                            style="background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.25);">
-                            <i class="fa-solid fa-trash-can"></i> Eliminar foto
-                        </button>
-                    </form>
+                    <button type="button" class="btn btn-sm" onclick="eliminarFotoSocio()"
+                        style="background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.25);"
+                        title="Eliminar la foto actual del socio">
+                        <i class="fa-solid fa-trash-can"></i> Eliminar foto
+                    </button>
                 }
                 <input type="hidden" name="FotoBase64" id="FotoBase64" />
                 <video id="cameraVideo" style="display:none;" autoplay playsinline></video>
@@ -70,6 +66,10 @@
                 <label class="form-label">Teléfono</label>
                 <input asp-for="Telefono" class="form-control" />
             </div>
+            <div class="form-group">
+                <label class="form-label">Fecha de Registro</label>
+                <input asp-for="FechaCreacion" type="date" class="form-control" value="@Model.FechaCreacion?.ToString("yyyy-MM-dd")" />
+            </div>
             <div class="form-group" style="grid-column:1/-1;">
                 <label class="form-label">Observaciones</label>
                 <textarea asp-for="Observaciones" class="form-control" rows="3"></textarea>
@@ -84,7 +84,18 @@
     </form>
 </div>
 
+<form id="formEliminarFoto" asp-action="EliminarFoto" method="post" style="display:none;">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="id" value="@Model.IdSocio" />
+</form>
+
 <script>
+function eliminarFotoSocio() {
+    if (confirm('¿Eliminar la foto del socio?')) {
+        document.getElementById('formEliminarFoto').submit();
+    }
+}
+
 (function(){
     const fotoBox  = document.getElementById('fotoBox');
     const video    = document.getElementById('cameraVideo');

@@ -25,15 +25,15 @@ public class ReportesController : AuthController
     public async Task<IActionResult> Visitas(DateTime? desde, DateTime? hasta)
     {
         ViewData["Title"] = "Reporte de Visitas";
-        desde ??= DateTime.Today.AddMonths(-1);
-        hasta ??= DateTime.Today;
-        ViewBag.Desde = desde.Value.ToString("yyyy-MM-dd");
-        ViewBag.Hasta = hasta.Value.ToString("yyyy-MM-dd");
+        DateTime fDesde = (desde ?? DateTime.Today.AddMonths(-1)).Date;
+        DateTime fHasta = (hasta ?? DateTime.Today).Date.AddDays(1);
+        ViewBag.Desde = (desde ?? DateTime.Today.AddMonths(-1)).ToString("yyyy-MM-dd");
+        ViewBag.Hasta = (hasta ?? DateTime.Today).ToString("yyyy-MM-dd");
         var list = await _db.Registros
             .Include(r => r.IdSocioNavigation)
             .Where(r => r.FechaCreacion.HasValue &&
-                        r.FechaCreacion.Value.Date >= desde.Value.Date &&
-                        r.FechaCreacion.Value.Date <= hasta.Value.Date)
+                        r.FechaCreacion.Value >= fDesde &&
+                        r.FechaCreacion.Value < fHasta)
             .OrderByDescending(r => r.FechaCreacion)
             .ToListAsync();
         return View(list);
@@ -67,20 +67,23 @@ public class ReportesController : AuthController
             .FirstOrDefaultAsync() ?? config?.PrecioVisita ?? 0m;
         ViewBag.PrecioConfig = modo == "dia" ? precioVisita : 0m;
 
+        DateTime fDesde = desde.Date;
+        DateTime fHasta = hasta.Date.AddDays(1);
+
         var ventas = await _db.Detallesalida
             .Include(d => d.IdProductoNavigation)
             .Include(d => d.IdSalidaNavigation)
             .Where(d => d.IdSalidaNavigation!.FechaCreacion.HasValue &&
-                        d.IdSalidaNavigation.FechaCreacion.Value.Date >= desde.Date &&
-                        d.IdSalidaNavigation.FechaCreacion.Value.Date <= hasta.Date)
+                        d.IdSalidaNavigation.FechaCreacion.Value >= fDesde &&
+                        d.IdSalidaNavigation.FechaCreacion.Value < fHasta)
             .OrderBy(d => d.IdSalidaNavigation!.FechaCreacion)
             .ToListAsync();
 
         var visitas = await _db.Registros
             .Where(r => r.IdSocio == null &&
                         r.FechaCreacion.HasValue &&
-                        r.FechaCreacion.Value.Date >= desde.Date &&
-                        r.FechaCreacion.Value.Date <= hasta.Date)
+                        r.FechaCreacion.Value >= fDesde &&
+                        r.FechaCreacion.Value < fHasta)
             .OrderBy(r => r.FechaCreacion)
             .ToListAsync();
 
@@ -88,8 +91,8 @@ public class ReportesController : AuthController
             .Include(p => p.IdSocioNavigation)
             .Include(p => p.IdMembresiaNavigation)
             .Where(p => p.FechaCreacion.HasValue &&
-                        p.FechaCreacion.Value.Date >= desde.Date &&
-                        p.FechaCreacion.Value.Date <= hasta.Date)
+                        p.FechaCreacion.Value >= fDesde &&
+                        p.FechaCreacion.Value < fHasta)
             .OrderBy(p => p.FechaCreacion)
             .ToListAsync();
 
@@ -113,27 +116,30 @@ public class ReportesController : AuthController
         }
         else { desde = hasta = fecha ?? DateTime.Today; }
 
+        DateTime fDesde = desde.Date;
+        DateTime fHasta = hasta.Date.AddDays(1);
+
         var ventas = await _db.Detallesalida
             .Include(d => d.IdProductoNavigation)
             .Include(d => d.IdSalidaNavigation)
             .Where(d => d.IdSalidaNavigation!.FechaCreacion.HasValue &&
-                        d.IdSalidaNavigation.FechaCreacion.Value.Date >= desde.Date &&
-                        d.IdSalidaNavigation.FechaCreacion.Value.Date <= hasta.Date)
+                        d.IdSalidaNavigation.FechaCreacion.Value >= fDesde &&
+                        d.IdSalidaNavigation.FechaCreacion.Value < fHasta)
             .OrderBy(d => d.IdSalidaNavigation!.FechaCreacion).ToListAsync();
 
         var visitas = await _db.Registros
             .Where(r => r.IdSocio == null &&
                         r.FechaCreacion.HasValue &&
-                        r.FechaCreacion.Value.Date >= desde.Date &&
-                        r.FechaCreacion.Value.Date <= hasta.Date)
+                        r.FechaCreacion.Value >= fDesde &&
+                        r.FechaCreacion.Value < fHasta)
             .OrderBy(r => r.FechaCreacion).ToListAsync();
 
         var pagos = await _db.Pagos
             .Include(p => p.IdSocioNavigation)
             .Include(p => p.IdMembresiaNavigation)
             .Where(p => p.FechaCreacion.HasValue &&
-                        p.FechaCreacion.Value.Date >= desde.Date &&
-                        p.FechaCreacion.Value.Date <= hasta.Date)
+                        p.FechaCreacion.Value >= fDesde &&
+                        p.FechaCreacion.Value < fHasta)
             .OrderBy(p => p.FechaCreacion).ToListAsync();
 
         var esCultura = new System.Globalization.CultureInfo("es-MX");
@@ -144,11 +150,11 @@ public class ReportesController : AuthController
             ? desde.ToString("MMMM yyyy", esCultura)
             : desde.ToString("dd/MM/yyyy");
         string tipoCorte = modo == "mes" ? "Mes" : "Día";
-
         decimal totVisitas = visitas.Sum(v => v.PrecioVisita);
-        decimal totVentas  = ventas.Sum(d => (d.PrecioUnitario ?? 0) * d.Cantidad);
+        decimal totVentasContado = ventas.Where(d => d.IdSalidaNavigation?.EsCredito != true).Sum(d => (d.PrecioUnitario ?? 0) * d.Cantidad);
+        decimal totVentasCredito = ventas.Where(d => d.IdSalidaNavigation?.EsCredito == true).Sum(d => (d.PrecioUnitario ?? 0) * d.Cantidad);
         decimal totPagos   = pagos.Sum(p => p.Monto);
-        decimal totGeneral = totVisitas + totVentas + totPagos;
+        decimal totGeneral = totVisitas + totVentasContado + totPagos;
 
         // Si solicitan formato CSV plano tradicional
         if (string.Equals(formato, "csv", StringComparison.OrdinalIgnoreCase))
@@ -167,16 +173,22 @@ public class ReportesController : AuthController
             sb.AppendLine("SUBTOTAL," + totVisitas.ToString("N2"));
             sb.AppendLine();
             sb.AppendLine("VENTAS DE PRODUCTOS");
-            sb.AppendLine("Fecha,Hora,Producto,Cantidad,Total,Ganancia");
+            sb.AppendLine("Fecha,Hora,Producto,Método,Cantidad,Total,Ganancia");
             foreach (var d in ventas)
             {
                 string vf   = d.IdSalidaNavigation?.FechaCreacion?.ToString("dd/MM/yyyy") ?? "";
                 string vh   = d.IdSalidaNavigation?.FechaCreacion?.ToString("HH:mm") ?? "";
+                bool esCredito = d.IdSalidaNavigation?.EsCredito == true;
+                string metodo = esCredito ? "A Crédito" : "Contado";
                 decimal tot = (d.PrecioUnitario ?? 0) * d.Cantidad;
                 decimal gan = ((d.PrecioUnitario ?? 0) - (d.IdProductoNavigation?.Costo ?? 0)) * d.Cantidad;
-                sb.AppendLine(vf + "," + vh + "," + CsvEsc(d.IdProductoNavigation?.Nombre) + "," + d.Cantidad + "," + tot.ToString("N2") + "," + gan.ToString("N2"));
+                sb.AppendLine(vf + "," + vh + "," + CsvEsc(d.IdProductoNavigation?.Nombre) + "," + metodo + "," + d.Cantidad + "," + tot.ToString("N2") + "," + gan.ToString("N2"));
             }
-            sb.AppendLine("SUBTOTAL," + totVentas.ToString("N2"));
+            sb.AppendLine("SUBTOTAL EN CAJA (CONTADO)," + totVentasContado.ToString("N2"));
+            if (totVentasCredito > 0)
+            {
+                sb.AppendLine("SUBTOTAL A CRÉDITO (NO SUMA A CAJA)," + totVentasCredito.ToString("N2"));
+            }
             sb.AppendLine();
             sb.AppendLine("PAGOS DE MEMBRESÍAS");
             sb.AppendLine("Fecha,Hora,Socio,Plan,Método,Monto");
@@ -186,12 +198,12 @@ public class ReportesController : AuthController
                 string ph     = p.FechaCreacion?.ToString("HH:mm") ?? "";
                 string nombre = p.IdSocioNavigation != null
                     ? p.IdSocioNavigation.Nombre + " " + p.IdSocioNavigation.Paterno : "";
-                string plan   = p.IdMembresiaNavigation?.Nombre ?? "";
+                string plan   = p.IdMembresiaNavigation?.Nombre ?? (!string.IsNullOrWhiteSpace(p.Notas) ? p.Notas : "Abono / Cobro");
                 sb.AppendLine(pf + "," + ph + "," + CsvEsc(nombre) + "," + CsvEsc(plan) + "," + CsvEsc(p.MetodoPago) + "," + p.Monto.ToString("N2"));
             }
             sb.AppendLine("SUBTOTAL," + totPagos.ToString("N2"));
             sb.AppendLine();
-            sb.AppendLine("TOTAL GENERAL," + totGeneral.ToString("N2"));
+            sb.AppendLine("TOTAL GENERAL EN CAJA," + totGeneral.ToString("N2"));
 
             var bytes = new System.Text.UTF8Encoding(true).GetBytes(sb.ToString());
             return File(bytes, "text/csv", "corte_" + periodo + ".csv");
@@ -219,10 +231,13 @@ public class ReportesController : AuthController
             TempData["Error"] = "El precio en Configuración es $0.00. Primero configure el precio de visita de día.";
             return RedirectToAction(nameof(CorteDia), new { fecha = fecha.ToString("yyyy-MM-dd") });
         }
+        DateTime fDia = fecha.Date;
+        DateTime fDiaSig = fecha.Date.AddDays(1);
         var visitas = await _db.Registros
             .Where(r => r.IdSocio == null &&
                         r.FechaCreacion.HasValue &&
-                        r.FechaCreacion.Value.Date == fecha.Date &&
+                        r.FechaCreacion.Value >= fDia &&
+                        r.FechaCreacion.Value < fDiaSig &&
                         r.PrecioVisita == 0)
             .ToListAsync();
         if (!visitas.Any())
@@ -239,10 +254,11 @@ public class ReportesController : AuthController
     public async Task<IActionResult> Asistencia(int? idSocio, DateTime? desde, DateTime? hasta)
     {
         ViewData["Title"] = "Asistencia por Socio";
-        desde ??= DateTime.Today.AddMonths(-1);
-        hasta ??= DateTime.Today;
-        ViewBag.Desde = desde.Value.ToString("yyyy-MM-dd");
-        ViewBag.Hasta = hasta.Value.ToString("yyyy-MM-dd");
+        DateTime dtDesde = (desde ?? DateTime.Today.AddMonths(-1)).Date;
+        DateTime dtHasta = (hasta ?? DateTime.Today).Date.AddDays(1);
+
+        ViewBag.Desde = (desde ?? DateTime.Today.AddMonths(-1)).ToString("yyyy-MM-dd");
+        ViewBag.Hasta = (hasta ?? DateTime.Today).ToString("yyyy-MM-dd");
 
         var socios = await _db.Socios.Where(s => s.IdEstado == 1)
             .OrderBy(s => s.Paterno).ThenBy(s => s.Nombre).ToListAsync();
@@ -257,8 +273,8 @@ public class ReportesController : AuthController
             registros = await _db.Registros
                 .Where(r => r.IdSocio == idSocio.Value &&
                             r.FechaCreacion.HasValue &&
-                            r.FechaCreacion.Value.Date >= desde.Value.Date &&
-                            r.FechaCreacion.Value.Date <= hasta.Value.Date)
+                            r.FechaCreacion.Value >= dtDesde &&
+                            r.FechaCreacion.Value < dtHasta)
                 .OrderByDescending(r => r.FechaCreacion)
                 .ToListAsync();
         }

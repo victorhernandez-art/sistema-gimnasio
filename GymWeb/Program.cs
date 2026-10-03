@@ -32,7 +32,9 @@ if (!isMySql)
     string dbRaw = connStr.Replace("Data Source=", "", StringComparison.OrdinalIgnoreCase).Trim();
     if (!Path.IsPathRooted(dbRaw))
     {
-        string absoluteDbPath = Path.Combine(AppContext.BaseDirectory, dbRaw);
+        string projectDb = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", dbRaw));
+        string currentDb = Path.Combine(AppContext.BaseDirectory, dbRaw);
+        string absoluteDbPath = File.Exists(projectDb) ? projectDb : currentDb;
         connStr = $"Data Source={absoluteDbPath}";
     }
 }
@@ -189,6 +191,10 @@ try
         try { db.Database.ExecuteSqlRaw("ALTER TABLE salida ADD COLUMN IF NOT EXISTS cambio DECIMAL(8,2) NULL;"); } catch { }
         try { db.Database.ExecuteSqlRaw("ALTER TABLE salida ADD COLUMN IF NOT EXISTS referencia VARCHAR(100) NULL;"); } catch { }
         try { db.Database.ExecuteSqlRaw("ALTER TABLE salida ADD COLUMN IF NOT EXISTS notas VARCHAR(255) NULL;"); } catch { }
+        try { db.Database.ExecuteSqlRaw("ALTER TABLE salida ADD COLUMN IF NOT EXISTS idSocio INT NULL;"); } catch { }
+        try { db.Database.ExecuteSqlRaw("ALTER TABLE salida ADD COLUMN IF NOT EXISTS esCredito TINYINT(1) DEFAULT 0;"); } catch { }
+        try { db.Database.ExecuteSqlRaw("ALTER TABLE salida ADD COLUMN IF NOT EXISTS saldoPendiente DECIMAL(8,2) DEFAULT 0;"); } catch { }
+        try { db.Database.ExecuteSqlRaw("ALTER TABLE salida ADD COLUMN IF NOT EXISTS fechaLiquidacion DATETIME NULL;"); } catch { }
 
         try { db.Database.ExecuteSqlRaw("ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS precio_visita DECIMAL(8,2) DEFAULT 0;"); } catch { }
         try { db.Database.ExecuteSqlRaw("ALTER TABLE registro ADD COLUMN IF NOT EXISTS nombre_visita VARCHAR(150) NULL;"); } catch { }
@@ -270,9 +276,14 @@ app.Use(async (context, next) =>
         return;
     }
 
-    // 3. Si no ha iniciado sesión, continuar al flujo normal (AuthController lo enviará a /Account/Login)
+    // 3. Si no ha iniciado sesión, redirigir la raíz a /Account/Login
     if (string.IsNullOrEmpty(context.Session.GetString("UsuarioId")))
     {
+        if (path == "/" || path == "")
+        {
+            context.Response.Redirect("/Account/Login");
+            return;
+        }
         await next();
         return;
     }
@@ -321,6 +332,6 @@ app.Use(async (context, next) =>
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Account}/{action=Login}/{id?}");
+    pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();

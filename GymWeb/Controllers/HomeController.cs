@@ -33,9 +33,12 @@ public class HomeController : AuthController
         ViewBag.TotalSocios     = await _db.Socios.CountAsync(s => s.IdEstado == 1);
         ViewBag.TotalMembresias = await _db.Membresia.CountAsync(m => m.IdEstado == 1);
         ViewBag.TotalProductos  = await _db.Productos.CountAsync(p => p.IdEstado == 1);
+        var hoyDt = DateTime.Today;
+        var mananaDt = hoyDt.AddDays(1);
         ViewBag.VisitasHoy      = await _db.Registros
             .CountAsync(r => r.FechaCreacion.HasValue &&
-                             r.FechaCreacion.Value.Date == DateTime.Today);
+                             r.FechaCreacion.Value >= hoyDt &&
+                             r.FechaCreacion.Value < mananaDt);
 
         ViewBag.UltimasVisitas = await _db.Registros
             .Include(r => r.IdSocioNavigation)
@@ -83,7 +86,7 @@ public class HomeController : AuthController
             // Configuración del repositorio desde appsettings.json
             var owner = _config["GitHub:Owner"] ?? "victorhernandez-art";
             var repo  = _config["GitHub:Repo"]  ?? "sistema-gimnasio";
-            var apiUrl = $"https://api.github.com/repos/{owner}/{repo}/releases/latest";
+            var apiUrl = $"https://api.github.com/repos/{owner}/{repo}/releases?per_page=10";
 
             var client = _http.CreateClient();
             // GitHub requiere User-Agent para aceptar peticiones
@@ -98,18 +101,42 @@ public class HomeController : AuthController
 
             var json = await response.Content.ReadAsStringAsync();
             using var doc = System.Text.Json.JsonDocument.Parse(json);
-            var root = doc.RootElement;
+            
+            System.Text.Json.JsonElement targetRelease = default;
+            if (doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Array)
+            {
+                // Buscar el release más reciente del sistema (tag que comience con 'v', ej: v2.3, v2.2)
+                foreach (var r in doc.RootElement.EnumerateArray())
+                {
+                    if (r.TryGetProperty("tag_name", out var t) && (t.GetString() ?? "").StartsWith("v", StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetRelease = r;
+                        break;
+                    }
+                }
+                if (targetRelease.ValueKind == System.Text.Json.JsonValueKind.Undefined)
+                {
+                    targetRelease = doc.RootElement.EnumerateArray().FirstOrDefault();
+                }
+            }
+            else
+            {
+                targetRelease = doc.RootElement;
+            }
 
-            // Obtener el tag del último release (ej: "v2.1", "v2.2")
-            var latestTag    = root.GetProperty("tag_name").GetString() ?? "";
-            var releaseTitle = root.TryGetProperty("name", out var nameEl)  ? nameEl.GetString() ?? "" : "";
-            var releaseNotes = root.TryGetProperty("body", out var bodyEl)  ? bodyEl.GetString() ?? "" : "";
+            if (targetRelease.ValueKind == System.Text.Json.JsonValueKind.Undefined)
+            {
+                return Json(new { hasUpdate = false, current = AppSettings.CurrentVersion });
+            }
+
+            // Obtener datos del release del sistema
+            var latestTag    = targetRelease.TryGetProperty("tag_name", out var tagEl) ? tagEl.GetString() ?? "" : "";
+            var releaseTitle = targetRelease.TryGetProperty("name", out var nameEl)     ? nameEl.GetString() ?? "" : "";
+            var releaseNotes = targetRelease.TryGetProperty("body", out var bodyEl)     ? bodyEl.GetString() ?? "" : "";
 
             // Construir URL de descarga del parche ligero
-            // Convención: el asset del parche se llama Parche_Ligero_GymWeb.zip
-            // Si no existe ese asset específico, usamos la página del release en GitHub
             string? downloadUrl = null;
-            if (root.TryGetProperty("assets", out var assets))
+            if (targetRelease.TryGetProperty("assets", out var assets))
             {
                 foreach (var asset in assets.EnumerateArray())
                 {
@@ -124,7 +151,7 @@ public class HomeController : AuthController
             }
 
             // Fallback: página HTML del release en GitHub
-            downloadUrl ??= root.TryGetProperty("html_url", out var htmlUrl)
+            downloadUrl ??= targetRelease.TryGetProperty("html_url", out var htmlUrl)
                 ? htmlUrl.GetString()
                 : $"https://github.com/{owner}/{repo}/releases/latest";
 
@@ -154,4 +181,116 @@ public class HomeController : AuthController
             return Json(new { hasUpdate = false, current = AppSettings.CurrentVersion });
         }
     }
+
+    [HttpGet]
+    [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+    public async Task<IActionResult> DescargarParche()
+    {
+        if (string.IsNullOrEmpty(_cachedDownloadUrl))
+        {
+            await CheckUpdate();
+        }
+
+        var url = _cachedDownloadUrl;
+        if (string.IsNullOrEmpty(url))
+        {
+            return NotFound("No se encontró el archivo del parche.");
+        }
+
+        try
+        {
+            var client = _http.CreateClient();
+            client.DefaultRequestHeaders.Add("User-Agent", "GymWeb-Downloader/2.4");
+            client.Timeout = TimeSpan.FromMinutes(3);
+            var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+            if (!response.IsSuccessStatusCode)
+            {
+                return Redirect(url);
+            }
+
+            var stream = await response.Content.ReadAsStreamAsync();
+            return File(stream, "application/zip", "Parche_Ligero_GymWeb.zip");
+        }
+        catch
+        {
+            return Redirect(url);
+        }
+    }
+
+    public class GuardarTicketPdfPayload
+    {
+        public string Filename { get; set; } = "comprobante.pdf";
+        public string Base64 { get; set; } = "";
+    }
+
+    [HttpPost]
+    [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+    public async Task<IActionResult> GuardarYCopiarPdf([FromBody] GuardarTicketPdfPayload payload)
+    {
+        if (string.IsNullOrEmpty(payload?.Base64))
+            return BadRequest(new { ok = false, msg = "No se recibió archivo PDF." });
+
+        try
+        {
+            string filename = string.IsNullOrWhiteSpace(payload.Filename) ? "comprobante.pdf" : payload.Filename;
+            if (!filename.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                filename += ".pdf";
+
+            foreach (char c in Path.GetInvalidFileNameChars())
+                filename = filename.Replace(c, '_');
+
+            string userFolder = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            string downloadsFolder = Path.Combine(userFolder, "Downloads");
+            if (!Directory.Exists(downloadsFolder))
+                downloadsFolder = Path.GetTempPath();
+
+            string fullPath = Path.Combine(downloadsFolder, filename);
+
+            string cleanBase64 = payload.Base64;
+            int commaIdx = cleanBase64.IndexOf(',');
+            if (commaIdx >= 0)
+                cleanBase64 = cleanBase64.Substring(commaIdx + 1);
+
+            byte[] pdfBytes = Convert.FromBase64String(cleanBase64);
+            await System.IO.File.WriteAllBytesAsync(fullPath, pdfBytes);
+
+            // Copiar al portapapeles de Windows y auto-pegar en la ventana de WhatsApp (mismo mecanismo de Taller-GitHub)
+            if (OperatingSystem.IsWindows())
+            {
+                try
+                {
+                    string safePath = fullPath.Replace("'", "''");
+                    string psCommand = $@"
+                        Set-Clipboard -Path '{safePath}';
+                        $wsh = New-Object -ComObject Wscript.Shell;
+                        for ($i = 0; $i -lt 10; $i++) {{
+                            if ($wsh.AppActivate('WhatsApp')) {{
+                                Start-Sleep -Milliseconds 350;
+                                $wsh.SendKeys('^v');
+                                break;
+                            }}
+                            Start-Sleep -Milliseconds 800;
+                        }}
+                    ";
+                    var psi = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = "powershell.exe",
+                        Arguments = $"-NoProfile -WindowStyle Hidden -Command \"{psCommand}\"",
+                        CreateNoWindow = true,
+                        UseShellExecute = false,
+                        WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
+                    };
+                    System.Diagnostics.Process.Start(psi);
+                }
+                catch { }
+            }
+
+            return Json(new { ok = true, path = fullPath });
+        }
+        catch (Exception ex)
+        {
+            return Json(new { ok = false, error = ex.Message });
+        }
+    }
 }
+

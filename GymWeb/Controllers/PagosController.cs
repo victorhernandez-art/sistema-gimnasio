@@ -142,7 +142,8 @@ public class PagosController : AuthController
             socio = nombreSocio,
             socioId = pago.IdSocio,
             socioTelefono = socio?.Telefono ?? "",
-            plan = pago.IdMembresiaNavigation?.Nombre ?? "Cuota / Membresía",
+            telefono = socio?.Telefono ?? "",
+            plan = pago.IdMembresiaNavigation?.Nombre ?? (pago.Notas != null && pago.Notas.Contains("Abono") ? "Abono a Deuda / Liquidación" : "Cuota / Membresía"),
             vigencia = vigenciaTexto,
             metodoPago = pago.MetodoPago ?? "Efectivo",
             monto = pago.Monto,
@@ -151,7 +152,8 @@ public class PagosController : AuthController
             gymNombre = !string.IsNullOrWhiteSpace(config?.NombreGimnacio) ? config.NombreGimnacio : AppSettings.GymNombre,
             gymDomicilio = !string.IsNullOrWhiteSpace(config?.Domicilio) ? config.Domicilio : AppSettings.GymDomicilio,
             gymTelefono = !string.IsNullOrWhiteSpace(config?.Telefono) ? config.Telefono : AppSettings.GymTelefono,
-            gymPieTicket = !string.IsNullOrWhiteSpace(config?.Mensaje) ? config.Mensaje : AppSettings.GymPieTicket
+            gymPieTicket = !string.IsNullOrWhiteSpace(config?.Mensaje) ? config.Mensaje : AppSettings.GymPieTicket,
+            gymLogo = AppSettings.HasCustomLogo ? "/img/logo-custom.png" : "/img/gym.jpeg"
         });
     }
 

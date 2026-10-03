@@ -57,8 +57,12 @@
                 <input asp-for="Telefono" class="form-control" placeholder="555-1234" />
             </div>
             <div class="form-group">
+                <label class="form-label">Fecha de Registro</label>
+                <input asp-for="FechaCreacion" type="date" class="form-control" id="inpFechaRegistro" value="@(Model?.FechaCreacion?.ToString("yyyy-MM-dd") ?? DateTime.Now.ToString("yyyy-MM-dd"))" />
+            </div>
+            <div class="form-group">
                 <label class="form-label">Plan / Membresía</label>
-                <select name="IdMembresia" class="form-control">
+                <select name="IdMembresia" id="selMembresia" class="form-control">
                     <option value="">— Sin membresía —</option>
                     @foreach (var m in (IEnumerable<GymWeb.Models.Membresium>)ViewBag.Membresias)
                     {
@@ -67,8 +71,8 @@
                 </select>
             </div>
             <div class="form-group">
-                <label class="form-label">Fecha de Inicio</label>
-                <input type="date" name="FechaInicioMembresia" class="form-control" value="@DateTime.Now.ToString("yyyy-MM-dd")" />
+                <label class="form-label">Fecha de Inicio de Membresía</label>
+                <input type="date" name="FechaInicioMembresia" id="inpFechaInicio" class="form-control" value="@DateTime.Now.ToString("yyyy-MM-dd")" />
             </div>
             <div class="form-group" style="grid-column:1/-1;">
                 <label class="form-label">Observaciones</label>
@@ -162,6 +166,23 @@
         };
         reader.readAsDataURL(file);
     });
+
+    // Sincronizar fechas de registro e inicio de membresía
+    const inpRegistro = document.getElementById('inpFechaRegistro');
+    const inpInicio   = document.getElementById('inpFechaInicio');
+    if (inpRegistro && inpInicio) {
+        inpInicio.addEventListener('change', () => {
+            if (!inpRegistro.dataset.manual) {
+                inpRegistro.value = inpInicio.value;
+            }
+        });
+        inpRegistro.addEventListener('change', () => {
+            inpRegistro.dataset.manual = 'true';
+            if (!inpInicio.dataset.manual) {
+                inpInicio.value = inpRegistro.value;
+            }
+        });
+    }
 })();
 </script>
 

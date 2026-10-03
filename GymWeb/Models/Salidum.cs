@@ -29,9 +29,19 @@ public partial class Salidum
 
     public string? Notas { get; set; }
 
+    public int? IdSocio { get; set; }
+
+    public bool EsCredito { get; set; } = false;
+
+    public decimal SaldoPendiente { get; set; } = 0;
+
+    public DateTime? FechaLiquidacion { get; set; }
+
     public virtual ICollection<Detallesalidum> Detallesalida { get; set; } = new List<Detallesalidum>();
 
     public virtual Estado? IdEstadoNavigation { get; set; }
 
     public virtual Usuario? IdUsuarioCreoNavigation { get; set; }
+
+    public virtual Socio? IdSocioNavigation { get; set; }
 }

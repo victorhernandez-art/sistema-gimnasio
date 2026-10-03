@@ -73,7 +73,16 @@
                         <option value="">Seleccionar...</option>
                         @foreach (var m in membresias ?? Enumerable.Empty<GymWeb.Models.Membresium>())
                         {
-                            <option value="@m.IdMembresia">@m.Nombre — @m.Meses mes(es) — $@m.Precio</option>
+                            string durLabel = m.Meses switch {
+                                1 => "1 día",
+                                7 => "7 días (1 semana)",
+                                15 => "15 días (quincena)",
+                                30 => "1 mes (30 días)",
+                                var x when x.HasValue && x.Value >= 60 && x.Value % 30 == 0 => $"{x.Value / 30} meses",
+                                var x when x.HasValue => $"{x.Value} días",
+                                _ => "Personalizada"
+                            };
+                            <option value="@m.IdMembresia">@m.Nombre — @durLabel — $@m.Precio</option>
                         }
                     </select>
                 </div>

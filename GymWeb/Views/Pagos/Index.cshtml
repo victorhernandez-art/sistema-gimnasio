@@ -152,6 +152,11 @@
                                 onclick="imprimirTicketPagoDirecto(@p.IdPago)" title="Imprimir comprobante en impresora de tickets POS">
                                 <i class="fa-solid fa-print"></i>
                             </button>
+                            <button type="button" class="btn btn-sm"
+                                style="background:#25D366;color:#0B1120;border:none;margin-right:6px;font-weight:700;"
+                                onclick="enviarTicketPagoWhatsAppDirecto(@p.IdPago)" title="Enviar comprobante al WhatsApp del socio">
+                                <i class="fa-brands fa-whatsapp"></i>
+                            </button>
                             <form asp-action="Delete" method="post" style="display:inline;"
                                   onsubmit="return confirm('¿Eliminar este pago?')">
                                 @Html.AntiForgeryToken()
@@ -383,7 +388,7 @@ function ejecutarImpresionTicketPago(data) {
     <style>
         @@page {
             size: auto;
-            margin: 0mm;
+            margin: 0mm 0mm 8mm 0mm;
         }
         * {
             box-sizing: border-box;
@@ -406,8 +411,9 @@ function ejecutarImpresionTicketPago(data) {
             width: 100%;
             max-width: 72mm;
             margin: 0 auto;
-            padding: 2mm 2.5mm 6mm 2.5mm;
+            padding: 2mm 3.5mm 12mm 3.5mm;
             box-sizing: border-box;
+            page-break-inside: avoid;
         }
         .text-center { text-align: center; }
         .text-right { text-align: right; }
@@ -560,6 +566,11 @@ function ejecutarImpresionTicketPago(data) {
             <div class="pie-msg">${pie}</div>
             <div class="pie-sub">Conserve este comprobante para cualquier aclaración o acceso</div>
         </div>
+
+        ${window.generarBarcodeSvgDirecto ? window.generarBarcodeSvgDirecto(
+            (data.socioId ? data.socioId.toString() : folio.replace('#','')),
+            (data.socioId ? `SOCIO #${data.socioId} | FOLIO ${folio}` : `FOLIO ${folio}`)
+        ) : ''}
     </div>
 
     <script>
@@ -574,29 +585,33 @@ function ejecutarImpresionTicketPago(data) {
 </html>
     `;
 
-    let iframe = document.getElementById('iframeImpresionTicketPago');
-    if (!iframe) {
-        iframe = document.createElement('iframe');
-        iframe.id = 'iframeImpresionTicketPago';
-        iframe.style.position = 'fixed';
-        iframe.style.top = '-9999px';
-        iframe.style.left = '-9999px';
-        iframe.style.width = '0px';
-        iframe.style.height = '0px';
-        iframe.style.border = 'none';
-        document.body.appendChild(iframe);
-    }
-
-    const doc = iframe.contentWindow || iframe.contentDocument;
-    if (doc.document) {
-        const d = doc.document;
-        d.open();
-        d.write(html);
-        d.close();
+    if (window.GymPrintManager && typeof window.GymPrintManager.ejecutarImpresionNativa === 'function') {
+        window.GymPrintManager.ejecutarImpresionNativa(html);
     } else {
-        doc.open();
-        doc.write(html);
-        doc.close();
+        let iframe = document.getElementById('iframeImpresionTicketPago');
+        if (!iframe) {
+            iframe = document.createElement('iframe');
+            iframe.id = 'iframeImpresionTicketPago';
+            iframe.style.position = 'fixed';
+            iframe.style.top = '-9999px';
+            iframe.style.left = '-9999px';
+            iframe.style.width = '0px';
+            iframe.style.height = '0px';
+            iframe.style.border = 'none';
+            document.body.appendChild(iframe);
+        }
+
+        const doc = iframe.contentWindow || iframe.contentDocument;
+        if (doc.document) {
+            const d = doc.document;
+            d.open();
+            d.write(html);
+            d.close();
+        } else {
+            doc.open();
+            doc.write(html);
+            doc.close();
+        }
     }
 }
 
@@ -612,6 +627,33 @@ async function imprimirTicketPagoDirecto(idPago) {
         }
     } catch (e) {
         alert('Error de conexión al cargar el ticket de pago.');
+    }
+}
+
+// ── ENVÍO DE COMPROBANTE DE PAGO EN FORMATO PDF POR WHATSAPP (Mecánica Taller) ──
+function enviarTicketPagoWhatsAppActual() {
+    if (ultimoPagoData) {
+        ultimoPagoData.tipoTicket = 'MEMBRESIA';
+        const modalConf = document.getElementById('modalConfirmacionPago');
+        if (modalConf) modalConf.style.display = 'none';
+        window.enviarComprobantePdfWhatsApp(ultimoPagoData);
+    } else {
+        alert('No hay información de pago para enviar por WhatsApp.');
+    }
+}
+
+async function enviarTicketPagoWhatsAppDirecto(idPago) {
+    try {
+        const resp = await fetch(`/Pagos/GetDetallePago?idPago=${idPago}`);
+        const data = await resp.json();
+        if (data.ok) {
+            data.tipoTicket = 'MEMBRESIA';
+            window.enviarComprobantePdfWhatsApp(data);
+        } else {
+            alert(data.msg || 'No se pudo obtener la información para WhatsApp.');
+        }
+    } catch (e) {
+        alert('Error de conexión al preparar comprobante de WhatsApp.');
     }
 }
 
@@ -634,20 +676,12 @@ async function abrirModalConfirmacionNuevoPago(idPago) {
         if (!data.ok) return;
 
         ultimoPagoData = data;
-        document.getElementById('confPagoFolio').textContent = data.folio;
-        document.getElementById('confPagoSocio').textContent = data.socio;
-        document.getElementById('confPagoPlan').textContent  = data.plan;
+        ultimoPagoData.tipoTicket = 'MEMBRESIA';
 
-        const vigRow = document.getElementById('confPagoVigenciaRow');
-        if (data.vigencia) {
-            document.getElementById('confPagoVigencia').textContent = 'Hasta ' + data.vigencia;
-            vigRow.style.display = 'flex';
-        } else {
-            vigRow.style.display = 'none';
+        const container = document.getElementById('confTicketPagoPaperContainer');
+        if (container && window.generarTicketHtmlEstiloTaller) {
+            container.innerHTML = window.generarTicketHtmlEstiloTaller(data);
         }
-
-        document.getElementById('confPagoMetodo').textContent = data.metodoPago;
-        document.getElementById('confPagoMonto').textContent  = '$' + Number(data.monto || 0).toFixed(2);
 
         document.getElementById('modalConfirmacionPago').style.display = 'flex';
     } catch (e) { }
@@ -663,43 +697,28 @@ async function abrirModalConfirmacionNuevoPago(idPago) {
 }
 </script>
 
-<!-- Modal Confirmación de Pago de Membresía -->
+<!-- Modal Confirmación de Pago de Membresía (Estilo Taller) -->
 <div id="modalConfirmacionPago" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:99999;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
-    <div style="background:#161f30;border:1px solid #23354d;border-radius:18px;padding:32px;width:100%;max-width:440px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,0.8);text-align:center;">
-        <div style="width:64px;height:64px;border-radius:50%;background:rgba(16,185,129,0.15);color:#10b981;font-size:28px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px auto;border:2px solid #10b981;">
+    <div style="background:#161f30;border:1px solid #23354d;border-radius:18px;padding:24px;width:100%;max-width:440px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,0.8);text-align:center;">
+        <div style="width:56px;height:56px;border-radius:50%;background:rgba(16,185,129,0.15);color:#10b981;font-size:24px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px auto;border:2px solid #10b981;">
             <i class="fa-solid fa-check"></i>
         </div>
-        <h3 style="margin-bottom:6px;font-size:20px;font-weight:800;color:#ffffff;">¡Pago Registrado con Éxito!</h3>
-        <div id="confPagoFolio" style="display:inline-block;background:rgba(6,182,212,0.15);color:#38bdf8;border:1px solid rgba(6,182,212,0.3);padding:3px 12px;border-radius:20px;font-size:12px;font-weight:700;margin-bottom:20px;">#PAG-000000</div>
+        <h3 style="margin-bottom:6px;font-size:18px;font-weight:800;color:#ffffff;">¡Pago Registrado con Éxito!</h3>
 
-        <div style="background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:16px;text-align:left;margin-bottom:20px;font-size:13px;display:flex;flex-direction:column;gap:8px;">
-            <div style="display:flex;justify-content:space-between;gap:8px;">
-                <span style="color:#94a3b8;flex-shrink:0;">Socio:</span>
-                <strong id="confPagoSocio" style="color:#ffffff;text-align:right;word-break:break-word;">—</strong>
-            </div>
-            <div style="display:flex;justify-content:space-between;gap:8px;">
-                <span style="color:#94a3b8;flex-shrink:0;">Membresía / Concepto:</span>
-                <strong id="confPagoPlan" style="color:#38bdf8;text-align:right;">—</strong>
-            </div>
-            <div id="confPagoVigenciaRow" style="display:flex;justify-content:space-between;gap:8px;">
-                <span style="color:#94a3b8;flex-shrink:0;">Vigencia:</span>
-                <strong id="confPagoVigencia" style="color:#4ade80;text-align:right;">—</strong>
-            </div>
-            <div style="display:flex;justify-content:space-between;gap:8px;">
-                <span style="color:#94a3b8;flex-shrink:0;">Método de Pago:</span>
-                <strong id="confPagoMetodo" style="color:#ffffff;text-align:right;">—</strong>
-            </div>
-            <div style="display:flex;justify-content:space-between;border-top:1px solid #1e293b;padding-top:8px;font-size:15px;">
-                <span style="color:#ffffff;font-weight:700;">Total Pagado:</span>
-                <strong id="confPagoMonto" style="color:#4ade80;font-weight:800;">$0.00</strong>
-            </div>
-        </div>
+        <!-- Vista del Ticket Térmico Oficial Estilo Taller-GitHub -->
+        <div id="confTicketPagoPaperContainer" style="max-height:55vh;overflow-y:auto;margin:12px auto;padding:4px;display:flex;justify-content:center;"></div>
 
         <div style="display:flex;flex-direction:column;gap:10px;">
-            <button type="button" onclick="imprimirTicketPagoActual()" class="btn"
-                    style="background:linear-gradient(135deg, #10b981 0%, #059669 100%);color:#ffffff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 12px rgba(16,185,129,0.3);">
-                <i class="fa-solid fa-print"></i> Imprimir Ticket de Pago
-            </button>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <button type="button" onclick="imprimirTicketPagoActual()" class="btn"
+                        style="background:linear-gradient(135deg, #10b981 0%, #059669 100%);color:#ffffff;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 12px rgba(16,185,129,0.3);">
+                    <i class="fa-solid fa-print"></i> Imprimir Ticket
+                </button>
+                <button type="button" onclick="enviarTicketPagoWhatsAppActual()" class="btn"
+                        style="background:#25D366;color:#0B1120;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 14px rgba(37,211,102,0.35);">
+                    <i class="fa-brands fa-whatsapp" style="font-size:17px;"></i> WhatsApp
+                </button>
+            </div>
             <div style="display:flex;gap:10px;">
                 <button type="button" onclick="cerrarModalConfirmacionPago(); document.getElementById('modalPago').style.display='flex';" class="btn btn-outline"
                         style="flex:1;border-radius:10px;padding:10px;font-size:13px;">

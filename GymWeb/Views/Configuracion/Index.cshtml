@@ -473,12 +473,15 @@ else if (licStatus.IsFirstInstall)
         }
 
         const phone = '@AppSettings.LicenseWhatsApp';
-        let url = 'https://api.whatsapp.com/send?';
-        if (phone && phone.trim() !== '') {
-            url += 'phone=' + encodeURIComponent(phone.trim().replace(/[^0-9]/g, '')) + '&';
+        const cleanPhone = (phone && phone.trim() !== '') ? phone.trim().replace(/[^0-9]/g, '') : '';
+        if (window.abrirVentanaWhatsAppCentrada) {
+            window.abrirVentanaWhatsAppCentrada(cleanPhone, msg);
+        } else {
+            let url = 'https://api.whatsapp.com/send?';
+            if (cleanPhone) url += 'phone=' + encodeURIComponent(cleanPhone) + '&';
+            url += 'text=' + encodeURIComponent(msg);
+            window.open(url, 'whatsapp_taller_win');
         }
-        url += 'text=' + encodeURIComponent(msg);
-        window.open(url, '_blank');
     }
 
     function mostrarToast(msg) {

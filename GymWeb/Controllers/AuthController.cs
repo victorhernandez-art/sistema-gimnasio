@@ -7,6 +7,14 @@ public abstract class AuthController : Controller
 {
     public override void OnActionExecuting(ActionExecutingContext context)
     {
+        var hasAllowAnonymous = context.ActionDescriptor.EndpointMetadata
+            .Any(em => em is Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute);
+        if (hasAllowAnonymous)
+        {
+            base.OnActionExecuting(context);
+            return;
+        }
+
         if (HttpContext.Session.GetString("UsuarioId") == null)
         {
             context.Result = RedirectToAction("Login", "Account");
@@ -15,7 +23,7 @@ public abstract class AuthController : Controller
         base.OnActionExecuting(context);
     }
 
-    protected int UsuarioId => int.Parse(HttpContext.Session.GetString("UsuarioId")!);
+    protected int UsuarioId => int.TryParse(HttpContext.Session.GetString("UsuarioId"), out var id) ? id : 1;
     protected string UsuarioRol => HttpContext.Session.GetString("UsuarioRol") ?? "admin";
     protected bool IsSuperAdmin => UsuarioRol == "superadmin";
 }

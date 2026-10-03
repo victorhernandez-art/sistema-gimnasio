@@ -308,7 +308,6 @@ else
 <div id="navTip" class="nav-tip-popup"></div>
 <script src="~/lib/jquery/dist/jquery.min.js"></script>
 <script src="~/js/gym.js" asp-append-version="true"></script>
-@await RenderSectionAsync("Scripts", required: false)
 
 @if (Context.Session.GetString("UsuarioId") != null)
 {
@@ -424,7 +423,7 @@ else
         <button onclick="gymDismissUpdate('later')" style="padding:9px 20px;border-radius:10px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);color:#94a3b8;font-size:13px;font-weight:600;cursor:pointer;">
             <i class="fa-regular fa-clock"></i>&nbsp; Más tarde
         </button>
-        <a id="upDownloadBtn" href="#" target="_blank" style="display:inline-flex;align-items:center;gap:8px;padding:9px 22px;border-radius:10px;background:linear-gradient(135deg,#00f2ff,#0284c7);color:#000000;font-size:13px;font-weight:700;text-decoration:none;box-shadow:0 4px 16px rgba(0,242,255,0.35);">
+        <a id="upDownloadBtn" href="/Home/DescargarParche" download="Parche_Ligero_GymWeb.zip" style="display:inline-flex;align-items:center;gap:8px;padding:9px 22px;border-radius:10px;background:linear-gradient(135deg,#00f2ff,#0284c7);color:#000000;font-size:13px;font-weight:700;text-decoration:none;box-shadow:0 4px 16px rgba(0,242,255,0.35);">
             <i class="fa-solid fa-download"></i> Descargar parche
         </a>
     </div>
@@ -460,7 +459,7 @@ else
 
             document.getElementById('upCurrent').textContent = data.current;
             document.getElementById('upLatest').textContent  = data.latest;
-            document.getElementById('upDownloadBtn').href    = data.downloadUrl || '#';
+            document.getElementById('upDownloadBtn').href    = '/Home/DescargarParche';
 
             const notes = (data.releaseNotes || '').trim();
             if (notes) {
@@ -507,5 +506,10 @@ else
 </script>
 }
 }
+    <script src="~/lib/JsBarcode.all.min.js" asp-append-version="true"></script>
+    <script src="~/lib/html2canvas.min.js" asp-append-version="true"></script>
+    <script src="~/lib/jspdf.umd.min.js" asp-append-version="true"></script>
+    <script src="~/js/gym-tickets-whatsapp.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

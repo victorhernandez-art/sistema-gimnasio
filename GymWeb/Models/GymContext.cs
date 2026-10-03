@@ -297,6 +297,10 @@ public partial class GymContext : DbContext
             entity.Property(e => e.Cambio).HasPrecision(8, 2).HasColumnName("cambio");
             entity.Property(e => e.Referencia).HasMaxLength(100).HasColumnName("referencia");
             entity.Property(e => e.Notas).HasMaxLength(255).HasColumnName("notas");
+            entity.Property(e => e.IdSocio).HasColumnName("idSocio");
+            entity.Property(e => e.EsCredito).HasColumnName("esCredito").HasDefaultValue(false);
+            entity.Property(e => e.SaldoPendiente).HasPrecision(8, 2).HasColumnName("saldoPendiente").HasDefaultValue(0m);
+            entity.Property(e => e.FechaLiquidacion).HasColumnType("datetime").HasColumnName("fechaLiquidacion");
 
             entity.HasOne(d => d.IdEstadoNavigation).WithMany(p => p.Salida)
                 .HasForeignKey(d => d.IdEstado)
@@ -305,6 +309,10 @@ public partial class GymContext : DbContext
             entity.HasOne(d => d.IdUsuarioCreoNavigation).WithMany(p => p.Salida)
                 .HasForeignKey(d => d.IdUsuarioCreo)
                 .HasConstraintName("fk_Salida_Usuario1");
+
+            entity.HasOne(d => d.IdSocioNavigation).WithMany(p => p.Salidas)
+                .HasForeignKey(d => d.IdSocio)
+                .HasConstraintName("fk_Salida_Socio1");
         });
 
         modelBuilder.Entity<Pago>(entity =>

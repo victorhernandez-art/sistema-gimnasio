@@ -1,4 +1,10 @@
 @model IEnumerable<GymWeb.Models.Socio>
+@using GymWeb.Helpers
+@{
+    var deudas = ViewBag.Deudas as Dictionary<int, SocioDeudorItemDto> ?? new Dictionary<int, SocioDeudorItemDto>();
+    int totalDeudores = ViewBag.TotalDeudoresCount ?? 0;
+    decimal totalMontoCobrar = ViewBag.TotalMontoPorCobrar ?? 0m;
+}
 
 @if (TempData["Success"] != null)
 {
@@ -14,11 +20,16 @@
 }
 
 <div class="card">
-    <div class="card-header">
-        <div class="card-title"><i class="fa-solid fa-users"></i> Lista de Socios</div>
-        <div style="display:flex;gap:8px;">
+    <div class="card-header" style="flex-wrap:wrap;gap:12px;">
+        <div class="card-title"><i class="fa-solid fa-users"></i> Directorio y Control de Socios</div>
+            <button type="button" onclick="abrirModalDifusionMasiva()" class="btn btn-sm" style="background:#25D366;color:#0B1120;font-weight:800;border:none;box-shadow:0 2px 8px rgba(37,211,102,0.3);" title="Enviar mensaje o promoción masiva a los socios por WhatsApp">
+                <i class="fa-brands fa-whatsapp"></i> Difusión WhatsApp
+            </button>
             <a asp-action="ExportCsv" asp-route-formato="excel" class="btn btn-sm" style="background:#16a34a;color:#fff;" title="Descargar directorio formal en Excel con Logo">
-                <i class="fa-solid fa-file-excel"></i> Excel
+                <i class="fa-solid fa-file-excel"></i> Directorio Excel
+            </a>
+            <a asp-action="ExportarDeudores" asp-route-formato="excel" class="btn btn-sm" style="background:#dc2626;color:#fff;" title="Descargar reporte formal de socios con saldo deudor en Excel con Logo">
+                <i class="fa-solid fa-file-invoice-dollar"></i> Reporte Deudores (@totalDeudores)
             </a>
             <a asp-action="Create" class="btn btn-primary btn-sm">
                 <i class="fa-solid fa-plus"></i> Nuevo Socio
@@ -26,30 +37,84 @@
         </div>
     </div>
 
+    <!-- Píldoras de Filtros Rápidos -->
+    <div style="padding:12px 20px;border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:rgba(255,255,255,0.015);">
+        <button type="button" class="btn btn-sm filtro-btn active" data-filtro="todos" onclick="filtrarSocios('todos', this)" style="border-radius:20px;font-size:12px;">
+            <i class="fa-solid fa-layer-group"></i> Todos (@Model.Count())
+        </button>
+        <button type="button" class="btn btn-sm filtro-btn" data-filtro="activos" onclick="filtrarSocios('activos', this)" style="border-radius:20px;font-size:12px;background:rgba(0,242,100,0.06);border:1px solid rgba(0,242,100,0.25);color:#00f264;">
+            <i class="fa-solid fa-circle-check"></i> Activos (@Model.Count(s => s.IdEstado == 1))
+        </button>
+        <button type="button" class="btn btn-sm filtro-btn" data-filtro="inactivos" onclick="filtrarSocios('inactivos', this)" style="border-radius:20px;font-size:12px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.25);color:#f87171;">
+            <i class="fa-solid fa-user-slash"></i> Inactivos (@Model.Count(s => s.IdEstado != 1))
+        </button>
+        <button type="button" class="btn btn-sm filtro-btn" data-filtro="deudores" onclick="filtrarSocios('deudores', this)" style="border-radius:20px;font-size:12px;background:rgba(251,146,60,0.1);border:1px solid rgba(251,146,60,0.4);color:#fb923c;font-weight:700;">
+            <i class="fa-solid fa-circle-exclamation"></i> Con Saldo Deudor (@totalDeudores) &nbsp;·&nbsp; $@totalMontoCobrar.ToString("N2")
+        </button>
+    </div>
+
     <div class="toolbar">
         <div class="toolbar-left">
             <div class="search-box">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input id="tableSearch" type="text" placeholder="Buscar socio..." />
+                <input id="tableSearch" type="text" placeholder="Buscar socio por nombre, clave o teléfono..." onkeyup="ejecutarBusquedaYFiltro()" />
             </div>
         </div>
         <div class="toolbar-right">
-            <span class="text-muted" style="font-size:13px;">Total: @Model.Count() socios</span>
+            <span id="labelContadorSocios" class="text-muted" style="font-size:13px;">Mostrando @Model.Count() socios</span>
         </div>
     </div>
 
+<style>
+.socio-action-btn {
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    max-width: 28px !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 6px !important;
+    font-size: 11px !important;
+    flex-shrink: 0 !important;
+    line-height: 1 !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+.socio-action-btn:hover {
+    transform: scale(1.12);
+}
+.socio-actions-container {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    gap: 3px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-wrap: nowrap !important;
+    white-space: nowrap !important;
+}
+.socio-actions-container form {
+    margin: 0 !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    flex-shrink: 0 !important;
+}
+</style>
+
     <div class="table-responsive">
-        <table class="gym-table">
+        <table class="gym-table" id="tablaSocios">
             <thead>
                 <tr>
                     <th>#</th>
                     <th></th>
-                    <th>Nombre</th>
+                    <th>Nombre / Estado de Cuenta</th>
                     <th>Clave</th>
                     <th>Teléfono</th>
                     <th>Estado</th>
                     <th>Registro</th>
-                    <th>Acciones</th>
+                    <th style="text-align:center;width:1%;white-space:nowrap;min-width:270px;">Acciones</th>
                 </tr>
             </thead>
             <tbody>
@@ -57,7 +122,13 @@
             @foreach (var s in Model)
             {
                 num++;
-                <tr>
+                var infoDeuda = deudas.TryGetValue(s.IdSocio, out var dItem) ? dItem : null;
+                decimal deudaTotal = infoDeuda?.DeudaTotal ?? 0m;
+                bool esDeudor = deudaTotal > 0;
+                string estadoTexto = s.IdEstado == 1 ? "activo" : "inactivo";
+                string textoBusqueda = $"{s.Nombre} {s.Paterno} {s.Materno} {s.IdSocio} {s.Telefono}".ToLower();
+
+                <tr class="socio-row" data-estado="@estadoTexto" data-deudor="@(esDeudor ? "true" : "false")" data-search="@textoBusqueda">
                     <td class="text-muted">@num</td>
                     <td style="padding:8px 6px;">
                         @if (s.Foto != null && s.Foto.Length > 0)
@@ -70,16 +141,37 @@
                         }
                     </td>
                     <td>
-                        <span class="name-cell">@s.Nombre @s.Paterno @s.Materno</span>
+                        <div class="name-cell" style="font-weight:600;display:inline-block;">@s.Nombre @s.Paterno @s.Materno</div>
                         @if (s.SocioHuella != null && s.SocioHuella.Template != null)
                         {
                             <span class="badge" style="font-size:10px;padding:2px 7px;margin-left:6px;background:rgba(0,242,100,0.12);color:#00f264;border:1px solid rgba(0,242,100,0.3);font-family:'Inter',monospace;" title="Huella y PIN activos">
                                 <i class="fa-solid fa-fingerprint"></i> PIN @s.SocioHuella.Pin
                             </span>
                         }
+
+                        @if (esDeudor)
+                        {
+                            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-top:3px;">
+                                <span class="badge" style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.35);font-size:11px;font-weight:700;cursor:pointer;" onclick="abrirModalEstadoCuenta(@s.IdSocio, '@s.Nombre @s.Paterno')" title="Click para ver desglose y cobrar abono">
+                                    <i class="fa-solid fa-circle-exclamation"></i> Debe: $@deudaTotal.ToString("N2")
+                                </span>
+                                @if (infoDeuda!.DeudaProductos > 0)
+                                {
+                                    <span class="badge" style="background:rgba(251,146,60,0.12);color:#fb923c;font-size:10px;" title="A crédito en tienda">
+                                        <i class="fa-solid fa-bag-shopping"></i> A crédito: $@infoDeuda.DeudaProductos.ToString("N2")
+                                    </span>
+                                }
+                                @if (infoDeuda!.DeudaMembresias > 0)
+                                {
+                                    <span class="badge" style="background:rgba(56,189,248,0.12);color:#38bdf8;font-size:10px;" title="Membresía adeudada">
+                                        <i class="fa-solid fa-id-card"></i> Membresía: $@infoDeuda.DeudaMembresias.ToString("N2")
+                                    </span>
+                                }
+                            </div>
+                        }
                     </td>
                     <td><span class="badge badge-info" style="font-family:'Inter',monospace;letter-spacing:1px;">@s.IdSocio</span></td>
-                    <td>@s.Telefono</td>
+                    <td>@(string.IsNullOrWhiteSpace(s.Telefono) ? "—" : s.Telefono)</td>
                     <td>
                         @if (s.IdEstado == 1)
                         { <span class="badge badge-success"><i class="fa-solid fa-circle"></i> Activo</span> }
@@ -87,46 +179,71 @@
                         { <span class="badge badge-danger"><i class="fa-solid fa-circle"></i> Inactivo</span> }
                     </td>
                     <td class="text-muted" style="font-size:12px;">@s.FechaCreacion?.ToString("dd/MM/yyyy")</td>
-                    <td>
-                        <div style="display:flex;gap:6px;">
-                            <a asp-action="Membresia" asp-route-id="@s.IdSocio" class="btn btn-outline btn-sm" title="Membresía / Renovar">
+                    <td style="white-space:nowrap;width:1%;min-width:270px;text-align:center;padding:4px 6px;">
+                        <div class="socio-actions-container">
+                            <a asp-action="Membresia" asp-route-id="@s.IdSocio" class="btn btn-outline btn-sm socio-action-btn" title="Membresía / Renovar">
                                 <i class="fa-solid fa-id-card"></i>
                             </a>
-                            <a asp-action="PagosSocio" asp-route-id="@s.IdSocio" class="btn btn-outline btn-sm" title="Historial de pagos">
+                            <a asp-action="PagosSocio" asp-route-id="@s.IdSocio" class="btn btn-outline btn-sm socio-action-btn" title="Historial de pagos">
                                 <i class="fa-solid fa-dollar-sign"></i>
                             </a>
-                            <button type="button" class="btn btn-outline btn-sm"
+                            <!-- Botón Asistencias -->
+                            <button type="button" class="btn btn-outline btn-sm socio-action-btn"
+                                    onclick="abrirModalAsistencias(@s.IdSocio, '@s.Nombre @s.Paterno')"
+                                    title="Historial de Asistencias (Semana / Mes / Fechas)"
+                                    style="border-color:rgba(56,189,248,0.4);background:rgba(56,189,248,0.08);color:#38bdf8;">
+                                <i class="fa-solid fa-calendar-check"></i>
+                            </button>
+                            <!-- Botón Estado de Cuenta / A Crédito -->
+                            <button type="button" class="btn btn-outline btn-sm socio-action-btn"
+                                    onclick="abrirModalEstadoCuenta(@s.IdSocio, '@s.Nombre @s.Paterno')"
+                                    title="Estado de Cuenta y Cobro a Crédito"
+                                    style="@(esDeudor ? "border-color:rgba(239,68,68,0.6);background:rgba(239,68,68,0.15);color:#f87171;" : "border-color:rgba(251,191,36,0.4);background:rgba(251,191,36,0.08);color:#fbbf24;")">
+                                <i class="fa-solid fa-receipt"></i>
+                            </button>
+                            <!-- Botón Biométrico -->
+                            <button type="button" class="btn btn-outline btn-sm socio-action-btn"
                                     onclick="abrirBiometrico(@s.IdSocio)"
                                     style="@(s.SocioHuella != null && s.SocioHuella.Template != null ? "border-color:rgba(0,242,100,0.5);background:rgba(0,242,100,0.12);" : "")"
                                     title="@(s.SocioHuella != null && s.SocioHuella.Template != null ? $"✓ Huella Registrada (PIN: {s.SocioHuella.Pin})" : "Acceso Biométrico — Registrar Huella")">
                                 <i class="fa-solid fa-fingerprint" style="@(s.SocioHuella != null && s.SocioHuella.Template != null ? "color:#00f264;" : "")"></i>
                             </button>
-                            <a asp-action="Edit" asp-route-id="@s.IdSocio" class="btn btn-outline btn-sm" title="Editar">
+                            <!-- Botón WhatsApp Directo -->
+                            @if (!string.IsNullOrWhiteSpace(s.Telefono))
+                            {
+                                <button type="button" class="btn btn-outline btn-sm socio-action-btn"
+                                        onclick="enviarMensajeDirectoSocio('@s.Telefono', '@s.Nombre @s.Paterno', @s.IdSocio)"
+                                        title="Enviar WhatsApp a @s.Nombre"
+                                        style="border-color:rgba(37,211,102,0.45);background:rgba(37,211,102,0.08);color:#25D366;">
+                                    <i class="fa-brands fa-whatsapp"></i>
+                                </button>
+                            }
+                            <a asp-action="Edit" asp-route-id="@s.IdSocio" class="btn btn-outline btn-sm socio-action-btn" title="Editar">
                                 <i class="fa-solid fa-pen"></i>
                             </a>
                             @if (s.IdEstado == 1)
                             {
-                                <form asp-action="Delete" method="post" style="margin:0;" onsubmit="return confirm('¿Inactivar este socio?')">
+                                <form asp-action="Delete" method="post" style="margin:0;display:inline-flex;" onsubmit="return confirm('¿Inactivar este socio?')">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="id" value="@s.IdSocio" />
-                                    <button type="submit" class="btn btn-sm" style="background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.3);" title="Inactivar">
+                                    <button type="submit" class="btn btn-sm socio-action-btn" style="background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.3);" title="Inactivar">
                                         <i class="fa-solid fa-user-slash"></i>
                                     </button>
                                 </form>
                             }
                             else
                             {
-                                <form asp-action="Activate" method="post" style="margin:0;" onsubmit="return confirm('¿Activar este socio?')">
+                                <form asp-action="Activate" method="post" style="margin:0;display:inline-flex;" onsubmit="return confirm('¿Activar este socio?')">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="id" value="@s.IdSocio" />
-                                    <button type="submit" class="btn btn-sm" style="background:rgba(0,242,100,0.15);color:#00f264;border:1px solid rgba(0,242,100,0.3);" title="Activar">
+                                    <button type="submit" class="btn btn-sm socio-action-btn" style="background:rgba(0,242,100,0.15);color:#00f264;border:1px solid rgba(0,242,100,0.3);" title="Activar">
                                         <i class="fa-solid fa-rotate-left"></i>
                                     </button>
                                 </form>
-                                <form asp-action="PermanentDelete" method="post" style="margin:0;" onsubmit="return confirm('⚠️ ELIMINAR PERMANENTEMENTE\n\nEsto eliminará al socio y todos sus datos del sistema.\n\nEsta acción NO se puede deshacer.\n\n¿Continuar?')">
+                                <form asp-action="PermanentDelete" method="post" style="margin:0;display:inline-flex;" onsubmit="return confirm('⚠️ ELIMINAR PERMANENTEMENTE\n\nEsto eliminará al socio y todos sus datos del sistema.\n\nEsta acción NO se puede deshacer.\n\n¿Continuar?')">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="id" value="@s.IdSocio" />
-                                    <button type="submit" class="btn btn-sm" style="background:rgba(220,38,38,0.20);color:#f87171;border:1px solid rgba(220,38,38,0.45);" title="Eliminar permanentemente">
+                                    <button type="submit" class="btn btn-sm socio-action-btn" style="background:rgba(220,38,38,0.20);color:#f87171;border:1px solid rgba(220,38,38,0.45);" title="Eliminar permanentemente">
                                         <i class="fa-solid fa-trash-can"></i>
                                     </button>
                                 </form>
@@ -437,4 +554,734 @@
     // Cerrar con Escape
     document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarBiometrico(); });
 })();
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     MODAL DE ASISTENCIAS DEL SOCIO (CONSULTA SEMANA / MES / EXCEL)
+═══════════════════════════════════════════════════════════════ -->
+<div id="modalAsistencias" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9995;align-items:flex-start;justify-content:center;padding-top:40px;overflow-y:auto;">
+    <div style="background:#111827;border:1px solid var(--border);border-radius:16px;width:100%;max-width:680px;box-shadow:0 32px 80px rgba(0,0,0,0.85);overflow:hidden;margin-bottom:40px;">
+        <!-- Header -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--border);background:rgba(255,255,255,0.02);">
+            <div>
+                <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#38bdf8;font-weight:700;"><i class="fa-solid fa-calendar-check"></i> Historial de Asistencias</div>
+                <div id="asisSocioNombre" style="font-size:18px;font-weight:700;margin-top:2px;">—</div>
+            </div>
+            <button onclick="cerrarModalAsistencias()" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;padding:4px 8px;">✕</button>
+        </div>
+
+        <!-- Controles de Período y Botón Excel -->
+        <div style="padding:16px 24px;border-bottom:1px solid var(--border);background:rgba(0,0,0,0.15);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+            <div style="display:flex;gap:6px;align-items:center;">
+                <button type="button" class="btn btn-sm btn-periodo active" id="btnAsisSemana" onclick="cambiarPeriodoAsistencias('semana')" style="border-radius:8px;font-size:12px;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);">
+                    <i class="fa-solid fa-calendar-week"></i> Esta Semana
+                </button>
+                <button type="button" class="btn btn-sm btn-periodo" id="btnAsisMes" onclick="cambiarPeriodoAsistencias('mes')" style="border-radius:8px;font-size:12px;background:transparent;color:var(--text-muted);border:1px solid var(--border);">
+                    <i class="fa-solid fa-calendar-days"></i> Todo el Mes
+                </button>
+                <button type="button" class="btn btn-sm btn-periodo" id="btnAsisCustom" onclick="cambiarPeriodoAsistencias('custom')" style="border-radius:8px;font-size:12px;background:transparent;color:var(--text-muted);border:1px solid var(--border);">
+                    <i class="fa-solid fa-sliders"></i> Rango
+                </button>
+            </div>
+            <div>
+                <a id="btnDescargarAsisExcel" href="#" class="btn btn-sm" style="background:#16a34a;color:#fff;font-weight:600;" title="Descargar este reporte formal en Excel con Logo">
+                    <i class="fa-solid fa-file-excel"></i> Descargar Excel
+                </a>
+            </div>
+        </div>
+
+        <!-- Selector personalizado de fechas -->
+        <div id="wrapAsisFechasCustom" style="display:none;padding:12px 24px;background:rgba(56,189,248,0.04);border-bottom:1px solid var(--border);align-items:center;gap:10px;flex-wrap:wrap;">
+            <span class="text-muted" style="font-size:12px;">Desde:</span>
+            <input type="date" id="asisFechaDesde" class="form-control" style="width:auto;padding:4px 8px;font-size:12px;" />
+            <span class="text-muted" style="font-size:12px;">Hasta:</span>
+            <input type="date" id="asisFechaHasta" class="form-control" style="width:auto;padding:4px 8px;font-size:12px;" />
+            <button type="button" class="btn btn-primary btn-sm" onclick="cargarAsistencias('custom')">Consultar</button>
+        </div>
+
+        <!-- Indicador Resumen -->
+        <div style="padding:14px 24px;display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.01);border-bottom:1px solid var(--border);">
+            <div style="font-size:13px;color:var(--text-muted);">
+                Período: <strong id="asisPeriodoTexto" style="color:var(--text-primary);">—</strong>
+            </div>
+            <div style="font-size:14px;color:#38bdf8;font-weight:700;">
+                <span id="asisTotalDias">0</span> días asistidos
+            </div>
+        </div>
+
+        <!-- Tabla de Asistencias -->
+        <div style="max-height:360px;overflow-y:auto;padding:0 24px 20px;">
+            <div id="asisLoading" style="text-align:center;padding:30px;color:var(--text-muted);">
+                <i class="fa-solid fa-circle-notch fa-spin" style="font-size:24px;color:#38bdf8;margin-bottom:8px;"></i>
+                <div>Cargando asistencias...</div>
+            </div>
+            <table class="gym-table" id="tablaAsistenciasDetalle" style="display:none;margin-top:14px;">
+                <thead>
+                    <tr>
+                        <th style="width:45px;text-align:center;">#</th>
+                        <th>Fecha</th>
+                        <th>Día</th>
+                        <th style="text-align:right;">Hora de Ingreso</th>
+                    </tr>
+                </thead>
+                <tbody id="asisTbody">
+                </tbody>
+            </table>
+            <div id="asisSinDatos" style="display:none;text-align:center;padding:35px 20px;color:var(--text-muted);">
+                <i class="fa-solid fa-calendar-xmark" style="font-size:32px;color:rgba(255,255,255,0.15);margin-bottom:8px;"></i>
+                <div style="font-size:14px;font-weight:600;">Sin asistencias registradas</div>
+                <div style="font-size:12px;margin-top:2px;">El socio no tiene accesos registrados en este período.</div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="padding:12px 24px;border-top:1px solid var(--border);text-align:right;background:rgba(0,0,0,0.2);">
+            <button type="button" class="btn btn-outline btn-sm" onclick="cerrarModalAsistencias()">Cerrar</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     MODAL DE ESTADO DE CUENTA / GESTIÓN DE FIADOS Y ABONOS
+═══════════════════════════════════════════════════════════════ -->
+<div id="modalEstadoCuenta" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9995;align-items:flex-start;justify-content:center;padding-top:40px;overflow-y:auto;">
+    <div style="background:#111827;border:1px solid var(--border);border-radius:16px;width:100%;max-width:740px;box-shadow:0 32px 80px rgba(0,0,0,0.85);overflow:hidden;margin-bottom:40px;">
+        <!-- Header -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--border);background:rgba(255,255,255,0.02);">
+            <div>
+                <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#fb923c;font-weight:700;"><i class="fa-solid fa-receipt"></i> Cuentas por Cobrar & A Crédito</div>
+                <div id="ctaNombreSocio" style="font-size:18px;font-weight:700;margin-top:2px;">—</div>
+            </div>
+            <button onclick="cerrarModalEstadoCuenta()" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;padding:4px 8px;">✕</button>
+        </div>
+
+        <div style="padding:20px 24px;">
+            <!-- KPIs Resumen de Deuda -->
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;">
+                <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:12px;padding:12px 16px;text-align:center;">
+                    <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#f87171;font-weight:700;">Saldo Total Deudor</div>
+                    <div id="ctaTotalDeuda" style="font-size:22px;font-weight:800;color:#f87171;margin-top:4px;">$0.00</div>
+                </div>
+                <div style="background:rgba(251,146,60,0.08);border:1px solid rgba(251,146,60,0.3);border-radius:12px;padding:12px 16px;text-align:center;">
+                    <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#fb923c;font-weight:700;">Productos a Crédito</div>
+                    <div id="ctaDeudaProductos" style="font-size:20px;font-weight:700;color:#fb923c;margin-top:4px;">$0.00</div>
+                </div>
+                <div style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.3);border-radius:12px;padding:12px 16px;text-align:center;">
+                    <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#38bdf8;font-weight:700;">Membresías Adeudadas</div>
+                    <div id="ctaDeudaMembresias" style="font-size:20px;font-weight:700;color:#38bdf8;margin-top:4px;">$0.00</div>
+                </div>
+            </div>
+
+            <!-- Botón para desplegar formulario de cobro -->
+            <div style="margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;">
+                <div style="font-size:13px;color:var(--text-muted);">
+                    <i class="fa-solid fa-circle-info" style="color:var(--accent);"></i> Los cobros y abonos entran directo al corte de caja en efectivo de hoy.
+                </div>
+                <button type="button" id="btnToggleAbono" class="btn btn-sm" onclick="toggleFormAbono()" style="background:#16a34a;color:#fff;font-weight:700;">
+                    <i class="fa-solid fa-hand-holding-dollar"></i> Registrar Abono / Liquidar
+                </button>
+            </div>
+
+            <!-- Formulario Desplegable de Abono -->
+            <div id="wrapFormAbono" style="display:none;background:rgba(22,163,74,0.05);border:1px solid rgba(22,163,74,0.35);border-radius:12px;padding:16px;margin-bottom:24px;">
+                <div style="font-size:14px;font-weight:700;color:#4ade80;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
+                    <span><i class="fa-solid fa-cash-register"></i> Cobrar Abono al Socio</span>
+                    <button type="button" onclick="llenarMontoTotalAbonar()" class="btn btn-sm" style="font-size:11px;padding:2px 8px;background:rgba(74,222,128,0.15);color:#4ade80;border:1px solid rgba(74,222,128,0.3);">
+                        Liquidar todo el saldo
+                    </button>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;">
+                    <div>
+                        <label class="form-label" style="font-size:12px;">Monto a cobrar ($) *</label>
+                        <input type="number" id="abonoMonto" class="form-control" step="0.50" min="0.50" placeholder="0.00" style="font-size:16px;font-weight:700;color:#4ade80;" />
+                    </div>
+                    <div>
+                        <label class="form-label" style="font-size:12px;">Método de Pago *</label>
+                        <select id="abonoMetodo" class="form-control">
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Tarjeta">Tarjeta de Débito / Crédito</option>
+                            <option value="Transferencia">Transferencia Bancaria</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label" style="font-size:12px;">Notas / Concepto (Opcional)</label>
+                        <input type="text" id="abonoNotas" class="form-control" placeholder="Ej. Pago parcial de deuda..." />
+                    </div>
+                </div>
+                <div id="abonoError" style="display:none;color:#f87171;font-size:12px;margin-top:8px;"></div>
+                <div style="margin-top:14px;display:flex;justify-content:flex-end;gap:8px;">
+                    <button type="button" class="btn btn-outline btn-sm" onclick="toggleFormAbono(false)">Cancelar</button>
+                    <button type="button" id="btnConfirmarAbono" class="btn btn-sm" onclick="procesarAbono()" style="background:#16a34a;color:#fff;font-weight:700;">
+                        <i class="fa-solid fa-check"></i> Confirmar Cobro e Ingresar a Caja
+                    </button>
+                </div>
+            </div>
+
+            <!-- Sección: Desglose de Ventas a Crédito (Productos) -->
+            <div style="margin-bottom:22px;">
+                <h4 style="font-size:13px;font-weight:700;color:#fb923c;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+                    <i class="fa-solid fa-bag-shopping"></i> Notas de Venta a Crédito
+                </h4>
+                <div class="table-responsive" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;">
+                    <table class="gym-table" style="font-size:12px;margin:0;">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Productos</th>
+                                <th style="text-align:right;">Total Nota</th>
+                                <th style="text-align:right;">Saldo Pendiente</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ctaTbodyProductos">
+                        </tbody>
+                    </table>
+                </div>
+                <div id="ctaSinProductos" style="display:none;padding:12px;text-align:center;font-size:12px;color:var(--text-muted);border:1px solid var(--border);border-radius:10px;">
+                    ✓ No tiene productos a crédito pendientes.
+                </div>
+            </div>
+
+            <!-- Sección: Desglose de Membresías -->
+            <div>
+                <h4 style="font-size:13px;font-weight:700;color:#38bdf8;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+                    <i class="fa-solid fa-id-card"></i> Membresías Adeudadas
+                </h4>
+                <div class="table-responsive" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;">
+                    <table class="gym-table" style="font-size:12px;margin:0;">
+                        <thead>
+                            <tr>
+                                <th>Membresía</th>
+                                <th>Vigencia</th>
+                                <th style="text-align:right;">Precio</th>
+                                <th style="text-align:right;">Pagado</th>
+                                <th style="text-align:right;">Pendiente</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ctaTbodyMembresias">
+                        </tbody>
+                    </table>
+                </div>
+                <div id="ctaSinMembresias" style="display:none;padding:12px;text-align:center;font-size:12px;color:var(--text-muted);border:1px solid var(--border);border-radius:10px;">
+                    ✓ No tiene membresías adeudadas pendientes.
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.2);">
+            <a asp-action="ExportarDeudores" asp-route-formato="excel" class="btn btn-outline btn-sm" style="font-size:12px;">
+                <i class="fa-solid fa-file-excel"></i> Descargar Padrón de Deudores
+            </a>
+            <button type="button" class="btn btn-outline btn-sm" onclick="cerrarModalEstadoCuenta()">Cerrar</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ── FILTROS Y BÚSQUEDA DE SOCIOS EN VIVO ─────────────────────────────
+let filtroActivo = 'todos';
+
+function filtrarSocios(tipo, btn) {
+    filtroActivo = tipo;
+    document.querySelectorAll('.filtro-btn').forEach(b => {
+        b.classList.remove('active');
+        b.style.opacity = '0.7';
+    });
+    if (btn) {
+        btn.classList.add('active');
+        btn.style.opacity = '1';
+    }
+    ejecutarBusquedaYFiltro();
+}
+
+function ejecutarBusquedaYFiltro() {
+    const q = (document.getElementById('tableSearch')?.value || '').toLowerCase().trim();
+    const rows = document.querySelectorAll('#tablaSocios tbody tr.socio-row');
+    let visibles = 0;
+
+    rows.forEach(r => {
+        const estado = r.getAttribute('data-estado');
+        const esDeudor = r.getAttribute('data-deudor') === 'true';
+        const searchData = r.getAttribute('data-search') || '';
+
+        // Condición de pestaña/filtro
+        let coincideFiltro = true;
+        if (filtroActivo === 'activos' && estado !== 'activo') coincideFiltro = false;
+        if (filtroActivo === 'inactivos' && estado !== 'inactivo') coincideFiltro = false;
+        if (filtroActivo === 'deudores' && !esDeudor) coincideFiltro = false;
+
+        // Condición de texto
+        let coincideTexto = true;
+        if (q.length > 0 && !searchData.includes(q)) {
+            coincideTexto = false;
+        }
+
+        if (coincideFiltro && coincideTexto) {
+            r.style.display = '';
+            visibles++;
+        } else {
+            r.style.display = 'none';
+        }
+    });
+
+    const lbl = document.getElementById('labelContadorSocios');
+    if (lbl) {
+        lbl.textContent = `Mostrando ${visibles} socios`;
+    }
+}
+
+// ── CONTROLADOR DE ASISTENCIAS DEL SOCIO ─────────────────────────────
+let asisSocioIdActivo = null;
+let asisPeriodoActual = 'semana';
+
+function abrirModalAsistencias(idSocio, nombreSocio) {
+    asisSocioIdActivo = idSocio;
+    document.getElementById('asisSocioNombre').textContent = `${nombreSocio} (Clave #${idSocio})`;
+    document.getElementById('modalAsistencias').style.display = 'flex';
+    cambiarPeriodoAsistencias('semana');
+}
+
+function cerrarModalAsistencias() {
+    document.getElementById('modalAsistencias').style.display = 'none';
+    asisSocioIdActivo = null;
+}
+
+function cambiarPeriodoAsistencias(periodo) {
+    asisPeriodoActual = periodo;
+    const btnSemana = document.getElementById('btnAsisSemana');
+    const btnMes = document.getElementById('btnAsisMes');
+    const btnCustom = document.getElementById('btnAsisCustom');
+    const wrapCustom = document.getElementById('wrapAsisFechasCustom');
+
+    [btnSemana, btnMes, btnCustom].forEach(b => {
+        b.style.background = 'transparent';
+        b.style.color = 'var(--text-muted)';
+        b.style.borderColor = 'var(--border)';
+    });
+
+    if (periodo === 'semana') {
+        btnSemana.style.background = 'rgba(56,189,248,0.15)';
+        btnSemana.style.color = '#38bdf8';
+        btnSemana.style.borderColor = 'rgba(56,189,248,0.4)';
+        wrapCustom.style.display = 'none';
+        cargarAsistencias('semana');
+    } else if (periodo === 'mes') {
+        btnMes.style.background = 'rgba(56,189,248,0.15)';
+        btnMes.style.color = '#38bdf8';
+        btnMes.style.borderColor = 'rgba(56,189,248,0.4)';
+        wrapCustom.style.display = 'none';
+        cargarAsistencias('mes');
+    } else if (periodo === 'custom') {
+        btnCustom.style.background = 'rgba(56,189,248,0.15)';
+        btnCustom.style.color = '#38bdf8';
+        btnCustom.style.borderColor = 'rgba(56,189,248,0.4)';
+        wrapCustom.style.display = 'flex';
+        // Inicializar fechas hoy / mes actual si vacías
+        const fH = new Date().toISOString().split('T')[0];
+        const fD = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().split('T')[0];
+        if (!document.getElementById('asisFechaDesde').value) document.getElementById('asisFechaDesde').value = fD;
+        if (!document.getElementById('asisFechaHasta').value) document.getElementById('asisFechaHasta').value = fH;
+        cargarAsistencias('custom');
+    }
+}
+
+async function cargarAsistencias(periodo) {
+    if (!asisSocioIdActivo) return;
+
+    const loading = document.getElementById('asisLoading');
+    const tabla = document.getElementById('tablaAsistenciasDetalle');
+    const sinDatos = document.getElementById('asisSinDatos');
+    const tbody = document.getElementById('asisTbody');
+    const btnExcel = document.getElementById('btnDescargarAsisExcel');
+
+    loading.style.display = 'block';
+    tabla.style.display = 'none';
+    sinDatos.style.display = 'none';
+    tbody.innerHTML = '';
+
+    let url = `/Socios/GetAsistencias?id=${asisSocioIdActivo}&periodo=${periodo}`;
+    let excelUrl = `/Socios/ExportarAsistenciasSocio?id=${asisSocioIdActivo}&periodo=${periodo}`;
+
+    if (periodo === 'custom') {
+        const d = document.getElementById('asisFechaDesde').value;
+        const h = document.getElementById('asisFechaHasta').value;
+        if (d && h) {
+            url += `&desde=${d}&hasta=${h}`;
+            excelUrl += `&desde=${d}&hasta=${h}`;
+        }
+    }
+
+    btnExcel.href = excelUrl;
+
+    try {
+        const resp = await fetch(url);
+        const data = await resp.json();
+        loading.style.display = 'none';
+
+        if (!data.ok) {
+            alert('Error al consultar asistencias: ' + data.msg);
+            return;
+        }
+
+        const listaAsistencias = data.asistencias || data.items || [];
+        const textoPeriodo = data.periodoTexto || data.periodoDisplay || '—';
+        const totalDias = (data.total !== undefined ? data.total : (data.diasUnicos !== undefined ? data.diasUnicos : (data.totalAsistencias !== undefined ? data.totalAsistencias : listaAsistencias.length)));
+
+        document.getElementById('asisPeriodoTexto').textContent = textoPeriodo;
+        document.getElementById('asisTotalDias').textContent = totalDias;
+
+        if (listaAsistencias.length === 0) {
+            sinDatos.style.display = 'block';
+            return;
+        }
+
+        tabla.style.display = 'table';
+        let count = 0;
+        listaAsistencias.forEach(item => {
+            count++;
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="text-align:center;color:var(--text-muted);font-size:12px;">${count}</td>
+                <td style="font-weight:600;">${item.fecha}</td>
+                <td style="text-transform:capitalize;color:var(--text-muted);">${item.dia || item.diaSemana || '—'}</td>
+                <td style="text-align:right;color:#38bdf8;font-weight:700;font-family:'Inter',monospace;">${item.hora}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+    } catch (e) {
+        loading.style.display = 'none';
+        alert('Error de conexión al cargar asistencias.');
+    }
+}
+
+// ── CONTROLADOR DE ESTADO DE CUENTA, FIADOS Y ABONOS ────────────────
+let ctaSocioIdActivo = null;
+let ctaSaldoTotalPendiente = 0;
+
+function abrirModalEstadoCuenta(idSocio, nombreSocio) {
+    ctaSocioIdActivo = idSocio;
+    document.getElementById('ctaNombreSocio').textContent = `${nombreSocio} (Clave #${idSocio})`;
+    document.getElementById('modalEstadoCuenta').style.display = 'flex';
+    toggleFormAbono(false);
+    cargarEstadoCuenta();
+}
+
+function cerrarModalEstadoCuenta() {
+    document.getElementById('modalEstadoCuenta').style.display = 'none';
+    ctaSocioIdActivo = null;
+}
+
+async function cargarEstadoCuenta() {
+    if (!ctaSocioIdActivo) return;
+
+    try {
+        const resp = await fetch(`/Socios/GetEstadoCuenta?id=${ctaSocioIdActivo}`);
+        const data = await resp.json();
+
+        if (!data.ok) {
+            alert('Error al cargar estado de cuenta: ' + data.msg);
+            return;
+        }
+
+        const totDeuda = Number(data.deudaTotal ?? data.totalDeuda ?? 0);
+        const deuProd  = Number(data.deudaProductos ?? 0);
+        const deuMem   = Number(data.deudaMembresias ?? 0);
+
+        ctaSaldoTotalPendiente = totDeuda;
+        document.getElementById('ctaTotalDeuda').textContent = `$${totDeuda.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        document.getElementById('ctaDeudaProductos').textContent = `$${deuProd.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        document.getElementById('ctaDeudaMembresias').textContent = `$${deuMem.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+        // Render productos fiados
+        const tbodyProd = document.getElementById('ctaTbodyProductos');
+        const sinProd = document.getElementById('ctaSinProductos');
+        tbodyProd.innerHTML = '';
+
+        if (!data.productosFiados || data.productosFiados.length === 0) {
+            tbodyProd.closest('.table-responsive').style.display = 'none';
+            sinProd.style.display = 'block';
+        } else {
+            tbodyProd.closest('.table-responsive').style.display = 'block';
+            sinProd.style.display = 'none';
+            data.productosFiados.forEach(p => {
+                const totNota = Number(p.totalNota || p.total || 0).toFixed(2);
+                const salPend = Number(p.saldoPendiente || 0).toFixed(2);
+                const itemsTexto = typeof p.items === 'string' ? p.items : (Array.isArray(p.items) ? p.items.map(i => i.nombre || 'Producto').join(', ') : 'Productos varios');
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="text-muted" style="white-space:nowrap;">${p.fecha || '—'}</td>
+                    <td style="font-weight:600;">${itemsTexto}</td>
+                    <td style="text-align:right;">$${totNota}</td>
+                    <td style="text-align:right;color:#fb923c;font-weight:700;">$${salPend}</td>
+                `;
+                tbodyProd.appendChild(tr);
+            });
+        }
+
+        // Render membresías
+        const tbodyMem = document.getElementById('ctaTbodyMembresias');
+        const sinMem = document.getElementById('ctaSinMembresias');
+        tbodyMem.innerHTML = '';
+
+        const listaMembresias = data.membresiasAdeudadas || data.membresias || [];
+        if (listaMembresias.length === 0) {
+            tbodyMem.closest('.table-responsive').style.display = 'none';
+            sinMem.style.display = 'block';
+        } else {
+            tbodyMem.closest('.table-responsive').style.display = 'block';
+            sinMem.style.display = 'none';
+            listaMembresias.forEach(m => {
+                const mPrecio = Number(m.precio || 0).toFixed(2);
+                const mPagado = Number(m.pagado || 0).toFixed(2);
+                const mPend = Number(m.pendiente != null ? m.pendiente : m.precio || 0).toFixed(2);
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-weight:600;">${m.nombre || 'Membresía'}</td>
+                    <td class="text-muted">${m.vigencia || m.fechaInicio || '—'}</td>
+                    <td style="text-align:right;">$${mPrecio}</td>
+                    <td style="text-align:right;color:#4ade80;">$${mPagado}</td>
+                    <td style="text-align:right;color:#38bdf8;font-weight:700;">$${mPend}</td>
+                `;
+                tbodyMem.appendChild(tr);
+            });
+        }
+
+    } catch (e) {
+        console.error('Error al cargar estado de cuenta:', e);
+        alert('Error al consultar el estado de cuenta: ' + (e.message || e));
+    }
+}
+
+function toggleFormAbono(forzar) {
+    const wrap = document.getElementById('wrapFormAbono');
+    const err = document.getElementById('abonoError');
+    err.style.display = 'none';
+    if (forzar !== undefined) {
+        wrap.style.display = forzar ? 'block' : 'none';
+    } else {
+        wrap.style.display = wrap.style.display === 'none' ? 'block' : 'none';
+    }
+    if (wrap.style.display === 'block') {
+        const inp = document.getElementById('abonoMonto');
+        inp.value = ctaSaldoTotalPendiente > 0 ? ctaSaldoTotalPendiente.toFixed(2) : '';
+        inp.focus();
+    }
+}
+
+function llenarMontoTotalAbonar() {
+    if (ctaSaldoTotalPendiente > 0) {
+        document.getElementById('abonoMonto').value = ctaSaldoTotalPendiente.toFixed(2);
+    }
+}
+
+async function procesarAbono() {
+    if (!ctaSocioIdActivo) return;
+
+    const montoVal = parseFloat(document.getElementById('abonoMonto').value);
+    const metodo = document.getElementById('abonoMetodo').value;
+    const notas = document.getElementById('abonoNotas').value;
+    const btn = document.getElementById('btnConfirmarAbono');
+    const err = document.getElementById('abonoError');
+
+    err.style.display = 'none';
+
+    if (isNaN(montoVal) || montoVal <= 0) {
+        err.textContent = 'Ingresa un monto válido mayor a $0.00';
+        err.style.display = 'block';
+        return;
+    }
+
+    if (montoVal > ctaSaldoTotalPendiente + 0.01) {
+        if (!confirm(`El monto ingresado ($${montoVal.toFixed(2)}) supera el saldo total adeudado ($${ctaSaldoTotalPendiente.toFixed(2)}). ¿Deseas cobrar este monto de todos modos?`)) {
+            return;
+        }
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Registrando abono...';
+
+    try {
+        const resp = await fetch('/Socios/RegistrarAbono', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+            },
+            body: JSON.stringify({
+                idSocio: ctaSocioIdActivo,
+                monto: montoVal,
+                metodoPago: metodo,
+                notas: notas
+            })
+        });
+
+        const data = await resp.json();
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Confirmar Cobro e Ingresar a Caja';
+
+        if (!data.ok) {
+            err.textContent = data.msg;
+            err.style.display = 'block';
+            return;
+        }
+
+        toggleFormAbono(false);
+        await cargarEstadoCuenta();
+
+        if (data.pagoId) {
+            window.abrirModalPostAbono(data.pagoId, data.msg);
+        } else {
+            alert('✓ ' + data.msg);
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        }
+
+    } catch (e) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Confirmar Cobro e Ingresar a Caja';
+        err.textContent = 'Error de conexión al procesar el abono.';
+        err.style.display = 'block';
+    }
+}
+
+async function imprimirComprobanteAbono(idPago) {
+    try {
+        const resp = await fetch(`/Pagos/GetDetallePago?idPago=${idPago}`);
+        const data = await resp.json();
+        if (!data.ok) return;
+
+        const folio = data.folio || ('#PAG-' + idPago);
+        const fecha = data.fecha || new Date().toLocaleString();
+        const socio = data.socio || 'Socio';
+        const socioClave = data.socioId ? '#' + data.socioId : '';
+        const plan = data.plan || 'Abono / Pago de Deuda';
+        const metodo = data.metodoPago || 'Efectivo';
+        const cajero = data.cajero || 'Recepción';
+        const notas = data.notas || '';
+        const monto = Number(data.monto || 0).toFixed(2);
+        const gymNom = data.gymNombre || 'MI GIMNASIO';
+        const gymDom = data.gymDomicilio || '';
+        const gymTel = data.gymTelefono || '';
+        const pie    = data.gymPieTicket || '¡Gracias por su pago!';
+
+        const barcodeHtml = window.generarBarcodeSvgDirecto ? window.generarBarcodeSvgDirecto(folio, folio + (socioClave ? ' | ' + socioClave : '')) : '';
+
+        const html = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Comprobante ${folio}</title>
+    <style>
+        @@page { size: auto; margin: 0 0 8mm 0; }
+        * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        html, body { margin: 0; padding: 0; width: 100%; background: #fff; color: #000; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 11.5px; line-height: 1.3; }
+        .ticket-wrapper { width: 100%; max-width: 72mm; margin: 0 auto; padding: 2mm 2.5mm 12mm 2.5mm; page-break-inside: avoid; }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .fw-bold { font-weight: 700; }
+        .fw-black { font-weight: 900; }
+        .logo-wrap { text-align: center; margin-bottom: 4px; }
+        .logo-img { max-width: 120px; max-height: 50px; object-fit: contain; filter: grayscale(100%); margin: 0 auto; display: block; }
+        .gym-name { font-size: 14px; font-weight: 800; text-transform: uppercase; margin: 2px 0 3px 0; line-height: 1.2; color: #000; }
+        .gym-info { font-size: 10.5px; color: #000; margin-bottom: 2px; }
+        .receipt-badge { display: inline-block; font-size: 11px; font-weight: 800; border: 1.5px solid #000; padding: 1.5px 8px; border-radius: 3px; text-transform: uppercase; margin: 4px 0 2px 0; color: #000; }
+        .divider { border-top: 1px dashed #000; margin: 5px 0; width: 100%; }
+        .meta-table, .totals-table { width: 100%; border-collapse: collapse; font-size: 11px; color: #000; }
+        .meta-table td { padding: 1.5px 0; vertical-align: top; }
+        .meta-label { font-weight: 600; color: #000; width: 32%; }
+        .meta-val { font-weight: 700; color: #000; text-align: right; word-break: break-word; }
+        .total-big { font-size: 15px; font-weight: 900; border-top: 1.5px dashed #000; border-bottom: 1.5px dashed #000; padding: 4px 0 !important; color: #000; }
+        .footer-note { margin-top: 7px; text-align: center; color: #000; }
+        .footer-note .pie-msg { font-size: 11px; font-weight: 700; line-height: 1.25; margin-bottom: 2px; }
+        .footer-note .pie-sub { font-size: 9.5px; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="ticket-wrapper">
+        <div class="logo-wrap">
+            <img class="logo-img" src="/img/logo-custom.png?v=${Date.now()}" onerror="this.style.display='none'" />
+        </div>
+        <div class="text-center">
+            <div class="gym-name">${gymNom}</div>
+            ${gymDom ? `<div class="gym-info">${gymDom}</div>` : ''}
+            ${gymTel ? `<div class="gym-info">Tel / WhatsApp: ${gymTel}</div>` : ''}
+            <div class="receipt-badge">COMPROBANTE DE ABONO</div>
+        </div>
+        <div class="divider"></div>
+        <table class="meta-table">
+            <tr><td class="meta-label">FOLIO:</td><td class="meta-val">${folio}</td></tr>
+            <tr><td class="meta-label">FECHA:</td><td class="meta-val">${fecha}</td></tr>
+            <tr><td class="meta-label">SOCIO:</td><td class="meta-val">${socio} ${socioClave}</td></tr>
+            <tr><td class="meta-label">CONCEPTO:</td><td class="meta-val">${plan}</td></tr>
+            <tr><td class="meta-label">MÉTODO:</td><td class="meta-val">${metodo}</td></tr>
+            <tr><td class="meta-label">ATENDIÓ:</td><td class="meta-val">${cajero}</td></tr>
+            ${notas ? `<tr><td class="meta-label">NOTAS:</td><td class="meta-val">${notas}</td></tr>` : ''}
+        </table>
+        <div class="divider"></div>
+        <table class="totals-table">
+            <tr class="total-big">
+                <td>MONTO ABONADO:</td>
+                <td class="text-right">$${monto}</td>
+            </tr>
+        </table>
+        ${barcodeHtml}
+        <div class="footer-note">
+            <div class="pie-msg">${pie}</div>
+            <div class="pie-sub">Conserve este comprobante para cualquier aclaración</div>
+        </div>
+    </div>
+    <script>
+        window.onload = function() {
+            setTimeout(function() { window.focus(); window.print(); }, 200);
+        };
+    <\/script>
+</body>
+</html>`;
+
+        if (window.GymPrintManager && typeof window.GymPrintManager.ejecutarImpresionNativa === 'function') {
+            window.GymPrintManager.ejecutarImpresionNativa(html);
+        } else {
+            let iframe = document.getElementById('iframePrintAbono');
+            if (!iframe) {
+                iframe = document.createElement('iframe');
+                iframe.id = 'iframePrintAbono';
+                iframe.style.position = 'fixed';
+                iframe.style.top = '-9999px';
+                iframe.style.left = '-9999px';
+                iframe.style.width = '0px';
+                iframe.style.height = '0px';
+                iframe.style.border = 'none';
+                document.body.appendChild(iframe);
+            }
+            const doc = iframe.contentWindow || iframe.contentDocument;
+            if (doc.document) {
+                const d = doc.document;
+                d.open(); d.write(html); d.close();
+            } else {
+                doc.open(); doc.write(html); doc.close();
+            }
+        }
+    } catch (e) {
+        console.error('Error al imprimir comprobante:', e);
+    }
+}
+
+async function enviarTicketAbonoWhatsApp(idPago) {
+    try {
+        const resp = await fetch(`/Pagos/GetDetallePago?idPago=${idPago}`);
+        const data = await resp.json();
+        if (data.ok) {
+            data.tipoTicket = 'ABONO';
+            window.abrirModalWhatsAppTicket(data);
+        } else {
+            alert(data.msg || 'No se pudo obtener la información para WhatsApp.');
+        }
+    } catch (e) {
+        alert('Error de conexión al preparar comprobante de WhatsApp.');
+    }
+}
 </script>

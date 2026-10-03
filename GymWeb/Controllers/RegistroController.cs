@@ -76,8 +76,9 @@ public class RegistroController : AuthController
 
         // Prevenir doble check-in — solo registrar si no entró hoy
         var hoy = DateTime.Today;
+        var manana = hoy.AddDays(1);
         var yaRegistrado = await _db.Registros
-            .AnyAsync(r => r.IdSocio == idSocio && r.FechaCreacion.HasValue && r.FechaCreacion.Value.Date == hoy);
+            .AnyAsync(r => r.IdSocio == idSocio && r.FechaCreacion.HasValue && r.FechaCreacion.Value >= hoy && r.FechaCreacion.Value < manana);
 
         if (yaRegistrado)
             return Json(new { ok = false, yaRegistrado = true,
@@ -174,16 +175,16 @@ public class RegistroController : AuthController
     public async Task<IActionResult> Historial(DateTime? desde, DateTime? hasta)
     {
         ViewData["Title"] = "Historial de Visitas";
-        desde ??= DateTime.Today.AddDays(-30);
-        hasta ??= DateTime.Today;
-        ViewBag.Desde = desde.Value.ToString("yyyy-MM-dd");
-        ViewBag.Hasta = hasta.Value.ToString("yyyy-MM-dd");
+        DateTime dtDesde = (desde ?? DateTime.Today.AddDays(-30)).Date;
+        DateTime dtHasta = (hasta ?? DateTime.Today).Date.AddDays(1);
+        ViewBag.Desde = (desde ?? DateTime.Today.AddDays(-30)).ToString("yyyy-MM-dd");
+        ViewBag.Hasta = (hasta ?? DateTime.Today).ToString("yyyy-MM-dd");
 
         var registros = await _db.Registros
             .Include(r => r.IdSocioNavigation)
             .Where(r => r.FechaCreacion.HasValue &&
-                        r.FechaCreacion.Value.Date >= desde.Value.Date &&
-                        r.FechaCreacion.Value.Date <= hasta.Value.Date)
+                        r.FechaCreacion.Value >= dtDesde &&
+                        r.FechaCreacion.Value < dtHasta)
             .OrderByDescending(r => r.FechaCreacion)
             .ToListAsync();
         return View(registros);

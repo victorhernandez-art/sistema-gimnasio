@@ -3,7 +3,7 @@ namespace GymWeb.Helpers;
 public static class AppSettings
 {
     // Versión instalada del sistema (comparada contra el último release de GitHub)
-    public const string CurrentVersion = "v2.2";
+    public const string CurrentVersion = "v2.5";
 
     public static string GymNombre { get; set; } = "GymPro";
     public static string GymDomicilio { get; set; } = "";

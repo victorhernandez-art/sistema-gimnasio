@@ -21,21 +21,39 @@ if (Test-Path $patchOut) { Remove-Item -Recurse -Force $patchOut }
 if (Test-Path $tempBuild) { Remove-Item -Recurse -Force $tempBuild }
 New-Item -ItemType Directory -Force -Path $patchFiles | Out-Null
 
-# 2. Compilar GymWeb
-Write-Host " [2/4] Compilando GymWeb (Release)..." -ForegroundColor Yellow
+# 2. Compilar GymWeb y GymApp (Visor de escritorio)
+Write-Host " [2/4] Compilando GymWeb y GymApp (Release)..." -ForegroundColor Yellow
 $gymWebProj = Join-Path $root "GymWeb\GymWeb.csproj"
 & dotnet publish $gymWebProj -c Release -r win-x64 --no-self-contained -o $tempBuild --nologo -v quiet
 
-# 3. Copiar únicamente GymWeb.dll, vistas compiladas y assets modificados
+$gymAppProj = Join-Path $root "GymApp\GymApp.csproj"
+$tempAppBuild = Join-Path $dist "temp_app_build"
+if (Test-Path $tempAppBuild) { Remove-Item -Recurse -Force $tempAppBuild }
+& dotnet publish $gymAppProj -c Release -r win-x64 --no-self-contained -o $tempAppBuild --nologo -v quiet
+
+# 3. Copiar únicamente GymWeb.dll, Gym.exe, vistas compiladas y assets modificados
 Write-Host " [3/4] Preparando archivos esenciales de actualización..." -ForegroundColor Yellow
 Copy-Item -Force (Join-Path $tempBuild "GymWeb.dll") (Join-Path $patchFiles "GymWeb.dll")
 Copy-Item -Force (Join-Path $tempBuild "GymWeb.pdb") (Join-Path $patchFiles "GymWeb.pdb")
+
+if (Test-Path (Join-Path $tempAppBuild "Gym.exe")) {
+    Copy-Item -Force (Join-Path $tempAppBuild "Gym.exe") (Join-Path $patchFiles "Gym.exe")
+    Copy-Item -Force (Join-Path $tempAppBuild "Gym.dll") (Join-Path $patchFiles "Gym.dll")
+    Copy-Item -Force (Join-Path $tempAppBuild "Gym.pdb") (Join-Path $patchFiles "Gym.pdb")
+    
+    # Actualizar también binarios locales en la raíz y en Publish
+    Copy-Item -Force (Join-Path $tempAppBuild "Gym.exe") (Join-Path $root "Gym.exe") -ErrorAction SilentlyContinue
+    Copy-Item -Force (Join-Path $tempAppBuild "Gym.dll") (Join-Path $root "Gym.dll") -ErrorAction SilentlyContinue
+    Copy-Item -Force (Join-Path $tempAppBuild "Gym.exe") (Join-Path $root "Publish\Gym.exe") -ErrorAction SilentlyContinue
+    Copy-Item -Force (Join-Path $tempAppBuild "Gym.dll") (Join-Path $root "Publish\Gym.dll") -ErrorAction SilentlyContinue
+}
 
 if (Test-Path (Join-Path $tempBuild "wwwroot")) {
     Copy-Item -Recurse -Force (Join-Path $tempBuild "wwwroot") (Join-Path $patchFiles "wwwroot")
     Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $patchFiles "wwwroot\img\logo-custom.png")
     Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $patchFiles "wwwroot\img\fondo-custom.jpg")
     Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $patchFiles "wwwroot\img\socios")
+    Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $patchFiles "wwwroot\img\productos\prod_*.*")
     Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $patchFiles "wwwroot\backups")
 }
 
@@ -44,6 +62,7 @@ Copy-Item -Force (Join-Path $root "Publish\ACTUALIZAR.bat") (Join-Path $patchOut
 Copy-Item -Force (Join-Path $root "Publish\actualizar.ps1") (Join-Path $patchOut "actualizar.ps1")
 
 try { Remove-Item -Recurse -Force $tempBuild -ErrorAction SilentlyContinue } catch { }
+try { Remove-Item -Recurse -Force $tempAppBuild -ErrorAction SilentlyContinue } catch { }
 
 # 4. Empaquetar ZIP ligero
 Write-Host " [4/4] Creando archivo ZIP ultraligero..." -ForegroundColor Yellow

@@ -35,7 +35,11 @@ public static class DbInitializer
             "ALTER TABLE salida ADD COLUMN montoRecibido REAL NULL;",
             "ALTER TABLE salida ADD COLUMN cambio REAL NULL;",
             "ALTER TABLE salida ADD COLUMN referencia TEXT NULL;",
-            "ALTER TABLE salida ADD COLUMN notas TEXT NULL;"
+            "ALTER TABLE salida ADD COLUMN notas TEXT NULL;",
+            "ALTER TABLE salida ADD COLUMN idSocio INTEGER NULL;",
+            "ALTER TABLE salida ADD COLUMN esCredito INTEGER NULL DEFAULT 0;",
+            "ALTER TABLE salida ADD COLUMN saldoPendiente REAL NULL DEFAULT 0;",
+            "ALTER TABLE salida ADD COLUMN fechaLiquidacion TEXT NULL;"
         };
         foreach (var sql in alterSalida)
         {

@@ -21,6 +21,9 @@ public partial class Form1 : Form
     private Process? _spawnedBackend;
     private Process? _spawnedBio;
     private int _retryCount = 0;
+    private Form? _whatsAppForm;
+    private WebView2? _whatsAppWebView;
+    private CoreWebView2Environment? _webViewEnv;
 
     public Form1()
     {
@@ -166,8 +169,25 @@ public partial class Form1 : Form
                 var env = await CoreWebView2Environment.CreateAsync(null, cacheDir);
                 await _webView.EnsureCoreWebView2Async(env);
 
-                _webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
-                _webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
+                _webViewEnv = env;
+                if (_webView.CoreWebView2 != null)
+                {
+                    _webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
+                    _webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
+
+                    // Manejo exclusivo de ventana única (Singleton) para WhatsApp Web idéntico a Sistema Taller
+                    _webView.CoreWebView2.NewWindowRequested += async (s, args) =>
+                    {
+                        string uri = args.Uri ?? "";
+                        if (uri.Contains("web.whatsapp.com", StringComparison.OrdinalIgnoreCase) ||
+                            uri.Contains("api.whatsapp.com", StringComparison.OrdinalIgnoreCase) ||
+                            uri.Contains("wa.me", StringComparison.OrdinalIgnoreCase))
+                        {
+                            args.Handled = true; // Impedir que WebView2 cree una ventana genérica duplicada
+                            await AbrirOEnfocarWhatsAppAsync(uri);
+                        }
+                    };
+                }
 
                 _webView.NavigationCompleted += (s, args) =>
                 {
@@ -265,6 +285,84 @@ public partial class Form1 : Form
         }
 
         return null;
+    }
+
+    private async Task AbrirOEnfocarWhatsAppAsync(string uri)
+    {
+        try
+        {
+            if (_whatsAppForm != null && !_whatsAppForm.IsDisposed)
+            {
+                // Si la ventana ya existe pero está minimizada en Windows, restaurarla inmediatamente
+                if (_whatsAppForm.WindowState == FormWindowState.Minimized)
+                {
+                    _whatsAppForm.WindowState = FormWindowState.Normal;
+                }
+
+                _whatsAppForm.BringToFront();
+                _whatsAppForm.Activate();
+
+                // Navegar al nuevo chat o conversación sin crear otra ventana
+                if (_whatsAppWebView != null && _whatsAppWebView.CoreWebView2 != null)
+                {
+                    _whatsAppWebView.CoreWebView2.Navigate(uri);
+                }
+                return;
+            }
+
+            // Crear ventana integrada centrada (1080x760 px, idéntica a Sistema Taller)
+            _whatsAppForm = new Form
+            {
+                Text = "WhatsApp Web — Sistema Gimnasio",
+                Width = 1080,
+                Height = 760,
+                MinimumSize = new Size(800, 600),
+                StartPosition = FormStartPosition.CenterScreen,
+                BackColor = Color.FromArgb(17, 27, 33)
+            };
+
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string icoPath = Path.Combine(baseDir, "app.ico");
+            if (File.Exists(icoPath))
+            {
+                try { _whatsAppForm.Icon = new Icon(icoPath); } catch { }
+            }
+
+            _whatsAppWebView = new WebView2
+            {
+                Dock = DockStyle.Fill
+            };
+            _whatsAppForm.Controls.Add(_whatsAppWebView);
+
+            _whatsAppForm.FormClosed += (s, e) =>
+            {
+                _whatsAppWebView?.Dispose();
+                _whatsAppWebView = null;
+                _whatsAppForm = null;
+            };
+
+            _whatsAppForm.Show(this);
+
+            if (_webViewEnv != null)
+            {
+                await _whatsAppWebView.EnsureCoreWebView2Async(_webViewEnv);
+            }
+            else
+            {
+                await _whatsAppWebView.EnsureCoreWebView2Async();
+            }
+
+            _whatsAppWebView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
+            _whatsAppWebView.CoreWebView2.Settings.IsStatusBarEnabled = false;
+
+            _whatsAppWebView.CoreWebView2.Navigate(uri);
+            _whatsAppForm.BringToFront();
+            _whatsAppForm.Activate();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Error al abrir WhatsApp Web singleton: {ex.Message}");
+        }
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)

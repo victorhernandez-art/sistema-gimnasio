@@ -14,12 +14,13 @@ public class CheckoutItemDto
 public class CheckoutRequestDto
 {
     public List<CheckoutItemDto> Items { get; set; } = new();
-    public string MetodoPago { get; set; } = "Efectivo"; // Efectivo | Transferencia | Tarjeta
+    public string MetodoPago { get; set; } = "Efectivo"; // Efectivo | Transferencia | Tarjeta | Crédito
     public decimal Descuento { get; set; } = 0;
     public decimal? MontoRecibido { get; set; }
     public decimal? Cambio { get; set; }
     public string? Referencia { get; set; }
     public string? Notas { get; set; }
+    public int? IdSocio { get; set; } // Socio asignado para fiado/crédito
 }
 
 public class ProductosController : AuthController
@@ -52,12 +53,20 @@ public class ProductosController : AuthController
             .ToListAsync();
 
         int ventasHoy = salidasHoy.Count;
-        decimal ingresosHoy = salidasHoy.Sum(s => s.Total ?? s.Detallesalida.Sum(d => (decimal)(d.Cantidad * (d.PrecioUnitario ?? 0m))));
+        // Solo las ventas pagadas (no crédito pendiente) entran a ingresos en caja hoy
+        decimal ingresosHoy = salidasHoy
+            .Where(s => !s.EsCredito)
+            .Sum(s => s.Total ?? s.Detallesalida.Sum(d => (decimal)(d.Cantidad * (d.PrecioUnitario ?? 0m))));
+        decimal ventasCreditoHoy = salidasHoy
+            .Where(s => s.EsCredito)
+            .Sum(s => s.Total ?? 0m);
+
         int productosVendidosHoy = salidasHoy.SelectMany(s => s.Detallesalida).Sum(d => d.Cantidad);
         int stockBajo = productos.Count(p => p.Stock <= p.StockMinimo);
 
         ViewBag.VentasHoy            = ventasHoy;
         ViewBag.IngresosHoy          = ingresosHoy;
+        ViewBag.VentasCreditoHoy     = ventasCreditoHoy;
         ViewBag.ProductosVendidosHoy = productosVendidosHoy;
         ViewBag.StockBajo            = stockBajo;
 
@@ -87,9 +96,29 @@ public class ProductosController : AuthController
             .OrderBy(c => c)
             .ToList();
 
+        // ── Lista de Socios Activos con cálculo de deuda previa para el POS ──
+        var deudasMap = await _db.Salida
+            .Where(s => s.IdEstado == 1 && s.EsCredito && s.SaldoPendiente > 0 && s.IdSocio != null)
+            .GroupBy(s => s.IdSocio!.Value)
+            .Select(g => new { IdSocio = g.Key, Total = g.Sum(x => x.SaldoPendiente) })
+            .ToDictionaryAsync(x => x.IdSocio, x => x.Total);
+
+        var sociosDb = await _db.Socios
+            .Where(s => s.IdEstado == 1)
+            .OrderBy(s => s.Paterno).ThenBy(s => s.Nombre)
+            .ToListAsync();
+
+        ViewBag.SociosLista = sociosDb.Select(s => new {
+            s.IdSocio,
+            NombreCompleto = $"{s.Nombre} {s.Paterno} {s.Materno}".Trim(),
+            Telefono = s.Telefono ?? "",
+            DeudaTotal = deudasMap.TryGetValue(s.IdSocio, out var d) ? d : 0m
+        }).ToList();
+
         // ── Historial de Ventas ──────────────────────────────────────────
         var historialSalidas = await _db.Salida
             .Include(s => s.IdUsuarioCreoNavigation)
+            .Include(s => s.IdSocioNavigation)
             .Include(s => s.Detallesalida)
                 .ThenInclude(d => d.IdProductoNavigation)
             .Where(s => s.IdEstado == 1)
@@ -120,10 +149,27 @@ public class ProductosController : AuthController
             return Json(new { ok = false, msg = "Las cantidades deben ser al menos de 1 unidad." });
 
         string metodo = dto.MetodoPago?.Trim() ?? "Efectivo";
-        if (metodo != "Efectivo" && metodo != "Transferencia" && metodo != "Tarjeta")
-            metodo = "Efectivo";
+        bool esCredito = string.Equals(metodo, "Crédito", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(metodo, "Credito", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(metodo, "Fiado", StringComparison.OrdinalIgnoreCase);
 
-        await using var tx = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+        Socio? socioCredito = null;
+        if (esCredito)
+        {
+            metodo = "Crédito";
+            if (!dto.IdSocio.HasValue || dto.IdSocio.Value <= 0)
+                return Json(new { ok = false, msg = "Debe seleccionar un socio para realizar una venta a crédito." });
+
+            socioCredito = await _db.Socios.FirstOrDefaultAsync(s => s.IdSocio == dto.IdSocio.Value && s.IdEstado == 1);
+            if (socioCredito == null)
+                return Json(new { ok = false, msg = "El socio seleccionado no existe o no está activo." });
+        }
+        else if (metodo != "Efectivo" && metodo != "Transferencia" && metodo != "Tarjeta")
+        {
+            metodo = "Efectivo";
+        }
+
+        await using var tx = await _db.Database.BeginTransactionAsync();
         try
         {
             var itemIds = dto.Items.Select(i => i.IdProducto).Distinct().ToList();
@@ -152,7 +198,7 @@ public class ProductosController : AuthController
                 decimal itemSubtotal = precio * item.Cantidad;
                 subtotal += itemSubtotal;
 
-                // Descontar inventario
+                // Descontar inventario inmediatamente
                 prod.Stock -= item.Cantidad;
 
                 detallesParaGuardar.Add(new Detallesalidum
@@ -177,14 +223,14 @@ public class ProductosController : AuthController
             decimal descuento = Math.Max(0, dto.Descuento);
             decimal totalFinal = Math.Max(0, subtotal - descuento);
 
-            if (metodo == "Efectivo" && dto.MontoRecibido.HasValue && dto.MontoRecibido.Value < totalFinal)
+            if (!esCredito && metodo == "Efectivo" && dto.MontoRecibido.HasValue && dto.MontoRecibido.Value < totalFinal)
             {
                 await tx.RollbackAsync();
                 return Json(new { ok = false, msg = $"El efectivo recibido (${dto.MontoRecibido.Value:N2}) es menor que el total a pagar (${totalFinal:N2})." });
             }
 
             decimal cambio = 0;
-            if (metodo == "Efectivo" && dto.MontoRecibido.HasValue)
+            if (!esCredito && metodo == "Efectivo" && dto.MontoRecibido.HasValue)
             {
                 cambio = Math.Max(0, dto.MontoRecibido.Value - totalFinal);
             }
@@ -196,11 +242,15 @@ public class ProductosController : AuthController
                 Total = totalFinal,
                 MetodoPago = metodo,
                 Descuento = descuento,
-                MontoRecibido = dto.MontoRecibido,
-                Cambio = cambio,
+                MontoRecibido = esCredito ? 0 : dto.MontoRecibido,
+                Cambio = esCredito ? 0 : cambio,
                 Referencia = dto.Referencia?.Trim(),
                 Notas = dto.Notas?.Trim(),
-                IdEstado = 1
+                IdEstado = 1,
+                IdSocio = esCredito ? dto.IdSocio : null,
+                EsCredito = esCredito,
+                SaldoPendiente = esCredito ? totalFinal : 0m,
+                FechaLiquidacion = esCredito ? null : DateTime.Now
             };
 
             _db.Salida.Add(salida);
@@ -227,6 +277,11 @@ public class ProductosController : AuthController
                 fecha = salida.FechaCreacion?.ToString("dd/MM/yyyy HH:mm"),
                 usuario = User.Identity?.Name ?? "Recepción",
                 metodo = salida.MetodoPago,
+                esCredito = salida.EsCredito,
+                saldoPendiente = salida.SaldoPendiente,
+                socioNombre = socioCredito != null ? $"{socioCredito.Nombre} {socioCredito.Paterno}".Trim() : null,
+                socioTelefono = socioCredito?.Telefono,
+                socioId = socioCredito?.IdSocio,
                 subtotal = subtotal,
                 descuento = descuento,
                 total = totalFinal,
@@ -237,6 +292,7 @@ public class ProductosController : AuthController
                 gymDomicilio = !string.IsNullOrWhiteSpace(config?.Domicilio) ? config.Domicilio : AppSettings.GymDomicilio,
                 gymTelefono = !string.IsNullOrWhiteSpace(config?.Telefono) ? config.Telefono : AppSettings.GymTelefono,
                 gymPieTicket = !string.IsNullOrWhiteSpace(config?.Mensaje) ? config.Mensaje : AppSettings.GymPieTicket,
+                gymLogo = AppSettings.HasCustomLogo ? "/img/logo-custom.png" : "/img/gym.jpeg",
                 items = resumenTicket
             });
         }
@@ -253,6 +309,7 @@ public class ProductosController : AuthController
     {
         var salida = await _db.Salida
             .Include(s => s.IdUsuarioCreoNavigation)
+            .Include(s => s.IdSocioNavigation)
             .Include(s => s.Detallesalida)
                 .ThenInclude(d => d.IdProductoNavigation)
             .FirstOrDefaultAsync(s => s.IdSalida == idSalida);
@@ -280,6 +337,11 @@ public class ProductosController : AuthController
             folio = salida.Folio ?? $"#{salida.IdSalida:D6}",
             fecha = salida.FechaCreacion?.ToString("dd/MM/yyyy HH:mm"),
             metodoPago = salida.MetodoPago ?? "Efectivo",
+            esCredito = salida.EsCredito,
+            saldoPendiente = salida.SaldoPendiente,
+            idSocio = salida.IdSocio,
+            socioNombre = salida.IdSocioNavigation != null ? $"{salida.IdSocioNavigation.Nombre} {salida.IdSocioNavigation.Paterno}".Trim() : null,
+            socioTelefono = salida.IdSocioNavigation?.Telefono,
             usuario = salida.IdUsuarioCreoNavigation?.Nombre ?? "Recepción",
             subtotal = detalles.Sum(x => x.subtotal),
             descuento = salida.Descuento ?? 0m,
@@ -292,6 +354,7 @@ public class ProductosController : AuthController
             gymDomicilio = !string.IsNullOrWhiteSpace(config?.Domicilio) ? config.Domicilio : AppSettings.GymDomicilio,
             gymTelefono = !string.IsNullOrWhiteSpace(config?.Telefono) ? config.Telefono : AppSettings.GymTelefono,
             gymPieTicket = !string.IsNullOrWhiteSpace(config?.Mensaje) ? config.Mensaje : AppSettings.GymPieTicket,
+            gymLogo = AppSettings.HasCustomLogo ? "/img/logo-custom.png" : "/img/gym.jpeg",
             items = detalles
         });
     }
@@ -299,11 +362,34 @@ public class ProductosController : AuthController
     // ── Crear producto (AJAX) ───────────────────────────────────────────
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CreateAjax(string nombre, string? categoria, decimal precio,
-        decimal? costo, int stock, int stockMinimo, string? descripcion, IFormFile? foto)
+    public async Task<IActionResult> CreateAjax(string nombre, string? categoria, string? precio,
+        string? costo, int? stock, int? stockMinimo, string? descripcion, IFormFile? foto)
     {
-        if (string.IsNullOrWhiteSpace(nombre) || precio <= 0)
-            return Json(new { ok = false, msg = "Nombre y precio son requeridos." });
+        if (string.IsNullOrWhiteSpace(nombre))
+            return Json(new { ok = false, msg = "El nombre del producto es requerido." });
+
+        decimal precioVal = 0;
+        if (!string.IsNullOrWhiteSpace(precio))
+        {
+            var pClean = precio.Replace("$", "").Trim().Replace(',', '.');
+            decimal.TryParse(pClean, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out precioVal);
+        }
+
+        if (precioVal <= 0)
+            return Json(new { ok = false, msg = "Ingresa un precio de venta válido mayor a $0.00." });
+
+        decimal? costoVal = null;
+        if (!string.IsNullOrWhiteSpace(costo))
+        {
+            var cClean = costo.Replace("$", "").Trim().Replace(',', '.');
+            if (decimal.TryParse(cClean, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var cv))
+            {
+                costoVal = cv;
+            }
+        }
+
+        if (costoVal.HasValue && costoVal.Value > precioVal)
+            return Json(new { ok = false, msg = $"El costo (${costoVal:N2}) no puede ser mayor que el precio de venta (${precioVal:N2})." });
 
         string? imgPath = null;
         if (foto != null && foto.Length > 0)
@@ -329,10 +415,10 @@ public class ProductosController : AuthController
         {
             Nombre        = nombre.Trim(),
             Categoria     = string.IsNullOrWhiteSpace(categoria) ? "Otro" : categoria.Trim(),
-            Precio        = precio,
-            Costo         = costo,
-            Stock         = Math.Max(0, stock),
-            StockMinimo   = Math.Max(0, stockMinimo),
+            Precio        = precioVal,
+            Costo         = costoVal,
+            Stock         = Math.Max(0, stock ?? 0),
+            StockMinimo   = Math.Max(0, stockMinimo ?? 5),
             Descripcion   = descripcion?.Trim(),
             ImagenUrl     = imgPath,
             IdEstado      = 1,
@@ -347,21 +433,44 @@ public class ProductosController : AuthController
     // ── Editar producto (AJAX) ──────────────────────────────────────────
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> EditAjax(int id, string nombre, string? categoria, decimal precio,
-        decimal? costo, int stock, int stockMinimo, string? descripcion, IFormFile? foto, bool eliminarFoto = false)
+    public async Task<IActionResult> EditAjax(int id, string nombre, string? categoria, string? precio,
+        string? costo, int? stock, int? stockMinimo, string? descripcion, IFormFile? foto, bool eliminarFoto = false)
     {
         var p = await _db.Productos.FindAsync(id);
         if (p == null) return Json(new { ok = false, msg = "Producto no encontrado." });
 
-        if (costo.HasValue && costo.Value > precio)
-            return Json(new { ok = false, msg = $"El costo (${costo:N2}) no puede ser mayor que el precio de venta (${precio:N2})." });
+        if (string.IsNullOrWhiteSpace(nombre))
+            return Json(new { ok = false, msg = "El nombre del producto es requerido." });
+
+        decimal precioVal = 0;
+        if (!string.IsNullOrWhiteSpace(precio))
+        {
+            var pClean = precio.Replace("$", "").Trim().Replace(',', '.');
+            decimal.TryParse(pClean, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out precioVal);
+        }
+
+        if (precioVal <= 0)
+            return Json(new { ok = false, msg = "Ingresa un precio de venta válido mayor a $0.00." });
+
+        decimal? costoVal = null;
+        if (!string.IsNullOrWhiteSpace(costo))
+        {
+            var cClean = costo.Replace("$", "").Trim().Replace(',', '.');
+            if (decimal.TryParse(cClean, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var cv))
+            {
+                costoVal = cv;
+            }
+        }
+
+        if (costoVal.HasValue && costoVal.Value > precioVal)
+            return Json(new { ok = false, msg = $"El costo (${costoVal:N2}) no puede ser mayor que el precio de venta (${precioVal:N2})." });
 
         p.Nombre      = nombre.Trim();
         p.Categoria   = string.IsNullOrWhiteSpace(categoria) ? "Otro" : categoria.Trim();
-        p.Precio      = precio;
-        p.Costo       = costo;
-        p.Stock       = Math.Max(0, stock);
-        p.StockMinimo = Math.Max(0, stockMinimo);
+        p.Precio      = precioVal;
+        p.Costo       = costoVal;
+        p.Stock       = Math.Max(0, stock ?? 0);
+        p.StockMinimo = Math.Max(0, stockMinimo ?? 5);
         p.Descripcion = descripcion?.Trim();
 
         if (eliminarFoto)

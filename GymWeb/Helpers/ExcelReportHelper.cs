@@ -332,9 +332,10 @@ public static class ExcelReportHelper
         ConfigurarPaginaCarta(ws, XLPageOrientation.Portrait);
 
         decimal totVisitas = visitas.Sum(v => v.PrecioVisita);
-        decimal totVentas  = ventas.Sum(d => (d.PrecioUnitario ?? 0) * d.Cantidad);
+        decimal totVentasContado = ventas.Where(d => d.IdSalidaNavigation?.EsCredito != true).Sum(d => (d.PrecioUnitario ?? 0) * d.Cantidad);
+        decimal totVentasCredito = ventas.Where(d => d.IdSalidaNavigation?.EsCredito == true).Sum(d => (d.PrecioUnitario ?? 0) * d.Cantidad);
         decimal totPagos   = pagos.Sum(p => p.Monto);
-        decimal totGeneral = totVisitas + totVentas + totPagos;
+        decimal totGeneral = totVisitas + totVentasContado + totPagos;
 
         int row = AgregarEncabezado(ws, gymNombre, $"CORTE DE CAJA DEL {tipoCorte.ToUpper()}", periodoLabel, logoBytes, 5);
 
@@ -350,7 +351,7 @@ public static class ExcelReportHelper
         ws.Cell(row, 1).Style.Font.FontColor = XLColor.FromHtml("#1E40AF");
         ws.Cell(row, 1).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
 
-        ws.Cell(row, 2).Value = "VENTA PRODUCTOS\n" + totVentas.ToString("C2");
+        ws.Cell(row, 2).Value = "VENTAS EN CAJA\n" + totVentasContado.ToString("C2") + (totVentasCredito > 0 ? $"\n(A Crédito: {totVentasCredito:C2})" : "");
         ws.Cell(row, 2).Style.Alignment.WrapText = true;
         ws.Cell(row, 2).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
         ws.Cell(row, 2).Style.Font.Bold = true;
@@ -368,7 +369,7 @@ public static class ExcelReportHelper
 
         var rangeTotalKpi = ws.Range(row, 4, row, 5);
         rangeTotalKpi.Merge();
-        rangeTotalKpi.Value = "TOTAL RECAUDADO\n" + totGeneral.ToString("C2");
+        rangeTotalKpi.Value = "TOTAL EN CAJA\n" + totGeneral.ToString("C2");
         rangeTotalKpi.Style.Alignment.WrapText = true;
         rangeTotalKpi.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
         rangeTotalKpi.Style.Font.Bold = true;
@@ -476,11 +477,17 @@ public static class ExcelReportHelper
                 row++;
                 decimal pu = d.PrecioUnitario ?? 0;
                 decimal sub = pu * d.Cantidad;
+                bool esCredito = d.IdSalidaNavigation?.EsCredito == true;
 
                 ws.Cell(row, 1).Value = d.IdSalidaNavigation?.FechaCreacion?.ToString("dd/MM/yyyy HH:mm") ?? "—";
                 ws.Cell(row, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
-                ws.Cell(row, 2).Value = d.IdProductoNavigation?.Nombre ?? $"Producto #{d.IdProducto}";
+                string nombreProd = d.IdProductoNavigation?.Nombre ?? $"Producto #{d.IdProducto}";
+                if (esCredito) nombreProd += "  [A CRÉDITO]";
+                else if (!string.IsNullOrEmpty(d.IdSalidaNavigation?.MetodoPago) && !string.Equals(d.IdSalidaNavigation.MetodoPago, "Efectivo", StringComparison.OrdinalIgnoreCase))
+                    nombreProd += $"  [{d.IdSalidaNavigation.MetodoPago.ToUpper()}]";
+                ws.Cell(row, 2).Value = nombreProd;
+                if (esCredito) ws.Cell(row, 2).Style.Font.FontColor = XLColor.FromHtml("#B45309");
 
                 ws.Cell(row, 3).Value = d.Cantidad;
                 ws.Cell(row, 3).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
@@ -500,26 +507,43 @@ public static class ExcelReportHelper
             }
         }
         row++;
-        ws.Range(row, 1, row, 4).Merge().Value = "Subtotal Productos:";
+        ws.Range(row, 1, row, 4).Merge().Value = "Subtotal Ventas Contado (en caja):";
         ws.Range(row, 1, row, 4).Style.Font.Bold = true;
         ws.Range(row, 1, row, 4).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
         ws.Range(row, 1, row, 4).Style.Fill.BackgroundColor = XLColor.FromHtml("#F1F5F9");
         var cSubProd = ws.Cell(row, 5);
-        cSubProd.Value = (double)totVentas;
+        cSubProd.Value = (double)totVentasContado;
         cSubProd.Style.NumberFormat.Format = "$#,##0.00";
         cSubProd.Style.Font.Bold = true;
         cSubProd.Style.Fill.BackgroundColor = XLColor.FromHtml("#F1F5F9");
 
+        if (totVentasCredito > 0)
+        {
+            row++;
+            ws.Range(row, 1, row, 4).Merge().Value = "Ventas Fiadas a Crédito (no ingresan a caja hoy):";
+            ws.Range(row, 1, row, 4).Style.Font.Bold = true;
+            ws.Range(row, 1, row, 4).Style.Font.FontColor = XLColor.FromHtml("#B45309");
+            ws.Range(row, 1, row, 4).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+            ws.Range(row, 1, row, 4).Style.Fill.BackgroundColor = XLColor.FromHtml("#FFFBEB");
+
+            var cSubCred = ws.Cell(row, 5);
+            cSubCred.Value = (double)totVentasCredito;
+            cSubCred.Style.NumberFormat.Format = "$#,##0.00";
+            cSubCred.Style.Font.Bold = true;
+            cSubCred.Style.Font.FontColor = XLColor.FromHtml("#B45309");
+            cSubCred.Style.Fill.BackgroundColor = XLColor.FromHtml("#FFFBEB");
+        }
+
         row += 2; // Espacio
 
-        // Sección 3: Cobros de Membresías
-        ws.Cell(row, 1).Value = $"3. Cobros de Membresías ({pagos.Count})";
+        // Sección 3: Pagos y Cobranza Recibida
+        ws.Cell(row, 1).Value = $"3. Pagos y Cobranza Recibida ({pagos.Count})";
         ws.Cell(row, 1).Style.Font.Bold = true;
         ws.Cell(row, 1).Style.Font.FontSize = 11;
         ws.Cell(row, 1).Style.Font.FontColor = XLColor.FromHtml("#1E293B");
         row++;
 
-        string[] headersPagos = { "Fecha", "Socio", "Membresía", "Método", "Monto" };
+        string[] headersPagos = { "Fecha", "Socio", "Concepto / Plan", "Método", "Monto" };
         for (int i = 0; i < headersPagos.Length; i++)
         {
             var c = ws.Cell(row, i + 1);
@@ -549,7 +573,7 @@ public static class ExcelReportHelper
                 ws.Cell(row, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
                 ws.Cell(row, 2).Value = $"{p.IdSocioNavigation?.Nombre} {p.IdSocioNavigation?.Paterno}".Trim();
-                ws.Cell(row, 3).Value = p.IdMembresiaNavigation?.Nombre ?? "Membresía";
+                ws.Cell(row, 3).Value = p.IdMembresiaNavigation?.Nombre ?? (!string.IsNullOrWhiteSpace(p.Notas) ? p.Notas : "Abono / Cobranza");
 
                 ws.Cell(row, 4).Value = p.MetodoPago ?? "Efectivo";
                 ws.Cell(row, 4).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
@@ -564,7 +588,7 @@ public static class ExcelReportHelper
             }
         }
         row++;
-        ws.Range(row, 1, row, 4).Merge().Value = "Subtotal Membresías:";
+        ws.Range(row, 1, row, 4).Merge().Value = "Subtotal Cobranza (Membresías + Abonos):";
         ws.Range(row, 1, row, 4).Style.Font.Bold = true;
         ws.Range(row, 1, row, 4).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
         ws.Range(row, 1, row, 4).Style.Fill.BackgroundColor = XLColor.FromHtml("#F1F5F9");
@@ -605,4 +629,221 @@ public static class ExcelReportHelper
         wb.SaveAs(msOut);
         return msOut.ToArray();
     }
+
+    /// <summary>
+    /// Genera el reporte formal en Excel de Cuentas por Cobrar (Socios que tienen deuda de productos a crédito o membresías).
+    /// </summary>
+    public static byte[] GenerarSociosDeudoresXlsx(List<SocioDeudorItemDto> deudores, string gymNombre, byte[]? logoBytes)
+    {
+        using var wb = new XLWorkbook();
+        var ws = wb.Worksheets.Add("Cuentas_Por_Cobrar");
+        ConfigurarPaginaCarta(ws, XLPageOrientation.Portrait);
+
+        decimal totalProductos = deudores.Sum(d => d.DeudaProductos);
+        decimal totalMembresias = deudores.Sum(d => d.DeudaMembresias);
+        decimal granTotalDeuda = deudores.Sum(d => d.DeudaTotal);
+
+        int row = AgregarEncabezado(ws, gymNombre, "CUENTAS POR COBRAR — SOCIOS CON SALDO DEUDOR", $"Total por cobrar: ${granTotalDeuda:N2}  |  {deudores.Count} socios deudores", logoBytes, 6);
+
+        // Encabezados de tabla
+        string[] headers = { "Clave", "Nombre del Socio", "Teléfono", "Deuda Productos", "Deuda Membresía", "Total Deudor" };
+        for (int i = 0; i < headers.Length; i++)
+        {
+            var cell = ws.Cell(row, i + 1);
+            cell.Value = headers[i];
+            cell.Style.Font.Bold = true;
+            cell.Style.Font.FontColor = XLColor.White;
+            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#B45309"); // Ámbar / Cobranza
+            cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            if (i == 0 || i == 2) cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            if (i >= 3) cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+        }
+        ws.Row(row).Height = 25;
+
+        int dataStartRow = row + 1;
+        foreach (var d in deudores)
+        {
+            row++;
+            ws.Row(row).Height = 20;
+
+            ws.Cell(row, 1).Value = d.IdSocio;
+            ws.Cell(row, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            ws.Cell(row, 1).Style.Font.Bold = true;
+
+            ws.Cell(row, 2).Value = d.NombreCompleto;
+            ws.Cell(row, 2).Style.Font.Bold = true;
+
+            ws.Cell(row, 3).Value = string.IsNullOrWhiteSpace(d.Telefono) ? "—" : d.Telefono;
+            ws.Cell(row, 3).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+            var cProd = ws.Cell(row, 4);
+            cProd.Value = (double)d.DeudaProductos;
+            cProd.Style.NumberFormat.Format = "$#,##0.00";
+            cProd.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+            if (d.DeudaProductos > 0) cProd.Style.Font.FontColor = XLColor.FromHtml("#B45309");
+
+            var cMem = ws.Cell(row, 5);
+            cMem.Value = (double)d.DeudaMembresias;
+            cMem.Style.NumberFormat.Format = "$#,##0.00";
+            cMem.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+            if (d.DeudaMembresias > 0) cMem.Style.Font.FontColor = XLColor.FromHtml("#2563EB");
+
+            var cTot = ws.Cell(row, 6);
+            cTot.Value = (double)d.DeudaTotal;
+            cTot.Style.NumberFormat.Format = "$#,##0.00";
+            cTot.Style.Font.Bold = true;
+            cTot.Style.Font.FontColor = XLColor.FromHtml("#DC2626"); // Rojo deudor
+            cTot.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+
+            // Zebra striping
+            if ((row - dataStartRow) % 2 == 1)
+            {
+                ws.Range(row, 1, row, headers.Length).Style.Fill.BackgroundColor = XLColor.FromHtml("#FFFBEB");
+            }
+        }
+
+        // Fila de Totales
+        row++;
+        ws.Row(row).Height = 24;
+        ws.Range(row, 1, row, 3).Merge().Value = "TOTAL GLOBAL POR COBRAR:";
+        ws.Range(row, 1, row, 3).Style.Font.Bold = true;
+        ws.Range(row, 1, row, 3).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+        ws.Range(row, 1, row, 3).Style.Fill.BackgroundColor = XLColor.FromHtml("#FDE68A");
+
+        var cTotProd = ws.Cell(row, 4);
+        cTotProd.Value = (double)totalProductos;
+        cTotProd.Style.NumberFormat.Format = "$#,##0.00";
+        cTotProd.Style.Font.Bold = true;
+        cTotProd.Style.Fill.BackgroundColor = XLColor.FromHtml("#FDE68A");
+
+        var cTotMem = ws.Cell(row, 5);
+        cTotMem.Value = (double)totalMembresias;
+        cTotMem.Style.NumberFormat.Format = "$#,##0.00";
+        cTotMem.Style.Font.Bold = true;
+        cTotMem.Style.Fill.BackgroundColor = XLColor.FromHtml("#FDE68A");
+
+        var cGranTot = ws.Cell(row, 6);
+        cGranTot.Value = (double)granTotalDeuda;
+        cGranTot.Style.NumberFormat.Format = "$#,##0.00";
+        cGranTot.Style.Font.Bold = true;
+        cGranTot.Style.Font.FontColor = XLColor.FromHtml("#DC2626");
+        cGranTot.Style.Fill.BackgroundColor = XLColor.FromHtml("#FDE68A");
+
+        // Bordes
+        var dataRange = ws.Range(dataStartRow - 1, 1, row, headers.Length);
+        dataRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+        dataRange.Style.Border.InsideBorderColor = XLColor.FromHtml("#E2E8F0");
+        dataRange.Style.Border.OutsideBorder = XLBorderStyleValues.Medium;
+        dataRange.Style.Border.OutsideBorderColor = XLColor.FromHtml("#B45309");
+
+        ws.Column(1).Width = 9;
+        ws.Column(2).Width = 26;
+        ws.Column(3).Width = 14;
+        ws.Column(4).Width = 16;
+        ws.Column(5).Width = 16;
+        ws.Column(6).Width = 17;
+
+        using var msOut = new MemoryStream();
+        wb.SaveAs(msOut);
+        return msOut.ToArray();
+    }
+
+    /// <summary>
+    /// Genera el reporte formal en Excel del registro de asistencias de un socio.
+    /// </summary>
+    public static byte[] GenerarAsistenciasSocioXlsx(Socio socio, List<Registro> asistencias, string periodoTexto, string gymNombre, byte[]? logoBytes)
+    {
+        using var wb = new XLWorkbook();
+        var ws = wb.Worksheets.Add("Asistencias");
+        ConfigurarPaginaCarta(ws, XLPageOrientation.Portrait);
+
+        string nombreSocio = $"{socio.Nombre} {socio.Paterno} {socio.Materno}".Trim();
+        int row = AgregarEncabezado(ws, gymNombre, $"HISTORIAL DE ASISTENCIAS — {nombreSocio.ToUpper()}", $"Período: {periodoTexto}  |  Clave Socio: #{socio.IdSocio}", logoBytes, 4);
+
+        // Encabezados
+        string[] headers = { "#", "Fecha", "Día de la Semana", "Hora de Ingreso" };
+        for (int i = 0; i < headers.Length; i++)
+        {
+            var cell = ws.Cell(row, i + 1);
+            cell.Value = headers[i];
+            cell.Style.Font.Bold = true;
+            cell.Style.Font.FontColor = XLColor.White;
+            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#0284C7"); // Azul / Visitas
+            cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+        }
+        ws.Row(row).Height = 25;
+
+        var esCultura = new System.Globalization.CultureInfo("es-MX");
+        int dataStartRow = row + 1;
+        int count = 0;
+
+        foreach (var r in asistencias)
+        {
+            count++;
+            row++;
+            ws.Row(row).Height = 20;
+
+            ws.Cell(row, 1).Value = count;
+            ws.Cell(row, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+            ws.Cell(row, 2).Value = r.FechaCreacion?.ToString("dd/MM/yyyy") ?? "—";
+            ws.Cell(row, 2).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+            ws.Cell(row, 3).Value = r.FechaCreacion.HasValue ? esCultura.DateTimeFormat.GetDayName(r.FechaCreacion.Value.DayOfWeek).ToUpper() : "—";
+            ws.Cell(row, 3).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+            ws.Cell(row, 4).Value = r.FechaCreacion?.ToString("hh:mm tt") ?? "—";
+            ws.Cell(row, 4).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            ws.Cell(row, 4).Style.Font.Bold = true;
+
+            // Zebra striping
+            if (count % 2 == 0)
+            {
+                ws.Range(row, 1, row, headers.Length).Style.Fill.BackgroundColor = XLColor.FromHtml("#F0F9FF");
+            }
+        }
+
+        // Fila Resumen
+        row++;
+        ws.Row(row).Height = 24;
+        ws.Range(row, 1, row, 3).Merge().Value = "TOTAL DE DÍAS / VISITAS REGISTRADAS:";
+        ws.Range(row, 1, row, 3).Style.Font.Bold = true;
+        ws.Range(row, 1, row, 3).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+        ws.Range(row, 1, row, 3).Style.Fill.BackgroundColor = XLColor.FromHtml("#E0F2FE");
+
+        var cTot = ws.Cell(row, 4);
+        cTot.Value = count;
+        cTot.Style.Font.Bold = true;
+        cTot.Style.Font.FontSize = 11;
+        cTot.Style.Font.FontColor = XLColor.FromHtml("#0284C7");
+        cTot.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+        cTot.Style.Fill.BackgroundColor = XLColor.FromHtml("#E0F2FE");
+
+        // Bordes
+        var dataRange = ws.Range(dataStartRow - 1, 1, row, headers.Length);
+        dataRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+        dataRange.Style.Border.InsideBorderColor = XLColor.FromHtml("#E2E8F0");
+        dataRange.Style.Border.OutsideBorder = XLBorderStyleValues.Medium;
+        dataRange.Style.Border.OutsideBorderColor = XLColor.FromHtml("#0284C7");
+
+        ws.Column(1).Width = 8;
+        ws.Column(2).Width = 15;
+        ws.Column(3).Width = 20;
+        ws.Column(4).Width = 18;
+
+        using var msOut = new MemoryStream();
+        wb.SaveAs(msOut);
+        return msOut.ToArray();
+    }
+}
+
+public class SocioDeudorItemDto
+{
+    public int IdSocio { get; set; }
+    public string NombreCompleto { get; set; } = "";
+    public string Telefono { get; set; } = "";
+    public decimal DeudaProductos { get; set; }
+    public decimal DeudaMembresias { get; set; }
+    public decimal DeudaTotal => DeudaProductos + DeudaMembresias;
 }

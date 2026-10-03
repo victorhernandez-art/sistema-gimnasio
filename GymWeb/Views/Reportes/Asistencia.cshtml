@@ -26,37 +26,58 @@
     </a>
 </div>
 
+<style>
+.sugerencia-socio-item:hover {
+    background: rgba(0, 242, 100, 0.14) !important;
+}
+</style>
+
 <div class="card" style="margin-bottom:20px;">
     <div class="card-header"><div class="card-title"><i class="fa-solid fa-filter"></i> Filtros</div></div>
-    <form method="get" asp-action="Asistencia" style="padding:16px 20px;">
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:16px;align-items:end;">
-            <div>
-                <label class="form-label">Socio</label>
-                <select name="idSocio" class="form-control" id="socioSelect">
-                    <option value="">— Seleccione un socio —</option>
+    <form method="get" asp-action="Asistencia" id="formAsistencia" style="padding:16px 20px;">
+        <div style="display:grid;grid-template-columns:1.5fr 1fr 1fr auto;gap:16px;align-items:end;">
+            <div style="position:relative;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                    <label class="form-label" style="margin-bottom:0;font-weight:600;"><i class="fa-solid fa-user"></i> Socio</label>
+                    <span id="contadorSociosFiltro" style="font-size:11.5px;color:var(--text-muted);">@socios.Count socios</span>
+                </div>
+
+                <!-- Buscador Rápido en Vivo por Clave o Nombre -->
+                <div style="position:relative;margin-bottom:6px;">
+                    <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:#00f264;font-size:12px;pointer-events:none;"></i>
+                    <input type="text" id="inputBuscarSocio" class="form-control"
+                           style="padding-left:32px;padding-right:28px;height:36px;font-size:13px;border:1px solid rgba(0,242,100,0.35);background:rgba(0,0,0,0.25);"
+                           placeholder="🔍 Escribe clave (ej. 1003) o nombre del socio..."
+                           autocomplete="off" oninput="filtrarSociosLive(this.value)" onkeydown="manejarKeyBuscar(event)" />
+                    <button type="button" onclick="limpiarBuscadorSocio()" id="btnLimpiarBuscar"
+                            style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:13px;padding:2px 6px;" title="Limpiar búsqueda">✕</button>
+
+                    <!-- Menú flotante de resultados rápidos -->
+                    <div id="dropdownSugerenciasSocios" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;max-height:250px;overflow-y:auto;background:#111827;border:1px solid rgba(0,242,100,0.4);border-radius:8px;z-index:9999;box-shadow:0 12px 28px rgba(0,0,0,0.85);padding:4px 0;">
+                    </div>
+                </div>
+
+                <select name="idSocio" class="form-control" id="socioSelect" style="height:38px;font-size:13px;" onchange="alCambiarSelectSocio()">
+                    <option value="">— Seleccione un socio (@socios.Count) —</option>
                     @foreach (var s in socios)
                     {
-                        if (s.IdSocio == idSocio)
-                        {
-                            <option value="@s.IdSocio" selected>#@s.IdSocio — @s.Nombre @s.Paterno @s.Materno</option>
-                        }
-                        else
-                        {
-                            <option value="@s.IdSocio">#@s.IdSocio — @s.Nombre @s.Paterno @s.Materno</option>
-                        }
+                        bool isSel = (s.IdSocio == idSocio);
+                        <option value="@s.IdSocio" data-clave="@s.IdSocio" data-nombre="@s.Nombre @s.Paterno @s.Materno" selected="@(isSel ? "selected" : null)">
+                            #@s.IdSocio — @s.Nombre @s.Paterno @s.Materno
+                        </option>
                     }
                 </select>
             </div>
             <div>
                 <label class="form-label">Desde</label>
-                <input type="date" name="desde" value="@desde" class="form-control" />
+                <input type="date" name="desde" value="@desde" class="form-control" style="height:38px;" />
             </div>
             <div>
                 <label class="form-label">Hasta</label>
-                <input type="date" name="hasta" value="@hasta" class="form-control" />
+                <input type="date" name="hasta" value="@hasta" class="form-control" style="height:38px;" />
             </div>
             <div>
-                <button type="submit" class="btn btn-primary" style="width:100%;">
+                <button type="submit" class="btn btn-primary" style="width:100%;height:38px;display:flex;align-items:center;justify-content:center;gap:6px;">
                     <i class="fa-solid fa-magnifying-glass"></i> Consultar
                 </button>
             </div>
@@ -179,11 +200,204 @@ else
 
 @section Scripts {
 <script>
-// Enhance select with simple search using datalist-like feel
-// (Keeping as native select for simplicity; upgrade to tom-select if desired)
+let catalogoSocios = [];
+let itemSugerenciaActivo = -1;
+
+function normalizarTexto(txt) {
+    return (txt || '').toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
+
 document.addEventListener('DOMContentLoaded', function() {
-    var sel = document.getElementById('socioSelect');
-    if (sel) sel.focus();
+    const sel = document.getElementById('socioSelect');
+    const input = document.getElementById('inputBuscarSocio');
+    const btnLimpiar = document.getElementById('btnLimpiarBuscar');
+
+    // Inicializar catálogo en memoria
+    if (sel) {
+        catalogoSocios = Array.from(sel.options).filter(o => o.value !== "").map(o => ({
+            value: o.value,
+            clave: o.getAttribute('data-clave') || o.value,
+            nombre: o.getAttribute('data-nombre') || o.text,
+            texto: o.text,
+            claveNorm: normalizarTexto(o.getAttribute('data-clave') || o.value),
+            nombreNorm: normalizarTexto(o.getAttribute('data-nombre') || o.text),
+            fullNorm: normalizarTexto(o.text)
+        }));
+
+        // Si ya hay un socio seleccionado, mostrar su nombre en el input de búsqueda
+        if (sel.value) {
+            const socioActual = catalogoSocios.find(s => s.value === sel.value);
+            if (socioActual) {
+                input.value = socioActual.texto;
+                btnLimpiar.style.display = 'block';
+            }
+        }
+    }
+
+    // Cerrar sugerencias al hacer clic fuera
+    document.addEventListener('click', function(e) {
+        const wrap = document.getElementById('dropdownSugerenciasSocios');
+        const inputB = document.getElementById('inputBuscarSocio');
+        if (wrap && !wrap.contains(e.target) && e.target !== inputB) {
+            wrap.style.display = 'none';
+        }
+    });
 });
+
+function filtrarSociosLive(val) {
+    const term = normalizarTexto(val);
+    const sel = document.getElementById('socioSelect');
+    const dropdown = document.getElementById('dropdownSugerenciasSocios');
+    const btnLimpiar = document.getElementById('btnLimpiarBuscar');
+    const contador = document.getElementById('contadorSociosFiltro');
+
+    itemSugerenciaActivo = -1;
+
+    if (!term) {
+        btnLimpiar.style.display = 'none';
+        dropdown.style.display = 'none';
+        dropdown.innerHTML = '';
+        contador.textContent = `${catalogoSocios.length} socios`;
+        restaurarSelect(sel, catalogoSocios, sel.value);
+        return;
+    }
+
+    btnLimpiar.style.display = 'block';
+
+    // Coincidencias: prioridad si la clave inicia con el término o contiene el nombre
+    const matches = catalogoSocios.filter(s => {
+        return s.claveNorm.includes(term) || s.nombreNorm.includes(term) || s.fullNorm.includes(term);
+    });
+
+    contador.textContent = `${matches.length} encontrado(s)`;
+
+    // Actualizar select nativo con sólo las coincidencias
+    restaurarSelect(sel, matches, matches.length === 1 ? matches[0].value : (sel.value || (matches[0] ? matches[0].value : '')));
+
+    // Renderizar dropdown flotante
+    if (matches.length === 0) {
+        dropdown.innerHTML = `<div style="padding:10px 14px;color:var(--text-muted);font-size:12px;text-align:center;"><i class="fa-solid fa-circle-exclamation"></i> No se encontró ningún socio con "${val}"</div>`;
+        dropdown.style.display = 'block';
+    } else {
+        dropdown.innerHTML = matches.slice(0, 12).map((s, idx) => `
+            <div class="sugerencia-socio-item" data-index="${idx}" data-val="${s.value}"
+                 onclick="seleccionarSugerencia('${s.value}', '${s.texto.replace(/'/g, "\\'")}')"
+                 style="padding:8px 14px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.05);transition:background 0.15s ease;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span style="background:rgba(0,242,100,0.12);color:#00f264;border:1px solid rgba(0,242,100,0.3);font-family:'Inter',monospace;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700;">#${s.clave}</span>
+                    <span style="font-weight:600;font-size:13px;color:#f8fafc;">${s.nombre}</span>
+                </div>
+                <span style="font-size:11px;color:var(--text-muted);"><i class="fa-solid fa-arrow-turn-down"></i> Seleccionar</span>
+            </div>
+        `).join('');
+        dropdown.style.display = 'block';
+    }
+}
+
+function restaurarSelect(sel, lista, selectedValue) {
+    sel.innerHTML = `<option value="">— Seleccione un socio (${lista.length}) —</option>`;
+    lista.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.value;
+        opt.textContent = s.texto;
+        opt.setAttribute('data-clave', s.clave);
+        opt.setAttribute('data-nombre', s.nombre);
+        if (s.value === selectedValue) {
+            opt.selected = true;
+        }
+        sel.appendChild(opt);
+    });
+}
+
+function seleccionarSugerencia(id, textoCompleto) {
+    const sel = document.getElementById('socioSelect');
+    const input = document.getElementById('inputBuscarSocio');
+    const dropdown = document.getElementById('dropdownSugerenciasSocios');
+    const btnLimpiar = document.getElementById('btnLimpiarBuscar');
+
+    // Restaurar select con todos los socios y seleccionar el elegido
+    restaurarSelect(sel, catalogoSocios, id);
+    sel.value = id;
+
+    input.value = textoCompleto;
+    btnLimpiar.style.display = 'block';
+    dropdown.style.display = 'none';
+    document.getElementById('contadorSociosFiltro').textContent = `${catalogoSocios.length} socios`;
+}
+
+function alCambiarSelectSocio() {
+    const sel = document.getElementById('socioSelect');
+    const input = document.getElementById('inputBuscarSocio');
+    const btnLimpiar = document.getElementById('btnLimpiarBuscar');
+
+    if (sel.value) {
+        const socio = catalogoSocios.find(s => s.value === sel.value);
+        if (socio) {
+            input.value = socio.texto;
+            btnLimpiar.style.display = 'block';
+        }
+    } else {
+        input.value = '';
+        btnLimpiar.style.display = 'none';
+    }
+}
+
+function limpiarBuscadorSocio() {
+    const sel = document.getElementById('socioSelect');
+    const input = document.getElementById('inputBuscarSocio');
+    const btnLimpiar = document.getElementById('btnLimpiarBuscar');
+    const dropdown = document.getElementById('dropdownSugerenciasSocios');
+
+    input.value = '';
+    btnLimpiar.style.display = 'none';
+    dropdown.style.display = 'none';
+    restaurarSelect(sel, catalogoSocios, '');
+    sel.value = '';
+    document.getElementById('contadorSociosFiltro').textContent = `${catalogoSocios.length} socios`;
+    input.focus();
+}
+
+function manejarKeyBuscar(e) {
+    const dropdown = document.getElementById('dropdownSugerenciasSocios');
+    const items = dropdown.querySelectorAll('.sugerencia-socio-item');
+
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (items.length > 0) {
+            itemSugerenciaActivo = (itemSugerenciaActivo + 1) % items.length;
+            resaltarItemSugerencia(items);
+        }
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (items.length > 0) {
+            itemSugerenciaActivo = (itemSugerenciaActivo - 1 + items.length) % items.length;
+            resaltarItemSugerencia(items);
+        }
+    } else if (e.key === 'Enter') {
+        if (itemSugerenciaActivo >= 0 && items[itemSugerenciaActivo]) {
+            e.preventDefault();
+            items[itemSugerenciaActivo].click();
+        } else {
+            // Si el select tiene valor, enviar formulario directamente
+            const sel = document.getElementById('socioSelect');
+            if (sel.value) {
+                document.getElementById('formAsistencia').submit();
+            }
+        }
+    } else if (e.key === 'Escape') {
+        dropdown.style.display = 'none';
+    }
+}
+
+function resaltarItemSugerencia(items) {
+    items.forEach((it, idx) => {
+        if (idx === itemSugerenciaActivo) {
+            it.style.background = 'rgba(0,242,100,0.18)';
+            it.scrollIntoView({ block: 'nearest' });
+        } else {
+            it.style.background = 'transparent';
+        }
+    });
+}
 </script>
 }

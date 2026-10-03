@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace GymWeb.Models;
@@ -33,6 +33,7 @@ public partial class Socio
 
     public virtual ICollection<Sociomembresium> Sociomembresia { get; set; } = new List<Sociomembresium>();
 
+    public virtual ICollection<Salidum> Salidas { get; set; } = new List<Salidum>();
 
     public virtual SocioHuella? SocioHuella { get; set; }
 }
