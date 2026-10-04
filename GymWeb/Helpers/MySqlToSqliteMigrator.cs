@@ -113,7 +113,14 @@ public static class MySqlToSqliteMigrator
                         }
                         else if (val is DateTime dt)
                         {
-                            insertCmd.Parameters.AddWithValue($"@{colName}", dt.ToString("yyyy-MM-dd HH:mm:ss"));
+                            if (colName.Equals("fechaPago", StringComparison.OrdinalIgnoreCase))
+                            {
+                                insertCmd.Parameters.AddWithValue($"@{colName}", dt.ToString("yyyy-MM-dd"));
+                            }
+                            else
+                            {
+                                insertCmd.Parameters.AddWithValue($"@{colName}", dt.ToString("yyyy-MM-dd HH:mm:ss"));
+                            }
                         }
                         else if (val is TimeSpan ts)
                         {

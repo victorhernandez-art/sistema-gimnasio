@@ -39,6 +39,31 @@ public class ReportesController : AuthController
         return View(list);
     }
 
+    private async Task<decimal> ObtenerPrecioVisitaDiaAsync()
+    {
+        var todasMembresias = await _db.Membresia
+            .Where(m => m.IdEstado == 1)
+            .OrderByDescending(m => m.FechaCreacion)
+            .ThenByDescending(m => m.IdMembresia)
+            .ToListAsync();
+
+        var memVisita = todasMembresias.FirstOrDefault(m => 
+            !string.IsNullOrWhiteSpace(m.Nombre) && 
+            (m.Nombre.Contains("visita", StringComparison.OrdinalIgnoreCase) || 
+             m.Nombre.Contains("día", StringComparison.OrdinalIgnoreCase) || 
+             m.Nombre.Contains("dia", StringComparison.OrdinalIgnoreCase)));
+
+        if (memVisita != null && memVisita.Precio.HasValue && memVisita.Precio.Value > 0)
+            return memVisita.Precio.Value;
+
+        var mem1Dia = todasMembresias.FirstOrDefault(m => m.Meses == 1 && m.Precio.HasValue && m.Precio.Value > 0);
+        if (mem1Dia != null)
+            return mem1Dia.Precio!.Value;
+
+        var config = await _db.Configuracions.FirstOrDefaultAsync();
+        return config?.PrecioVisita ?? 0m;
+    }
+
     public async Task<IActionResult> CorteDia(DateTime? fecha, string? mes, string modo = "dia")
     {
         ViewData["Title"] = "Corte del Período";
@@ -60,11 +85,7 @@ public class ReportesController : AuthController
         ViewBag.Fecha        = desde.ToString("yyyy-MM-dd");
         ViewBag.FechaDisplay = modo == "mes" ? desde.ToString("MMMM yyyy", esCultura) : desde.ToString("dd/MM/yyyy");
 
-        var config = await _db.Configuracions.FirstOrDefaultAsync();
-        var precioVisita = await _db.Membresia
-            .Where(m => m.Meses == 1 && m.IdEstado == 1)
-            .Select(m => m.Precio)
-            .FirstOrDefaultAsync() ?? config?.PrecioVisita ?? 0m;
+        var precioVisita = await ObtenerPrecioVisitaDiaAsync();
         ViewBag.PrecioConfig = modo == "dia" ? precioVisita : 0m;
 
         DateTime fDesde = desde.Date;
@@ -73,7 +94,9 @@ public class ReportesController : AuthController
         var ventas = await _db.Detallesalida
             .Include(d => d.IdProductoNavigation)
             .Include(d => d.IdSalidaNavigation)
-            .Where(d => d.IdSalidaNavigation!.FechaCreacion.HasValue &&
+            .Where(d => d.IdSalidaNavigation != null &&
+                        d.IdSalidaNavigation.IdEstado == 1 &&
+                        d.IdSalidaNavigation.FechaCreacion.HasValue &&
                         d.IdSalidaNavigation.FechaCreacion.Value >= fDesde &&
                         d.IdSalidaNavigation.FechaCreacion.Value < fHasta)
             .OrderBy(d => d.IdSalidaNavigation!.FechaCreacion)
@@ -122,7 +145,9 @@ public class ReportesController : AuthController
         var ventas = await _db.Detallesalida
             .Include(d => d.IdProductoNavigation)
             .Include(d => d.IdSalidaNavigation)
-            .Where(d => d.IdSalidaNavigation!.FechaCreacion.HasValue &&
+            .Where(d => d.IdSalidaNavigation != null &&
+                        d.IdSalidaNavigation.IdEstado == 1 &&
+                        d.IdSalidaNavigation.FechaCreacion.HasValue &&
                         d.IdSalidaNavigation.FechaCreacion.Value >= fDesde &&
                         d.IdSalidaNavigation.FechaCreacion.Value < fHasta)
             .OrderBy(d => d.IdSalidaNavigation!.FechaCreacion).ToListAsync();

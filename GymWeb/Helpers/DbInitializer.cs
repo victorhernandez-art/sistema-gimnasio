@@ -49,6 +49,20 @@ public static class DbInitializer
         // 2d. Asegurar columna imagen_url en producto
         try { db.Database.ExecuteSqlRaw("ALTER TABLE producto ADD COLUMN imagen_url TEXT NULL;"); } catch { }
 
+        // 2e. Normalizar fechas en SQLite para tablas que fueron migradas desde MySQL con hora (yyyy-MM-dd HH:mm:ss -> yyyy-MM-dd)
+        try
+        {
+            if (db.Database.IsSqlite())
+            {
+                db.Database.ExecuteSqlRaw(@"
+                    UPDATE pago 
+                    SET fechaPago = substr(fechaPago, 1, 10) 
+                    WHERE fechaPago IS NOT NULL AND length(fechaPago) > 10;
+                ");
+            }
+        }
+        catch { }
+
         // 3. Configurar secuencia para que los socios comiencen en la clave 1001 (si la tabla está vacía)
         try
         {

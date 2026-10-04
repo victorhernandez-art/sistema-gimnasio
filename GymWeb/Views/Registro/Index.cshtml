@@ -54,20 +54,20 @@
                     Visita de día
                     @if ((decimal)ViewBag.PrecioVisita > 0)
                     {
-                        <span style="margin-left:8px;font-size:13px;font-weight:400;color:#4ade80;">
+                        <span style="margin-left:8px;font-size:13px;font-weight:600;color:#4ade80;">
                             — $@(((decimal)ViewBag.PrecioVisita).ToString("N2")) c/u
                         </span>
                     }
                 </div>
-                <div class="text-muted" style="font-size:12px;">Personas que no son socios — ingrese nombre y registre</div>
+                <div class="text-muted" style="font-size:12px;">(Personas que no son socios — ingrese código 1000 o nombre y registre)</div>
             </div>
         </div>
-        <form asp-action="RegistrarVisita" method="post" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <form id="formVisitaDia" asp-action="RegistrarVisita" method="post" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
             @Html.AntiForgeryToken()
-            <input type="text" name="nombreVisita" class="form-control"
-                   placeholder="Nombre del visitante" maxlength="150" required
-                   style="max-width:300px;" autocomplete="off" />
-            <button type="submit" class="btn btn-sm" style="background:rgba(167,139,250,0.15);border:1px solid rgba(167,139,250,0.4);color:#a78bfa;height:40px;padding:0 16px;white-space:nowrap;">
+            <input type="text" id="inputNombreVisita" name="nombreVisita" class="form-control"
+                   placeholder="Código 1000 o Nombre de la persona" maxlength="150" required
+                   style="max-width:320px;" autocomplete="off" />
+            <button type="submit" id="btnRegistrarVisitaDia" class="btn btn-sm" style="background:rgba(167,139,250,0.15);border:1px solid rgba(167,139,250,0.4);color:#a78bfa;height:40px;padding:0 16px;white-space:nowrap;cursor:pointer;">
                 <i class="fa-solid fa-right-to-bracket"></i> Registrar Visita
             </button>
         </form>
@@ -232,7 +232,22 @@
         scanResult.style.display = 'none';
         if (!id || id < 1) return;
         if (id == 1000) {
-            mostrarError('Clave de visita de día', 'Use el formulario "Visita de día" para registrar visitantes sin membresía');
+            try {
+                const fd = new FormData();
+                fd.append('idSocio', 1000);
+                fd.append('nombreVisita', 'Visita de Día #1000');
+                fd.append('__RequestVerificationToken', csrfToken);
+                const resReg = await fetch('/Registro/RegistrarAjax', { method: 'POST', body: fd });
+                const reg = await resReg.json();
+                if (reg.ok) {
+                    mostrarModal(reg);
+                } else {
+                    mostrarError('Error al registrar', reg.msg ?? '');
+                }
+            } catch (e) {
+                mostrarError('Error de conexión', 'No se pudo registrar la visita.');
+            }
+            scanInput.value = '';
             return;
         }
         if (id < 1001) {
@@ -331,26 +346,34 @@
 
         // Badge
         let badgeHtml = '';
-        if (reg.yaRegistrado)
-            badgeHtml += '<div style="font-size:12px;color:#fbbf24;margin-bottom:6px;"><i class="fa-solid fa-triangle-exclamation"></i> Ya había registrado entrada hoy</div>';
-        if (reg.vencido)
-            badgeHtml = '<span class="badge badge-danger"><i class="fa-solid fa-circle-xmark"></i> Membresía vencida</span>';
-        else if (reg.sinMem)
-            badgeHtml = '<span class="badge badge-warning" style="font-size:13px;"><i class="fa-solid fa-triangle-exclamation"></i> Sin membresía</span>';
-        else if (reg.porVencer)
-            badgeHtml = `<span class="badge badge-warning" style="font-size:13px;padding:6px 14px;"><i class="fa-solid fa-triangle-exclamation"></i> Vence en ${reg.diasRestantes} día${reg.diasRestantes === 1 ? '' : 's'} — ${reg.vencimiento}</span>`;
-        else
-            badgeHtml = `<span class="badge badge-success" style="font-size:13px;padding:6px 14px;"><i class="fa-solid fa-circle-check"></i> Vigente hasta ${reg.vencimiento}</span>`;
+        if (reg.esVisitaDia) {
+            badgeHtml = '<span class="badge badge-success" style="font-size:13px;padding:6px 14px;background:rgba(167,139,250,0.2);color:#a78bfa;border:1px solid rgba(167,139,250,0.4);"><i class="fa-solid fa-ticket"></i> Visita de Día Registrada</span>';
+            status.style.background = '#a78bfa';
+            foto.style.display = 'none';
+            avatar.style.display = 'flex';
+            avatar.innerHTML = '<i class="fa-solid fa-person-walking-arrow-right" style="color:var(--accent,#a78bfa);"></i>';
+        } else {
+            if (reg.yaRegistrado)
+                badgeHtml += '<div style="font-size:12px;color:#fbbf24;margin-bottom:6px;"><i class="fa-solid fa-triangle-exclamation"></i> Ya había registrado entrada hoy</div>';
+            if (reg.vencido)
+                badgeHtml = '<span class="badge badge-danger"><i class="fa-solid fa-circle-xmark"></i> Membresía vencida</span>';
+            else if (reg.sinMem)
+                badgeHtml = '<span class="badge badge-warning" style="font-size:13px;"><i class="fa-solid fa-triangle-exclamation"></i> Sin membresía</span>';
+            else if (reg.porVencer)
+                badgeHtml = `<span class="badge badge-warning" style="font-size:13px;padding:6px 14px;"><i class="fa-solid fa-triangle-exclamation"></i> Vence en ${reg.diasRestantes} día${reg.diasRestantes === 1 ? '' : 's'} — ${reg.vencimiento}</span>`;
+            else
+                badgeHtml = `<span class="badge badge-success" style="font-size:13px;padding:6px 14px;"><i class="fa-solid fa-circle-check"></i> Vigente hasta ${reg.vencimiento}</span>`;
+
+            // Status bar color
+            status.style.background = reg.vencido || reg.sinMem ? '#ef4444' : reg.porVencer ? '#fbbf24' : '#4ade80';
+
+            // Photo
+            foto.src = `/Socios/GetFoto/${reg.idSocio}`;
+            foto.style.display = 'block';
+            avatar.style.display = 'none';
+            foto.onerror = () => { foto.style.display = 'none'; avatar.style.display = 'flex'; };
+        }
         document.getElementById('bioBadge').innerHTML = badgeHtml;
-
-        // Status bar color
-        status.style.background = reg.vencido || reg.sinMem ? '#ef4444' : reg.porVencer ? '#fbbf24' : '#4ade80';
-
-        // Photo
-        foto.src = `/Socios/GetFoto/${reg.idSocio}`;
-        foto.style.display = 'block';
-        avatar.style.display = 'none';
-        foto.onerror = () => { foto.style.display = 'none'; avatar.style.display = 'flex'; };
 
         modal.style.display = 'flex';
 
@@ -411,16 +434,49 @@
         }
     });
 
-    // ── Validación formulario Visita de día ──
-    document.querySelector('.visit-day-zone form').addEventListener('submit', function(e) {
-        const val = this.querySelector('input[name="nombreVisita"]').value.trim();
-        if (/^\d+$/.test(val)) {
-            if (parseInt(val, 10) !== 1000) {
-                e.preventDefault();
-                mostrarError('Número no válido', 'Solo se permite el número 1000 o el nombre de la persona.');
-                return false;
+    // ── Registro de Visita de día con AJAX y confirmación inmediata ──
+    const formVisita = document.getElementById('formVisitaDia') || document.querySelector('.visit-day-zone form');
+    if (formVisita) {
+        formVisita.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const inputVal = document.getElementById('inputNombreVisita') || this.querySelector('input[name="nombreVisita"]');
+            const val = inputVal ? inputVal.value.trim() : '';
+            if (!val) return;
+
+            // Si es numérico y no es 1000
+            if (/^\d+$/.test(val) && parseInt(val, 10) !== 1000) {
+                mostrarError('Número no válido', 'Solo se permite el código 1000 o el nombre de la persona.');
+                return;
             }
-        }
-    });
+
+            try {
+                const fd = new FormData();
+                fd.append('nombreVisita', val);
+                fd.append('__RequestVerificationToken', csrfToken);
+                const res = await fetch('/Registro/RegistrarVisitaAjax', {
+                    method: 'POST',
+                    body: fd
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    if (inputVal) inputVal.value = '';
+                    mostrarModal({
+                        esVisitaDia: true,
+                        idSocio: 1000,
+                        nombre: data.nombre,
+                        membresia: `Visita de Día — $${Number(data.precio).toFixed(2)}`,
+                        precio: data.precio,
+                        sinMem: false,
+                        vencido: false,
+                        porVencer: false
+                    });
+                } else {
+                    mostrarError('Error en Visita', data.msg || 'No se pudo registrar la visita.');
+                }
+            } catch (err) {
+                mostrarError('Error de conexión', 'No se pudo registrar la visita.');
+            }
+        });
+    }
 })();
 </script>

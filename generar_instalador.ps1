@@ -1,5 +1,5 @@
 # ==============================================================================
-#  GymWeb v2.1 - Generador del Paquete Instalador Completo para Windows
+#  GymWeb v2.5 - Generador del Paquete Instalador Completo para Windows
 # ==============================================================================
 $ErrorActionPreference = "Stop"
 
@@ -78,6 +78,11 @@ Set-Content -Path (Join-Path $winOut "DESINSTALAR.bat") -Value $desinstalarConte
 Copy-Item -Force (Join-Path $root "Publish\Iniciar GymWeb.bat") (Join-Path $winOut "Iniciar GymWeb.bat")
 Copy-Item -Force (Join-Path $root "Publish\AbrirGymWeb.vbs") (Join-Path $winOut "AbrirGymWeb.vbs")
 Copy-Item -Force (Join-Path $root "Publish\Crear Acceso Directo.bat") (Join-Path $winOut "Crear Acceso Directo.bat")
+Copy-Item -Force (Join-Path $root "Publish\ACTUALIZAR.bat") (Join-Path $winOut "ACTUALIZAR.bat") -ErrorAction SilentlyContinue
+Copy-Item -Force (Join-Path $root "Publish\actualizar.ps1") (Join-Path $winOut "actualizar.ps1") -ErrorAction SilentlyContinue
+if (Test-Path (Join-Path $root "Publish\REPARAR_FECHAS_CLIENTE.bat")) {
+    Copy-Item -Force (Join-Path $root "Publish\REPARAR_FECHAS_CLIENTE.bat") (Join-Path $winOut "REPARAR_FECHAS_CLIENTE.bat")
+}
 Copy-Item -Force (Join-Path $root "app.ico") (Join-Path $winOut "app.ico")
 
 # Limpieza estricta de archivos de pruebas previas en el instalador
@@ -85,6 +90,7 @@ Write-Host "       Asegurando instalacion limpia (sin fotos de prueba ni respald
 Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $winOut "wwwroot\img\logo-custom.png")
 Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $winOut "wwwroot\img\fondo-custom.jpg")
 Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $winOut "wwwroot\img\socios")
+Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $winOut "wwwroot\img\productos\prod_*.*")
 Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $winOut "wwwroot\backups")
 Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $winOut "license.json")
 
@@ -98,6 +104,10 @@ Write-Host " [6/6] Creando archivo ZIP final: Instalador_GymWeb_Windows_v2.1.zip
 if (Test-Path $zipOut) { Remove-Item -Force $zipOut }
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [System.IO.Compression.ZipFile]::CreateFromDirectory($winOut, $zipOut, [System.IO.Compression.CompressionLevel]::Fastest, $false)
+
+# Copiar también con nombre v2.5 por compatibilidad
+$zipV25 = Join-Path $dist "Instalador_GymWeb_Windows_v2.5.zip"
+Copy-Item -Force $zipOut $zipV25
 
 $zipItem = Get-Item $zipOut
 $sizeMb = [math]::Round($zipItem.Length / 1MB, 2)

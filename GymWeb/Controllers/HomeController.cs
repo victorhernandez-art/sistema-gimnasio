@@ -59,6 +59,24 @@ public class HomeController : AuthController
         return View();
     }
 
+    private static bool EsVersionMayor(string? tagRemoto, string? versionLocal)
+    {
+        if (string.IsNullOrWhiteSpace(tagRemoto) || string.IsNullOrWhiteSpace(versionLocal)) return false;
+
+        var rClean = tagRemoto.Trim().TrimStart('v', 'V');
+        var lClean = versionLocal.Trim().TrimStart('v', 'V');
+
+        if (!rClean.Contains(".")) rClean += ".0";
+        if (!lClean.Contains(".")) lClean += ".0";
+
+        if (Version.TryParse(rClean, out var vRemoto) && Version.TryParse(lClean, out var vLocal))
+        {
+            return vRemoto > vLocal;
+        }
+
+        return false;
+    }
+
     // ── Endpoint AJAX para verificar actualizaciones disponibles desde GitHub ──
     [HttpGet]
     public async Task<IActionResult> CheckUpdate()
@@ -68,9 +86,7 @@ public class HomeController : AuthController
             // Usar cache de 24 horas para no martillar la API de GitHub
             if (DateTime.UtcNow < _cacheExpiry && _cachedLatestVersion != null)
             {
-                bool cachedHasUpdate = !string.Equals(
-                    _cachedLatestVersion, AppSettings.CurrentVersion,
-                    StringComparison.OrdinalIgnoreCase);
+                bool cachedHasUpdate = EsVersionMayor(_cachedLatestVersion, AppSettings.CurrentVersion);
 
                 return Json(new
                 {
@@ -162,8 +178,7 @@ public class HomeController : AuthController
             _cachedReleaseTitle  = releaseTitle;
             _cacheExpiry         = DateTime.UtcNow.AddHours(24);
 
-            bool hasUpdate = !string.Equals(latestTag, AppSettings.CurrentVersion,
-                                            StringComparison.OrdinalIgnoreCase);
+            bool hasUpdate = EsVersionMayor(latestTag, AppSettings.CurrentVersion);
 
             return Json(new
             {
@@ -221,6 +236,7 @@ public class HomeController : AuthController
     {
         public string Filename { get; set; } = "comprobante.pdf";
         public string Base64 { get; set; } = "";
+        public string? ImageBase64 { get; set; }
     }
 
     [HttpPost]
@@ -254,22 +270,51 @@ public class HomeController : AuthController
             byte[] pdfBytes = Convert.FromBase64String(cleanBase64);
             await System.IO.File.WriteAllBytesAsync(fullPath, pdfBytes);
 
-            // Copiar al portapapeles de Windows y auto-pegar en la ventana de WhatsApp (mismo mecanismo de Taller-GitHub)
+            // Guardar imagen PNG del ticket si viene presente
+            string? imgPath = null;
+            if (!string.IsNullOrEmpty(payload.ImageBase64))
+            {
+                try
+                {
+                    string cleanImgBase64 = payload.ImageBase64;
+                    int imgComma = cleanImgBase64.IndexOf(',');
+                    if (imgComma >= 0)
+                        cleanImgBase64 = cleanImgBase64.Substring(imgComma + 1);
+
+                    byte[] imgBytes = Convert.FromBase64String(cleanImgBase64);
+                    imgPath = Path.Combine(Path.GetTempPath(), "ticket_gym_whatsapp.png");
+                    await System.IO.File.WriteAllBytesAsync(imgPath, imgBytes);
+                }
+                catch { }
+            }
+
+            // Copiar imagen o archivo al portapapeles de Windows y auto-pegar en la ventana de WhatsApp
             if (OperatingSystem.IsWindows())
             {
                 try
                 {
                     string safePath = fullPath.Replace("'", "''");
+                    string safeImgPath = (imgPath ?? "").Replace("'", "''");
+
+                    string copyCmd = !string.IsNullOrEmpty(safeImgPath) && System.IO.File.Exists(imgPath)
+                        ? $@"
+                            Add-Type -AssemblyName System.Windows.Forms;
+                            Add-Type -AssemblyName System.Drawing;
+                            $img = [System.Drawing.Image]::FromFile('{safeImgPath}');
+                            [System.Windows.Forms.Clipboard]::SetImage($img);
+                          "
+                        : $"Set-Clipboard -Path '{safePath}';";
+
                     string psCommand = $@"
-                        Set-Clipboard -Path '{safePath}';
+                        {copyCmd}
                         $wsh = New-Object -ComObject Wscript.Shell;
-                        for ($i = 0; $i -lt 10; $i++) {{
+                        for ($i = 0; $i -lt 15; $i++) {{
                             if ($wsh.AppActivate('WhatsApp')) {{
-                                Start-Sleep -Milliseconds 350;
+                                Start-Sleep -Milliseconds 600;
                                 $wsh.SendKeys('^v');
                                 break;
                             }}
-                            Start-Sleep -Milliseconds 800;
+                            Start-Sleep -Milliseconds 700;
                         }}
                     ";
                     var psi = new System.Diagnostics.ProcessStartInfo
@@ -291,6 +336,32 @@ public class HomeController : AuthController
         {
             return Json(new { ok = false, error = ex.Message });
         }
+    }
+
+    // ── Búsqueda rápida de socios para tickets y WhatsApp ───────────────
+    [HttpGet]
+    public async Task<IActionResult> BuscarSociosQuick(string q)
+    {
+        if (string.IsNullOrWhiteSpace(q))
+            return Json(new List<object>());
+
+        q = q.Trim().ToLower();
+        var socios = await _db.Socios
+            .Where(s => s.IdEstado == 1 &&
+                (s.IdSocio.ToString().Contains(q) ||
+                 (s.Nombre + " " + (s.Paterno ?? "") + " " + (s.Materno ?? "")).ToLower().Contains(q) ||
+                 (s.Telefono != null && s.Telefono.Contains(q))))
+            .Take(12)
+            .Select(s => new
+            {
+                idSocio = s.IdSocio,
+                nombre = $"{s.Nombre} {s.Paterno} {s.Materno}".Trim(),
+                telefono = s.Telefono ?? "",
+                foto = s.Foto
+            })
+            .ToListAsync();
+
+        return Json(socios);
     }
 }
 

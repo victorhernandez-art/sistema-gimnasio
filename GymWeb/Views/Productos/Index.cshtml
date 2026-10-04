@@ -350,43 +350,113 @@
      5. VISTA: HISTORIAL DE VENTAS
 ══════════════════════════════════════════════════════════════════════════ -->
 <div id="seccionHistorial" style="display:none;" class="tienda-historial-container">
-    <!-- Barra de filtros del historial -->
-    <div class="historial-filter-bar">
-        <div class="hist-filter-group" style="flex:2;min-width:200px;">
-            <label><i class="fa-solid fa-magnifying-glass"></i> Buscar por folio o producto</label>
-            <input type="text" id="histSearchText" placeholder="Folio #000125, Agua, Whey..." oninput="filtrarHistorialVentas()" />
+    <!-- Accesos Rápidos de Fecha + Barra de Filtros -->
+    <div class="historial-filter-card">
+        <!-- Pastillas Rápidas de Fechas -->
+        <div class="hist-quick-dates">
+            <span class="hist-quick-label"><i class="fa-regular fa-calendar-check text-cyan"></i> Período:</span>
+            <button type="button" class="hist-date-pill active" data-period="hoy" onclick="establecerFiltroFechaRapido('hoy')">
+                <i class="fa-solid fa-calendar-day"></i> Hoy
+            </button>
+            <button type="button" class="hist-date-pill" data-period="ayer" onclick="establecerFiltroFechaRapido('ayer')">
+                Ayer
+            </button>
+            <button type="button" class="hist-date-pill" data-period="semana" onclick="establecerFiltroFechaRapido('semana')">
+                Esta Semana
+            </button>
+            <button type="button" class="hist-date-pill" data-period="mes" onclick="establecerFiltroFechaRapido('mes')">
+                Este Mes
+            </button>
+            <button type="button" class="hist-date-pill" data-period="todos" onclick="establecerFiltroFechaRapido('todos')">
+                Todas las fechas
+            </button>
         </div>
-        <div class="hist-filter-group">
-            <label><i class="fa-solid fa-wallet"></i> Método de pago</label>
-            <select id="histFilterMetodo" onchange="filtrarHistorialVentas()">
-                <option value="">Todos los métodos</option>
-                <option value="Efectivo">Efectivo</option>
-                <option value="Transferencia">Transferencia</option>
-                <option value="Tarjeta">Tarjeta</option>
-                <option value="Crédito">A Crédito</option>
-            </select>
+
+        <!-- Barra de filtros manuales -->
+        <div class="historial-filter-bar">
+            <div class="hist-filter-group" style="flex:2;min-width:200px;">
+                <label><i class="fa-solid fa-magnifying-glass"></i> Buscar por folio, producto o socio</label>
+                <input type="text" id="histSearchText" placeholder="Folio #000125, Agua, Whey, Nombre..." oninput="filtrarHistorialVentasDebounced()" />
+            </div>
+            <div class="hist-filter-group">
+                <label><i class="fa-solid fa-wallet"></i> Método de pago</label>
+                <select id="histFilterMetodo" onchange="cargarHistorialVentasAjax()">
+                    <option value="">Todos los métodos</option>
+                    <option value="Efectivo">Efectivo</option>
+                    <option value="Transferencia">Transferencia</option>
+                    <option value="Tarjeta">Tarjeta</option>
+                    <option value="Crédito">A Crédito</option>
+                </select>
+            </div>
+            <div class="hist-filter-group">
+                <label><i class="fa-regular fa-calendar"></i> Desde</label>
+                <input type="date" id="histFilterDesde" onchange="onManualFechaChange()" />
+            </div>
+            <div class="hist-filter-group">
+                <label><i class="fa-regular fa-calendar"></i> Hasta</label>
+                <input type="date" id="histFilterHasta" onchange="onManualFechaChange()" />
+            </div>
+            <button type="button" onclick="cargarHistorialVentasAjax()" class="btn-recargar-hist" title="Actualizar datos">
+                <i class="fa-solid fa-arrows-rotate"></i> Actualizar
+            </button>
+            <button type="button" onclick="limpiarFiltrosHistorial()" class="btn-limpiar-hist" title="Restablecer filtros">
+                <i class="fa-solid fa-rotate-left"></i> Limpiar
+            </button>
         </div>
-        <div class="hist-filter-group">
-            <label><i class="fa-regular fa-calendar"></i> Desde</label>
-            <input type="date" id="histFilterDesde" onchange="filtrarHistorialVentas()" />
+    </div>
+
+    <!-- KPIs Resumen de Ventas del Período / Día Seleccionado -->
+    <div class="hist-kpi-grid">
+        <div class="hist-kpi-card total-box">
+            <div class="hist-kpi-top">
+                <span class="hist-kpi-title"><i class="fa-solid fa-circle-dollar-to-slot"></i> Total Vendido</span>
+                <span class="hist-kpi-sub" id="histKpiPeriodoTag">Hoy</span>
+            </div>
+            <div class="hist-kpi-val text-green" id="histKpiTotal">$0.00</div>
+            <div class="hist-kpi-bottom" id="histKpiCantidades">0 ventas · 0 artículos</div>
         </div>
-        <div class="hist-filter-group">
-            <label><i class="fa-regular fa-calendar"></i> Hasta</label>
-            <input type="date" id="histFilterHasta" onchange="filtrarHistorialVentas()" />
+
+        <div class="hist-kpi-card">
+            <div class="hist-kpi-top">
+                <span class="hist-kpi-title"><i class="fa-solid fa-money-bill-wave" style="color:var(--pos-green);"></i> Efectivo</span>
+            </div>
+            <div class="hist-kpi-val text-green" id="histKpiEfectivo">$0.00</div>
+            <div class="hist-kpi-bottom">Cobros en caja</div>
         </div>
-        <button onclick="limpiarFiltrosHistorial()" class="btn-limpiar-hist" title="Restablecer filtros">
-            <i class="fa-solid fa-rotate-left"></i> Limpiar
-        </button>
+
+        <div class="hist-kpi-card">
+            <div class="hist-kpi-top">
+                <span class="hist-kpi-title"><i class="fa-solid fa-building-columns" style="color:#38bdf8;"></i> Transferencia</span>
+            </div>
+            <div class="hist-kpi-val text-cyan" id="histKpiTransfer">$0.00</div>
+            <div class="hist-kpi-bottom">SPEI / Banco</div>
+        </div>
+
+        <div class="hist-kpi-card">
+            <div class="hist-kpi-top">
+                <span class="hist-kpi-title"><i class="fa-solid fa-credit-card" style="color:#c084fc;"></i> Tarjeta</span>
+            </div>
+            <div class="hist-kpi-val" style="color:#c084fc;" id="histKpiTarjeta">$0.00</div>
+            <div class="hist-kpi-bottom">Terminal bancaria</div>
+        </div>
+
+        <div class="hist-kpi-card">
+            <div class="hist-kpi-top">
+                <span class="hist-kpi-title"><i class="fa-solid fa-handshake" style="color:#fbbf24;"></i> A Crédito</span>
+            </div>
+            <div class="hist-kpi-val text-amber" id="histKpiCredito">$0.00</div>
+            <div class="hist-kpi-bottom">Cuentas por cobrar</div>
+        </div>
     </div>
 
     <!-- Tabla moderna del historial -->
     <div class="historial-table-card">
         <div class="historial-table-header">
             <div class="hist-header-title">
-                <i class="fa-solid fa-receipt"></i> Registro de Ventas y Tickets
+                <i class="fa-solid fa-receipt text-cyan"></i> Registro de Ventas y Tickets
             </div>
             <div id="histCounterBadge" class="hist-counter-pill">
-                @historialSalidas.Count ventas registradas
+                Cargando ventas...
             </div>
         </div>
 
@@ -403,101 +473,13 @@
                         <th style="text-align:center;">Acciones</th>
                     </tr>
                 </thead>
-                <tbody>
-                    @foreach (var s in historialSalidas)
-                    {
-                        var totalVenta = s.Total ?? s.Detallesalida.Sum(d => (decimal)(d.Cantidad * (d.PrecioUnitario ?? 0m)));
-                        var folioStr = s.Folio ?? $"#{s.IdSalida:D6}";
-                        var fechaStr = s.FechaCreacion?.ToString("dd/MM/yyyy HH:mm") ?? "—";
-                        var fechaIso = s.FechaCreacion?.ToString("yyyy-MM-dd") ?? "";
-                        var cantTotal = s.Detallesalida.Sum(d => d.Cantidad);
-                        var metodo = s.MetodoPago ?? "Efectivo";
-                        var usuario = s.IdUsuarioCreoNavigation?.Nombre ?? "Recepción";
-                        var socioNombre = s.IdSocioNavigation != null ? $"{s.IdSocioNavigation.Nombre} {s.IdSocioNavigation.Paterno}".Trim() : "";
-
-                        // Resumen de nombres de productos para filtro
-                        var prodsTexto = string.Join(" ", s.Detallesalida.Select(d => d.IdProductoNavigation?.Nombre ?? "")).ToLower() + " " + socioNombre.ToLower();
-
-                        <tr class="hist-row"
-                            data-folio="@folioStr.ToLower()"
-                            data-prods="@prodsTexto"
-                            data-metodo="@metodo"
-                            data-fecha="@fechaIso">
-                            <td>
-                                <span class="folio-tag">@folioStr</span>
-                            </td>
-                            <td>
-                                <div class="fecha-cell">
-                                    <i class="fa-regular fa-calendar-days text-muted"></i>
-                                    <span>@fechaStr</span>
-                                </div>
-                            </td>
-                            <td>
-                                <div class="items-summary-cell">
-                                    <span class="items-count-badge">@cantTotal @(cantTotal == 1 ? "artículo" : "artículos")</span>
-                                    <span class="items-names-sub" title="@string.Join(", ", s.Detallesalida.Select(d => $"{d.Cantidad}x {d.IdProductoNavigation?.Nombre}"))">
-                                        @string.Join(", ", s.Detallesalida.Take(2).Select(d => $"{d.Cantidad}x {d.IdProductoNavigation?.Nombre}"))@(s.Detallesalida.Count > 2 ? "..." : "")
-                                    </span>
-                                </div>
-                            </td>
-                            <td>
-                                @if (s.EsCredito)
-                                {
-                                    <span class="metodo-badge" style="background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);"><i class="fa-solid fa-handshake"></i> A Crédito @(s.SaldoPendiente > 0 ? $"(${s.SaldoPendiente:N2})" : "(Pagado)")</span>
-                                }
-                                else if (metodo == "Transferencia")
-                                {
-                                    <span class="metodo-badge metodo-transfer"><i class="fa-solid fa-building-columns"></i> Transferencia</span>
-                                }
-                                else if (metodo == "Tarjeta")
-                                {
-                                    <span class="metodo-badge metodo-tarjeta"><i class="fa-solid fa-credit-card"></i> Tarjeta</span>
-                                }
-                                else
-                                {
-                                    <span class="metodo-badge metodo-efectivo"><i class="fa-solid fa-money-bill-wave"></i> Efectivo</span>
-                                }
-                            </td>
-                            <td>
-                                <span class="usuario-cell">
-                                    @if (!string.IsNullOrEmpty(socioNombre))
-                                    {
-                                        <strong style="color:#fbbf24;" title="Socio con saldo a crédito"><i class="fa-solid fa-user-tag"></i> @socioNombre</strong>
-                                    }
-                                    else
-                                    {
-                                        <span><i class="fa-regular fa-user"></i> @usuario</span>
-                                    }
-                                </span>
-                            </td>
-                            <td style="text-align:right;">
-                                <span class="total-cell text-green">$@totalVenta.ToString("N2")</span>
-                            </td>
-                            <td style="text-align:center;">
-                                <div style="display:flex;align-items:center;justify-content:center;gap:6px;">
-                                    <button onclick="verDetalleVenta(@s.IdSalida)" class="btn-ver-detalle" title="Ver detalle de ticket">
-                                        <i class="fa-solid fa-eye"></i> Detalle
-                                    </button>
-                                    <button onclick="imprimirTicketDirecto(@s.IdSalida)" class="btn-table-print" title="Imprimir ticket en impresora POS">
-                                        <i class="fa-solid fa-print"></i>
-                                    </button>
-                                    <button onclick="enviarTicketWhatsAppDirecto(@s.IdSalida)" class="btn-table-print" style="background:#25D366;border-color:#25D366;color:#0B1120;" title="Enviar ticket digital por WhatsApp">
-                                        <i class="fa-brands fa-whatsapp"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    }
-
-                    @if (!historialSalidas.Any())
-                    {
-                        <tr id="historialEmptyRow">
-                            <td colspan="7" style="text-align:center;padding:48px 20px;color:var(--text-muted);">
-                                <i class="fa-solid fa-receipt" style="font-size:36px;opacity:0.3;display:block;margin-bottom:12px;"></i>
-                                Aún no hay ventas registradas en el sistema.
-                            </td>
-                        </tr>
-                    }
+                <tbody id="tablaHistorialVentasBody">
+                    <tr id="historialLoadingRow">
+                        <td colspan="7" style="text-align:center;padding:40px 20px;color:var(--text-muted);">
+                            <i class="fa-solid fa-circle-notch fa-spin" style="font-size:24px;color:var(--pos-cyan);display:block;margin-bottom:10px;"></i>
+                            Cargando historial de ventas...
+                        </td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -675,18 +657,15 @@
         <!-- Vista del Ticket Térmico Oficial Estilo Taller-GitHub -->
         <div id="confTicketPaperContainer" style="max-height:60vh;overflow-y:auto;margin:12px auto;padding:4px;display:flex;justify-content:center;"></div>
 
-        <div class="ticket-actions-row">
-            <button type="button" onclick="imprimirTicketActual()" class="btn-ticket-print" id="btnTicketPrintActual">
+        <div class="ticket-actions-row" style="display:flex;gap:10px;justify-content:center;">
+            <button type="button" onclick="imprimirTicketActual()" class="btn-ticket-print" id="btnTicketPrintActual" style="flex:1;">
                 <i class="fa-solid fa-print"></i> Imprimir Ticket
             </button>
-            <button type="button" onclick="enviarTicketActualWhatsApp()" class="btn-ticket-print" id="btnTicketWhatsActual" style="background:#25D366;border-color:#25D366;color:#0B1120;box-shadow:0 4px 12px rgba(37,211,102,0.35);font-weight:900;">
+            <button type="button" onclick="enviarTicketActualWhatsApp()" class="btn-ticket-print" id="btnTicketWhatsActual" style="flex:1;background:#25D366;border-color:#25D366;color:#0B1120;box-shadow:0 4px 12px rgba(37,211,102,0.35);font-weight:900;">
                 <i class="fa-brands fa-whatsapp" style="font-size:17px;"></i> WhatsApp
             </button>
-            <button type="button" onclick="nuevaVenta()" class="btn-ticket-primary">
+            <button type="button" onclick="nuevaVenta()" class="btn-ticket-primary" style="flex:1;">
                 <i class="fa-solid fa-cart-plus"></i> Nueva venta
-            </button>
-            <button type="button" onclick="verHistorialDesdeConfirmacion()" class="btn-ticket-secondary">
-                <i class="fa-solid fa-receipt"></i> Historial
             </button>
         </div>
 
@@ -770,6 +749,9 @@
                 </button>
                 <button type="button" onclick="enviarTicketDesdeHistorialWhatsApp()" class="btn-ticket-print" style="background:#25D366;border-color:#25D366;color:#0B1120;">
                     <i class="fa-brands fa-whatsapp"></i> WhatsApp
+                </button>
+                <button type="button" onclick="eliminarVentaDesdeDetalle()" class="btn-ticket-print" style="background:rgba(239,68,68,0.15);border-color:#ef4444;color:#ef4444;" title="Cancelar venta y devolver productos al inventario">
+                    <i class="fa-solid fa-trash-can"></i> Eliminar Venta y Devolver Stock
                 </button>
             </div>
             <button type="button" onclick="cerrarModalDetalleVenta()" class="btn-modal-cancel">Cerrar</button>
@@ -2422,11 +2404,64 @@
     gap: 16px;
 }
 
-.historial-filter-bar {
+.historial-filter-card {
     background: var(--pos-card-bg);
     border: 1px solid var(--pos-border);
     border-radius: 14px;
     padding: 14px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.hist-quick-dates {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.hist-quick-label {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-right: 4px;
+}
+
+.hist-date-pill {
+    background: #0b111a;
+    border: 1px solid var(--pos-border);
+    color: var(--text-muted);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.hist-date-pill:hover {
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.25);
+    background: #162232;
+}
+
+.hist-date-pill.active {
+    background: rgba(6, 182, 212, 0.16);
+    border-color: var(--pos-cyan);
+    color: var(--pos-cyan);
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.2);
+}
+
+.historial-filter-bar {
     display: flex;
     align-items: flex-end;
     gap: 12px;
@@ -2458,6 +2493,28 @@
     min-width: 140px;
 }
 
+.btn-recargar-hist {
+    background: rgba(6, 182, 212, 0.14);
+    border: 1px solid rgba(6, 182, 212, 0.4);
+    color: var(--pos-cyan);
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 35px;
+    transition: all 0.15s;
+}
+
+.btn-recargar-hist:hover {
+    background: var(--pos-cyan);
+    color: #0b111a;
+    box-shadow: 0 2px 10px rgba(6, 182, 212, 0.35);
+}
+
 .btn-limpiar-hist {
     background: #162232;
     border: 1px solid var(--pos-border);
@@ -2476,6 +2533,68 @@
 .btn-limpiar-hist:hover {
     color: #ffffff;
     border-color: #475569;
+}
+
+/* ── Historial KPIs ── */
+.hist-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+}
+
+.hist-kpi-card {
+    background: var(--pos-card-bg);
+    border: 1px solid var(--pos-border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    position: relative;
+    overflow: hidden;
+}
+
+.hist-kpi-card.total-box {
+    border-color: rgba(34, 197, 94, 0.35);
+    background: linear-gradient(180deg, #111a26, rgba(34, 197, 94, 0.06));
+}
+
+.hist-kpi-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.hist-kpi-title {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.hist-kpi-sub {
+    font-size: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #94a3b8;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+.hist-kpi-val {
+    font-size: 20px;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: -0.5px;
+}
+
+.hist-kpi-bottom {
+    font-size: 11px;
+    color: var(--text-muted);
 }
 
 .historial-table-card {
@@ -3378,13 +3497,18 @@
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Procesando...';
 
+        const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+        const tokenVal = tokenInput ? tokenInput.value : '';
+
         try {
+            const reqHeaders = { 'Content-Type': 'application/json' };
+            if (tokenVal) {
+                reqHeaders['RequestVerificationToken'] = tokenVal;
+            }
+
             const resp = await fetch('/Productos/CobrarVenta', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'RequestVerificationToken': CSRF
-                },
+                headers: reqHeaders,
                 body: JSON.stringify(payload)
             });
 
@@ -3398,24 +3522,26 @@
             }
 
             // Actualizar inventario en el DOM local para evitar recarga obligada
-            data.items.forEach(it => {
-                const card = document.querySelector(`.product-card[data-id="${it.idProducto}"]`);
-                if (card) {
-                    card.dataset.stock = it.nuevoStock;
-                    const stockTag = card.querySelector('.product-stock-tag span:last-child');
-                    if (stockTag) stockTag.textContent = `Stock: ${it.nuevoStock} u`;
+            if (data.items && Array.isArray(data.items)) {
+                data.items.forEach(it => {
+                    const card = document.querySelector(`.product-card[data-id="${it.idProducto}"]`);
+                    if (card) {
+                        card.dataset.stock = it.nuevoStock;
+                        const stockTag = card.querySelector('.product-stock-tag span:last-child');
+                        if (stockTag) stockTag.textContent = `Stock: ${it.nuevoStock} u`;
 
-                    if (it.nuevoStock <= 0) {
-                        card.dataset.agotado = 'true';
-                        const btnAdd = card.querySelector('.btn-add-cart');
-                        if (btnAdd) {
-                            btnAdd.classList.add('disabled');
-                            btnAdd.disabled = true;
-                            btnAdd.innerHTML = '<i class="fa-solid fa-ban"></i> Agotado';
+                        if (it.nuevoStock <= 0) {
+                            card.dataset.agotado = 'true';
+                            const btnAdd = card.querySelector('.btn-add-cart');
+                            if (btnAdd) {
+                                btnAdd.classList.add('disabled');
+                                btnAdd.disabled = true;
+                                btnAdd.innerHTML = '<i class="fa-solid fa-ban"></i> Agotado';
+                            }
                         }
                     }
-                }
-            });
+                });
+            }
 
             // Cerrar checkout y vaciar carrito
             cerrarModalCheckout();
@@ -3426,7 +3552,8 @@
             mostrarTicketConfirmacion(data);
 
         } catch (ex) {
-            err.textContent = 'Error de red o comunicación con el servidor.';
+            console.error('Error al procesar venta:', ex);
+            err.textContent = (ex && ex.message) ? ('Error al procesar la venta: ' + ex.message) : 'Error de red o comunicación con el servidor.';
             err.style.display = 'block';
             btn.disabled = false;
             btn.innerHTML = '<i class="fa-solid fa-circle-check"></i> Confirmar venta';
@@ -3439,17 +3566,19 @@
     function mostrarTicketConfirmacion(data) {
         ultimaVentaRealizada = data;
 
-        document.getElementById('confFolioBadge').textContent = data.folio ?? `#${data.idSalida}`;
-        document.getElementById('confFechaText').textContent = data.fecha ?? '—';
         const badge = document.getElementById('confFolioBadge');
         if (badge) badge.textContent = data.folio ?? `#${data.idSalida}`;
+
+        const fechaEl = document.getElementById('confFechaText');
+        if (fechaEl) fechaEl.textContent = data.fecha ?? '—';
 
         const container = document.getElementById('confTicketPaperContainer');
         if (container && window.generarTicketHtmlEstiloTaller) {
             container.innerHTML = window.generarTicketHtmlEstiloTaller(data);
         }
 
-        document.getElementById('modalConfirmacionVenta').style.display = 'flex';
+        const modalConf = document.getElementById('modalConfirmacionVenta');
+        if (modalConf) modalConf.style.display = 'flex';
     }
 
     window.cerrarModalConfirmacion = function() {
@@ -3858,15 +3987,25 @@
             return;
         }
         ultimaVentaRealizada.tipoTicket = 'VENTA';
-        window.enviarComprobantePdfWhatsApp(ultimaVentaRealizada);
+        if (typeof window.enviarComprobantePdfWhatsApp === 'function') {
+            window.enviarComprobantePdfWhatsApp(ultimaVentaRealizada);
+        } else if (typeof window.abrirModalWhatsAppTicket === 'function') {
+            window.abrirModalWhatsAppTicket(ultimaVentaRealizada);
+        } else {
+            alert('El módulo de WhatsApp aún no ha cargado. Por favor recarga la página.');
+        }
     };
 
     window.enviarTicketDesdeHistorialWhatsApp = function() {
-        if (ultimoDetalleConsultado) {
-            ultimoDetalleConsultado.tipoTicket = 'VENTA';
-            window.enviarComprobantePdfWhatsApp(ultimoDetalleConsultado);
-        } else {
+        if (!ultimoDetalleConsultado) {
             alert('No hay información del ticket para enviar por WhatsApp.');
+            return;
+        }
+        ultimoDetalleConsultado.tipoTicket = 'VENTA';
+        if (typeof window.enviarComprobantePdfWhatsApp === 'function') {
+            window.enviarComprobantePdfWhatsApp(ultimoDetalleConsultado);
+        } else if (typeof window.abrirModalWhatsAppTicket === 'function') {
+            window.abrirModalWhatsAppTicket(ultimoDetalleConsultado);
         }
     };
 
@@ -3885,40 +4024,328 @@
         }
     };
 
-    // ── HISTORIAL DE VENTAS: FILTROS Y DETALLE ──
-    window.filtrarHistorialVentas = function() {
-        const query  = (document.getElementById('histSearchText')?.value ?? '').toLowerCase().trim();
-        const metodo = (document.getElementById('histFilterMetodo')?.value ?? '').trim();
-        const desde  = document.getElementById('histFilterDesde')?.value ?? '';
-        const hasta  = document.getElementById('histFilterHasta')?.value ?? '';
+    // ── CANCELAR / ELIMINAR VENTA CON DEVOLUCIÓN DE STOCK AL INVENTARIO ──
+    window.eliminarVentaHistorial = async function(idSalida, folio) {
+        if (!idSalida) return;
+        const folioStr = folio || `#${idSalida}`;
+        const confirmar = confirm(`¿Estás seguro de cancelar y eliminar la venta ${folioStr}?\n\n⚠️ Esta acción:\n• Reincorporará automáticamente todos los artículos al stock del inventario.\n• Descontará el total de la venta de reportes y cortes de caja.\n• Anulará el registro de la venta.`);
+        if (!confirmar) return;
 
-        let visibles = 0;
-        document.querySelectorAll('.hist-row').forEach(row => {
-            const fol = row.dataset.folio ?? '';
-            const prods = row.dataset.prods ?? '';
-            const met = row.dataset.metodo ?? '';
-            const fecha = row.dataset.fecha ?? '';
+        try {
+            const resp = await fetch(`/Productos/EliminarVenta?idSalida=${idSalida}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await resp.json();
 
-            const okText = !query || fol.includes(query) || prods.includes(query);
-            const okMetodo = !metodo || met === metodo;
-            const okDesde = !desde || fecha >= desde;
-            const okHasta = !hasta || fecha <= hasta;
+            if (data.ok) {
+                // Actualizar stock de los productos devueltos en la vista del catálogo
+                if (data.items && Array.isArray(data.items)) {
+                    data.items.forEach(it => {
+                        const card = document.querySelector(`.product-card[data-id="${it.idProducto}"]`);
+                        if (card) {
+                            card.dataset.stock = it.nuevoStock;
+                            const stockTag = card.querySelector('.product-stock-tag span:last-child');
+                            if (stockTag) stockTag.textContent = `Stock: ${it.nuevoStock} u`;
 
-            const visible = okText && okMetodo && okDesde && okHasta;
-            row.style.display = visible ? '' : 'none';
-            if (visible) visibles++;
+                            if (it.nuevoStock > 0) {
+                                card.dataset.agotado = 'false';
+                                const btnAdd = card.querySelector('.btn-add-cart');
+                                if (btnAdd) {
+                                    btnAdd.classList.remove('disabled');
+                                    btnAdd.disabled = false;
+                                    btnAdd.innerHTML = '<i class="fa-solid fa-cart-plus"></i> Agregar';
+                                }
+                            }
+                        }
+                    });
+                }
+
+                if (window.mostrarToastNotificacion) {
+                    window.mostrarToastNotificacion(`🗑️ Venta ${folioStr} eliminada y productos devueltos al stock.`, 'success');
+                } else {
+                    alert(data.msg);
+                }
+
+                // Cerrar modal de detalle si estaba abierto
+                cerrarModalDetalleVenta();
+
+                // Recargar tabla de historial y métricas
+                cargarHistorialVentasAjax();
+            } else {
+                alert(data.msg || 'No se pudo eliminar la venta.');
+            }
+        } catch (err) {
+            console.error('Error al eliminar venta:', err);
+            alert('Error de conexión al intentar eliminar la venta.');
+        }
+    };
+
+    window.eliminarVentaDesdeDetalle = function() {
+        if (!ultimoDetalleConsultado || !ultimoDetalleConsultado.idSalida) {
+            alert('No hay información de la venta para cancelar.');
+            return;
+        }
+        eliminarVentaHistorial(ultimoDetalleConsultado.idSalida, ultimoDetalleConsultado.folio);
+    };
+
+    // ── CAMBIO DE PESTAÑAS (PRODUCTOS vs HISTORIAL DE VENTAS) ──
+    window.cambiarTabModulo = function(tab) {
+        const btnProd = document.getElementById('tabBtnProductos');
+        const btnHist = document.getElementById('tabBtnHistorial');
+        const secProd = document.getElementById('seccionProductos');
+        const secHist = document.getElementById('seccionHistorial');
+        const wrapStock = document.getElementById('wrapperFiltroStock');
+
+        if (tab === 'historial') {
+            if (btnHist) btnHist.classList.add('active');
+            if (btnProd) btnProd.classList.remove('active');
+            if (secProd) secProd.style.display = 'none';
+            if (wrapStock) wrapStock.style.display = 'none';
+            if (secHist) secHist.style.display = 'flex';
+
+            // Por defecto, inicializar en las ventas de HOY para ver lo que realmente se vendió hoy
+            const desdeVal = document.getElementById('histFilterDesde')?.value;
+            const hastaVal = document.getElementById('histFilterHasta')?.value;
+            if (!desdeVal && !hastaVal) {
+                establecerFiltroFechaRapido('hoy');
+            } else {
+                cargarHistorialVentasAjax();
+            }
+        } else {
+            if (btnProd) btnProd.classList.add('active');
+            if (btnHist) btnHist.classList.remove('active');
+            if (secProd) secProd.style.display = 'grid';
+            if (wrapStock) wrapStock.style.display = 'flex';
+            if (secHist) secHist.style.display = 'none';
+        }
+    };
+
+    // ── ACCESOS RÁPIDOS DE FECHA EN HISTORIAL (Hoy, Ayer, Semana, Mes, Todos) ──
+    window.establecerFiltroFechaRapido = function(periodo) {
+        document.querySelectorAll('.hist-date-pill').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.period === periodo);
         });
 
-        const badge = document.getElementById('histCounterBadge');
-        if (badge) badge.textContent = `${visibles} venta${visibles !== 1 ? 's' : ''} encontrada${visibles !== 1 ? 's' : ''}`;
+        const pad = (n) => n.toString().padStart(2, '0');
+        const toIso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+        const hoy = new Date();
+        let desde = '';
+        let hasta = '';
+        let tag = 'Personalizado';
+
+        if (periodo === 'hoy') {
+            desde = toIso(hoy);
+            hasta = toIso(hoy);
+            tag = 'Hoy';
+        } else if (periodo === 'ayer') {
+            const ayer = new Date(hoy);
+            ayer.setDate(ayer.getDate() - 1);
+            desde = toIso(ayer);
+            hasta = toIso(ayer);
+            tag = 'Ayer';
+        } else if (periodo === 'semana') {
+            const semana = new Date(hoy);
+            semana.setDate(semana.getDate() - 6);
+            desde = toIso(semana);
+            hasta = toIso(hoy);
+            tag = 'Últimos 7 días';
+        } else if (periodo === 'mes') {
+            const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+            desde = toIso(inicioMes);
+            hasta = toIso(hoy);
+            tag = 'Este Mes';
+        } else if (periodo === 'todos') {
+            desde = '';
+            hasta = '';
+            tag = 'Todas las fechas';
+        }
+
+        const inputDesde = document.getElementById('histFilterDesde');
+        const inputHasta = document.getElementById('histFilterHasta');
+        const tagPeriodo = document.getElementById('histKpiPeriodoTag');
+
+        if (inputDesde) inputDesde.value = desde;
+        if (inputHasta) inputHasta.value = hasta;
+        if (tagPeriodo) tagPeriodo.textContent = tag;
+
+        cargarHistorialVentasAjax();
+    };
+
+    window.onManualFechaChange = function() {
+        document.querySelectorAll('.hist-date-pill').forEach(btn => btn.classList.remove('active'));
+        const tagPeriodo = document.getElementById('histKpiPeriodoTag');
+        if (tagPeriodo) tagPeriodo.textContent = 'Rango manual';
+        cargarHistorialVentasAjax();
+    };
+
+    let debTimerHist = null;
+    window.filtrarHistorialVentasDebounced = function() {
+        clearTimeout(debTimerHist);
+        debTimerHist = setTimeout(() => {
+            cargarHistorialVentasAjax();
+        }, 280);
     };
 
     window.limpiarFiltrosHistorial = function() {
-        document.getElementById('histSearchText').value = '';
-        document.getElementById('histFilterMetodo').value = '';
-        document.getElementById('histFilterDesde').value = '';
-        document.getElementById('histFilterHasta').value = '';
-        filtrarHistorialVentas();
+        const txt = document.getElementById('histSearchText');
+        const met = document.getElementById('histFilterMetodo');
+        if (txt) txt.value = '';
+        if (met) met.value = '';
+        establecerFiltroFechaRapido('hoy');
+    };
+
+    // ── CARGAR HISTORIAL DE VENTAS EN VIVO VÍA AJAX CON RESUMEN DE TOTALES ──
+    window.cargarHistorialVentasAjax = async function() {
+        const tbody = document.getElementById('tablaHistorialVentasBody');
+        const badge = document.getElementById('histCounterBadge');
+
+        const q = (document.getElementById('histSearchText')?.value ?? '').trim();
+        const metodo = (document.getElementById('histFilterMetodo')?.value ?? '').trim();
+        const desde = (document.getElementById('histFilterDesde')?.value ?? '').trim();
+        const hasta = (document.getElementById('histFilterHasta')?.value ?? '').trim();
+
+        if (tbody) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="text-align:center;padding:36px 20px;color:var(--text-muted);">
+                        <i class="fa-solid fa-circle-notch fa-spin" style="font-size:22px;color:var(--pos-cyan);display:block;margin-bottom:10px;"></i>
+                        Consultando ventas en el servidor...
+                    </td>
+                </tr>
+            `;
+        }
+
+        try {
+            const url = `/Productos/GetHistorialVentas?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&metodo=${encodeURIComponent(metodo)}&q=${encodeURIComponent(q)}`;
+            const resp = await fetch(url);
+            const data = await resp.json();
+
+            if (!data.ok) {
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;color:#ef4444;"><i class="fa-solid fa-triangle-exclamation"></i> Error al cargar datos: ${data.msg || 'Desconocido'}</td></tr>`;
+                }
+                return;
+            }
+
+            // 1. Actualizar KPIs del período
+            const res = data.resumen || { total: 0, efectivo: 0, transferencia: 0, tarjeta: 0, credito: 0, cantidadVentas: 0, articulos: 0 };
+            const fmtMoney = (n) => '$' + Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            const kpiTot = document.getElementById('histKpiTotal');
+            const kpiCant = document.getElementById('histKpiCantidades');
+            const kpiEfec = document.getElementById('histKpiEfectivo');
+            const kpiTrans = document.getElementById('histKpiTransfer');
+            const kpiTarj = document.getElementById('histKpiTarjeta');
+            const kpiCred = document.getElementById('histKpiCredito');
+
+            if (kpiTot) kpiTot.textContent = fmtMoney(res.total);
+            if (kpiCant) kpiCant.textContent = `${res.cantidadVentas} venta${res.cantidadVentas !== 1 ? 's' : ''} · ${res.articulos} artículo${res.articulos !== 1 ? 's' : ''}`;
+            if (kpiEfec) kpiEfec.textContent = fmtMoney(res.efectivo);
+            if (kpiTrans) kpiTrans.textContent = fmtMoney(res.transferencia);
+            if (kpiTarj) kpiTarj.textContent = fmtMoney(res.tarjeta);
+            if (kpiCred) kpiCred.textContent = fmtMoney(res.credito);
+
+            if (badge) {
+                badge.textContent = `${data.ventas.length} venta${data.ventas.length !== 1 ? 's' : ''} registrada${data.ventas.length !== 1 ? 's' : ''}`;
+            }
+
+            // 2. Renderizar filas de la tabla
+            if (!data.ventas || data.ventas.length === 0) {
+                if (tbody) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="7" style="text-align:center;padding:48px 20px;color:var(--text-muted);">
+                                <i class="fa-solid fa-receipt" style="font-size:36px;opacity:0.3;display:block;margin-bottom:12px;"></i>
+                                No se encontraron ventas registradas para este período o con los filtros seleccionados.<br/>
+                                <button type="button" onclick="establecerFiltroFechaRapido('todos')" class="btn-recargar-hist" style="display:inline-flex;margin:14px auto 0 auto;">
+                                    <i class="fa-regular fa-calendar"></i> Ver todas las ventas históricas
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }
+                return;
+            }
+
+            let htmlRows = '';
+            data.ventas.forEach(v => {
+                const totalFmt = fmtMoney(v.total);
+                let metodoHtml = '';
+
+                if (v.esCredito) {
+                    metodoHtml = `<span class="metodo-badge" style="background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);"><i class="fa-solid fa-handshake"></i> A Crédito ${v.saldoPendiente > 0 ? `(${fmtMoney(v.saldoPendiente)})` : '(Pagado)'}</span>`;
+                } else if (v.metodoPago === 'Transferencia') {
+                    metodoHtml = `<span class="metodo-badge metodo-transfer"><i class="fa-solid fa-building-columns"></i> Transferencia</span>`;
+                } else if (v.metodoPago === 'Tarjeta') {
+                    metodoHtml = `<span class="metodo-badge metodo-tarjeta"><i class="fa-solid fa-credit-card"></i> Tarjeta</span>`;
+                } else {
+                    metodoHtml = `<span class="metodo-badge metodo-efectivo"><i class="fa-solid fa-money-bill-wave"></i> Efectivo</span>`;
+                }
+
+                const clienteHtml = v.socioNombre
+                    ? `<strong style="color:#fbbf24;" title="Socio cliente"><i class="fa-solid fa-user-tag"></i> ${v.socioNombre}</strong>`
+                    : `<span><i class="fa-regular fa-user"></i> ${v.usuario || 'Recepción'}</span>`;
+
+                htmlRows += `
+                    <tr class="hist-row">
+                        <td>
+                            <span class="folio-tag">${v.folio}</span>
+                        </td>
+                        <td>
+                            <div class="fecha-cell">
+                                <i class="fa-regular fa-calendar-days text-muted"></i>
+                                <span>${v.fecha}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="items-summary-cell">
+                                <span class="items-count-badge">${v.cantArticulos} ${v.cantArticulos === 1 ? 'artículo' : 'artículos'}</span>
+                                <span class="items-names-sub" title="${v.todosArticulos || v.resumenArticulos}">
+                                    ${v.resumenArticulos || 'Venta de mostrador'}
+                                </span>
+                            </div>
+                        </td>
+                        <td>
+                            ${metodoHtml}
+                        </td>
+                        <td>
+                            <span class="usuario-cell">
+                                ${clienteHtml}
+                            </span>
+                        </td>
+                        <td style="text-align:right;">
+                            <span class="total-cell text-green">${totalFmt}</span>
+                        </td>
+                        <td style="text-align:center;">
+                            <div style="display:flex;align-items:center;justify-content:center;gap:6px;">
+                                <button onclick="verDetalleVenta(${v.idSalida})" class="btn-ver-detalle" title="Ver detalle de ticket">
+                                    <i class="fa-solid fa-eye"></i> Detalle
+                                </button>
+                                <button onclick="imprimirTicketDirecto(${v.idSalida})" class="btn-table-print" title="Imprimir ticket en impresora POS">
+                                    <i class="fa-solid fa-print"></i>
+                                </button>
+                                <button onclick="enviarTicketWhatsAppDirecto(${v.idSalida})" class="btn-table-print" style="background:#25D366;border-color:#25D366;color:#0B1120;" title="Enviar ticket digital por WhatsApp">
+                                    <i class="fa-brands fa-whatsapp"></i>
+                                </button>
+                                <button onclick="eliminarVentaHistorial(${v.idSalida}, '${v.folio}')" class="btn-table-print" style="background:rgba(239,68,68,0.15);border-color:#ef4444;color:#ef4444;" title="Cancelar venta y devolver productos al inventario">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            if (tbody) tbody.innerHTML = htmlRows;
+
+        } catch (ex) {
+            console.error('Error al cargar historial de ventas:', ex);
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;color:#ef4444;"><i class="fa-solid fa-circle-exclamation"></i> Error de conexión al consultar el historial de ventas.</td></tr>`;
+            }
+        }
     };
 
     // ── Ver Detalle de Venta en Modal ──

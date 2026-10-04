@@ -130,16 +130,106 @@
                 ? `<text x="${(svgWidth / 2).toFixed(2)}" y="${(height + fontSize + 1).toFixed(2)}" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="${fontSize}px" font-weight="bold" fill="${color}">${textDisplay}</text>`
                 : '';
 
-            return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgWidth.toFixed(2)} ${svgHeight.toFixed(2)}" width="100%" height="${svgHeight}px" style="max-width:${Math.min(svgWidth, 260)}px;display:inline-block;margin:0 auto;">${rects}${textSvg}</svg>`;
+            const bgRect = `<rect x="0" y="0" width="${svgWidth.toFixed(2)}" height="${svgHeight.toFixed(2)}" fill="#ffffff" />`;
+
+            return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgWidth.toFixed(2)} ${svgHeight.toFixed(2)}" width="${Math.min(svgWidth, 260)}px" height="${svgHeight}px" style="max-width:100%;height:auto;display:block;margin:0 auto;background:#ffffff;">${bgRect}${rects}${textSvg}</svg>`;
+        },
+
+        // Generación nativa en Canvas -> PNG DataURL (100% nítido en html2canvas, PDF e impresión, sin desbordes de SVG)
+        generateCode128Png: function (rawText, options = {}) {
+            if (!rawText) return '';
+            rawText = String(rawText).trim();
+            if (!rawText) return '';
+
+            const height = options.height || 36;
+            const barWidth = options.barWidth || 1.8;
+            const color = options.color || '#000000';
+
+            const START_CODE_B = 104;
+            const STOP_CODE = 106;
+            let codes = [START_CODE_B];
+            let checkSum = START_CODE_B;
+
+            for (let i = 0; i < rawText.length; i++) {
+                const charCode = rawText.charCodeAt(i);
+                const val = charCode - 32;
+                if (val >= 0 && val <= 95) {
+                    codes.push(val);
+                    checkSum += val * (i + 1);
+                }
+            }
+
+            const checkDigit = checkSum % 103;
+            codes.push(checkDigit);
+            codes.push(STOP_CODE);
+
+            let modules = '';
+            for (let code of codes) {
+                const pattern = this.CODE128_PATTERNS[code];
+                if (pattern) {
+                    let isBar = true;
+                    for (let j = 0; j < pattern.length; j++) {
+                        const width = parseInt(pattern[j], 10);
+                        modules += (isBar ? '1' : '0').repeat(width);
+                        isBar = !isBar;
+                    }
+                }
+            }
+
+            const quietZone = 12;
+            const canvasWidth = Math.round((modules.length * barWidth) + (quietZone * 2));
+            const canvasHeight = height;
+
+            if (typeof document === 'undefined' || !document.createElement) {
+                return '';
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return '';
+
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+            ctx.fillStyle = color;
+            let currentX = quietZone;
+            for (let i = 0; i < modules.length; i++) {
+                if (modules[i] === '1') {
+                    let w = 1;
+                    while (i + 1 < modules.length && modules[i + 1] === '1') {
+                        w++;
+                        i++;
+                    }
+                    ctx.fillRect(currentX, 0, Math.round(w * barWidth), height);
+                    currentX += w * barWidth;
+                } else {
+                    currentX += barWidth;
+                }
+            }
+
+            return canvas.toDataURL('image/png');
         }
     };
     window.BarcodeUtil = BarcodeUtil;
 
-    // ── 1. GENERACIÓN DE CÓDIGO DE BARRAS EN SVG ──────────────────────────────
+    // ── 1. GENERACIÓN DE CÓDIGO DE BARRAS EN SVG / PNG ─────────────────────────
     window.generarBarcodeSvgHtml = function (valor, textoDebajo) {
         if (!valor) return '';
         const cleanVal = valor.toString().trim().replace(/[^a-zA-Z0-9_\-#]/g, '');
         const textoMostrar = textoDebajo || cleanVal;
+
+        if (BarcodeUtil && typeof BarcodeUtil.generateCode128Png === 'function') {
+            const pngUrl = BarcodeUtil.generateCode128Png(cleanVal, { height: 36, barWidth: 1.6 });
+            if (pngUrl) {
+                return `<div class="ticket-barcode-wrap" style="text-align:center;margin:6px auto 2px auto;background:#ffffff;padding:4px 0;width:100%;box-sizing:border-box;">
+                    <img src="${pngUrl}" alt="${cleanVal}" style="display:block;margin:0 auto;height:36px;max-width:100%;object-fit:contain;image-rendering:pixelated;" />
+                    <div style="font-size:9.5px;font-weight:800;color:#000000;margin-top:3px;letter-spacing:0.8px;text-align:center;">${textoMostrar}</div>
+                </div>`;
+            }
+        }
+
         const svg = BarcodeUtil.generateCode128Svg(cleanVal, {
             height: 36,
             barWidth: 1.35,
@@ -147,28 +237,28 @@
             textDisplay: textoMostrar,
             fontSize: 10
         });
-        return `<div class="ticket-barcode-wrap" style="text-align:center;margin:6px 0 3px 0;">${svg}</div>`;
+        return `<div class="ticket-barcode-wrap" style="text-align:center;margin:6px auto 2px auto;background:#ffffff;padding:4px 0;width:100%;box-sizing:border-box;">${svg}</div>`;
     };
 
-    // Función síncrona para inyectar SVG en tickets térmicos (idéntica a Taller-GitHub)
+    // Función síncrona para inyectar código de barras en tickets térmicos (idéntica a Taller-GitHub)
     window.generarBarcodeSvgDirecto = function (valor, textoDebajo) {
         if (!valor) return '';
         const cleanVal = valor.toString().trim().replace(/[^a-zA-Z0-9_\-#]/g, '');
         const texto = textoDebajo || cleanVal;
 
         try {
-            const svg = BarcodeUtil.generateCode128Svg(cleanVal, {
-                height: 34,
-                barWidth: 1.3,
-                showText: true,
-                textDisplay: texto,
-                fontSize: 9.5
-            });
-            if (svg) {
-                return `<div class="ticket-barcode-wrap" style="text-align:center;margin:8px 0 4px 0;">${svg}</div>`;
+            // Usar imagen PNG generada por Canvas: 100% inmune a errores de corte de html2canvas y jsPDF
+            if (BarcodeUtil && typeof BarcodeUtil.generateCode128Png === 'function') {
+                const pngUrl = BarcodeUtil.generateCode128Png(cleanVal, { height: 36, barWidth: 1.6 });
+                if (pngUrl) {
+                    return `<div class="ticket-barcode-wrap" style="text-align:center;margin:6px auto 2px auto;background:#ffffff;padding:4px 0;width:100%;box-sizing:border-box;">
+                        <img src="${pngUrl}" alt="${cleanVal}" style="display:block;margin:0 auto;height:36px;max-width:100%;object-fit:contain;image-rendering:pixelated;" />
+                        <div style="font-size:9.5px;font-weight:800;color:#000000;margin-top:3px;letter-spacing:0.8px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,Arial,sans-serif;">${texto}</div>
+                    </div>`;
+                }
             }
         } catch (e) {
-            console.warn('Error en BarcodeUtil:', e);
+            console.warn('Error en BarcodeUtil PNG:', e);
         }
 
         try {
@@ -339,20 +429,33 @@
     let currentWhatsPayload = null;
 
     window.abrirModalWhatsAppTicket = function (payload) {
+        payload = payload || {};
         currentWhatsPayload = payload;
         crearModalWhatsAppSiNoExiste();
 
         const inputTel = document.getElementById('whatsModalTelefono');
         const previewText = document.getElementById('whatsModalPreview');
         const alertBox = document.getElementById('whatsModalAlert');
+        const inputBuscar = document.getElementById('whatsModalBuscarSocio');
+        const btnClear = document.getElementById('btnLimpiarBuscarSocioWhats');
+        const dropdown = document.getElementById('whatsModalSocioDropdown');
 
+        if (dropdown) dropdown.style.display = 'none';
         alertBox.style.display = 'none';
 
         // Prellenar teléfono si viene en el payload
-        let tel = (payload.telefono || payload.socioTelefono || '').toString().trim();
-        // Limpiar caracteres no numéricos
-        tel = tel.replace(/[^0-9]/g, '');
-        inputTel.value = tel;
+        let tel = (payload.telefono || payload.socioTelefono || '').toString().trim().replace(/[^0-9]/g, '');
+        inputTel.value = tel.length >= 10 ? tel.slice(-10) : tel;
+
+        const socioNom = payload.socio || payload.socioNombre || '';
+        const socioId = payload.socioId || payload.idSocio;
+        if (socioNom && socioNom !== 'Cliente' && socioNom !== 'Cliente Mostrador') {
+            if (inputBuscar) inputBuscar.value = `${socioNom}${socioId ? ' (Clave: #' + socioId + ')' : ''}`;
+            if (btnClear) btnClear.style.display = 'block';
+        } else {
+            if (inputBuscar) inputBuscar.value = '';
+            if (btnClear) btnClear.style.display = 'none';
+        }
 
         // Generar texto estructurado y vistoso
         const mensajeFormateado = generarTextoTicketWhatsApp(payload);
@@ -360,13 +463,16 @@
 
         document.getElementById('modalWhatsAppTicket').style.display = 'flex';
         if (!tel) {
-            inputTel.focus();
+            if (inputBuscar) inputBuscar.focus();
+            else inputTel.focus();
         }
     };
 
     window.cerrarModalWhatsAppTicket = function () {
         const modal = document.getElementById('modalWhatsAppTicket');
         if (modal) modal.style.display = 'none';
+        const dropdown = document.getElementById('whatsModalSocioDropdown');
+        if (dropdown) dropdown.style.display = 'none';
         currentWhatsPayload = null;
     };
 
@@ -499,10 +605,11 @@ ${pie}${telContacto}`;
         }
 
         const barcodeVal = (data.socioId || data.idSocio || folio).toString().replace(/[^a-zA-Z0-9_\-#]/g, '');
-        const barcodeSvg = window.generarBarcodeSvgDirecto(barcodeVal, `Folio: ${folio} | ${socio}`);
+        const barcodeLabel = `Folio: ${folio}` + ((data.socioId || data.idSocio) ? ` • Clave: #${data.socioId || data.idSocio}` : '');
+        const barcodeSvg = window.generarBarcodeSvgDirecto(barcodeVal, barcodeLabel);
 
         return `
-          <div class="ticket-wrapper ticket-80mm" style="background:#FFFFFF;color:#000000;padding:12px 14px;border-radius:6px;box-shadow:0 4px 18px rgba(0,0,0,0.35);max-width:320px;width:100%;margin:0 auto 14px auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:11px;line-height:1.3;text-align:left;box-sizing:border-box;">
+          <div class="ticket-wrapper ticket-80mm" style="background:#FFFFFF;color:#000000;padding:12px 14px 18px 14px;border-radius:6px;box-shadow:0 4px 18px rgba(0,0,0,0.35);max-width:320px;width:100%;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:11px;line-height:1.3;text-align:left;box-sizing:border-box;overflow:visible;">
             <!-- Cabecera y Logo a Color -->
             <div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:6px;margin-bottom:6px;">
               <div style="margin-bottom:5px;">
@@ -579,8 +686,8 @@ ${pie}${telContacto}`;
               ${pie}
             </div>
 
-            <!-- Código de barras CODE128 -->
-            <div style="margin-top:6px;padding-top:4px;border-top:1px dashed #000;text-align:center;">
+            <!-- Código de barras CODE128 (integrado 100% adentro del papel blanco) -->
+            <div style="margin-top:8px;padding-top:6px;border-top:1px dashed #000000;text-align:center;background:#ffffff;border-radius:4px;width:100%;box-sizing:border-box;">
               ${barcodeSvg}
             </div>
           </div>
@@ -589,23 +696,28 @@ ${pie}${telContacto}`;
 
     // ── 3.1 GENERAR TICKET EN FORMATO PDF DE 80mm CON ULTRA NITIDEZ ──────────
     window.generarTicketPdfBlob = async function (data) {
-        let ticketEl = document.querySelector('.ticket-wrapper.ticket-80mm');
-        let tempContainer = null;
+        // Generar en contenedor absoluto fuera de vista con coordenadas (0,0) para evitar desfases de html2canvas
+        const tempContainer = document.createElement('div');
+        tempContainer.id = 'ticketPdfTempGen';
+        tempContainer.style.position = 'fixed';
+        tempContainer.style.top = '0';
+        tempContainer.style.left = '0';
+        tempContainer.style.width = '320px';
+        tempContainer.style.zIndex = '-99999';
+        tempContainer.style.opacity = '0';
+        tempContainer.style.pointerEvents = 'none';
+        tempContainer.style.background = '#FFFFFF';
+        tempContainer.innerHTML = window.generarTicketHtmlEstiloTaller(data);
+        document.body.appendChild(tempContainer);
 
-        if (!ticketEl) {
-            tempContainer = document.createElement('div');
-            tempContainer.id = 'ticketPdfTempGen';
-            tempContainer.style.position = 'fixed';
-            tempContainer.style.top = '-9999px';
-            tempContainer.style.left = '-9999px';
-            tempContainer.style.width = '320px';
-            tempContainer.style.background = '#FFFFFF';
-            tempContainer.innerHTML = window.generarTicketHtmlEstiloTaller(data);
-            document.body.appendChild(tempContainer);
-            ticketEl = tempContainer.querySelector('.ticket-wrapper') || tempContainer;
-        }
+        const ticketEl = tempContainer.querySelector('.ticket-wrapper') || tempContainer;
+        ticketEl.style.boxShadow = 'none';
+        ticketEl.style.borderRadius = '0';
+        ticketEl.style.margin = '0';
+        ticketEl.style.width = '320px';
+        ticketEl.style.maxWidth = '320px';
 
-        // Esperar a que las imágenes (logo) carguen
+        // Esperar a que las imágenes (logo y código de barras) carguen
         const imgs = ticketEl.querySelectorAll('img');
         await Promise.all(Array.from(imgs).map(img => {
             if (img.complete) return Promise.resolve();
@@ -617,18 +729,19 @@ ${pie}${telContacto}`;
 
         const canvas = await window.html2canvas(ticketEl, {
             backgroundColor: '#ffffff',
-            scale: 2.5,
+            scale: 2.2,
             useCORS: true,
-            logging: false
+            logging: false,
+            scrollX: 0,
+            scrollY: 0,
+            windowWidth: 320
         });
 
-        if (tempContainer) {
-            tempContainer.remove();
-        }
+        tempContainer.remove();
 
         const imgData = canvas.toDataURL('image/png', 1.0);
         const imgWidth = 80; // 80 mm ancho estándar
-        const pageHeight = Math.max(80, (canvas.height * imgWidth) / canvas.width);
+        const pageHeight = Math.max(35, (canvas.height * imgWidth) / canvas.width);
 
         const { jsPDF } = window.jspdf || {};
         if (!jsPDF) {
@@ -641,10 +754,10 @@ ${pie}${telContacto}`;
             format: [imgWidth, pageHeight]
         });
 
-        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, pageHeight);
+        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, pageHeight, undefined, 'FAST');
 
         const base64 = pdf.output('datauristring');
-        return { pdf, base64 };
+        return { pdf, base64, imgData, canvas };
     };
 
     // Referencia global para ventana única (Singleton) de WhatsApp Web
@@ -710,32 +823,55 @@ ${pie}${telContacto}`;
         const concepto = data.plan || (data.tipoTicket === 'VENTA' ? 'compra en tienda' : 'pago oficial');
         const msgBreve = `¡Hola ${socio}! Le compartimos el comprobante oficial de su ${concepto} en ${gymNom}:`;
 
-        window.mostrarToastNotificacion('📄 Generando comprobante PDF para WhatsApp...', 'info');
+        window.mostrarToastNotificacion('📄 Generando comprobante para WhatsApp...', 'info');
 
         try {
-            const { pdf, base64 } = await window.generarTicketPdfBlob(data);
+            const { pdf, base64, imgData, canvas } = await window.generarTicketPdfBlob(data);
 
-            // 1. Descarga del archivo PDF oficial
+            // 1. Copiar imagen del comprobante al portapapeles del navegador (compatible 100% con Ctrl+V en WhatsApp Web)
+            if (canvas && navigator.clipboard && window.ClipboardItem) {
+                try {
+                    await new Promise(resolve => {
+                        canvas.toBlob(async (blob) => {
+                            if (blob) {
+                                try {
+                                    await navigator.clipboard.write([
+                                        new ClipboardItem({ 'image/png': blob })
+                                    ]);
+                                    console.log('Ticket copiado al portapapeles como imagen para WhatsApp.');
+                                } catch (cErr) {
+                                    console.warn('Error al escribir imagen en navigator.clipboard:', cErr);
+                                }
+                            }
+                            resolve();
+                        }, 'image/png');
+                    });
+                } catch (clipErr) {
+                    console.warn('Error en preparación de imagen de portapapeles:', clipErr);
+                }
+            }
+
+            // 2. Descarga del archivo PDF oficial para respaldo
             pdf.save(filename);
 
-            // 2. Guardar en descargas y copiar al portapapeles de Windows (Set-Clipboard -Path)
+            // 3. Guardar en descargas y copiar imagen al portapapeles de Windows (para auto-pegar en WhatsApp)
             try {
                 await fetch('/Home/GuardarYCopiarPdf', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ filename, base64 })
+                    body: JSON.stringify({ filename, base64, imageBase64: imgData })
                 });
             } catch (e) {
                 console.warn('Copiado a portapapeles Windows:', e);
             }
 
-            // 3. Abrir ventana emergente centrada de WhatsApp Web
+            // 4. Abrir ventana emergente centrada de WhatsApp Web
             window.abrirVentanaWhatsAppCentrada(tel, msgBreve);
 
             window.cerrarModalWhatsAppTicket();
-            window.mostrarToastNotificacion('💬 WhatsApp Web abierto. Se adjuntará el PDF automáticamente (o presiona Ctrl+V para adjuntarlo).', 'success');
+            window.mostrarToastNotificacion('💬 WhatsApp Web abierto. ¡Presiona Ctrl + V para pegar el comprobante en el chat!', 'success');
         } catch (err) {
-            console.error('Error al generar PDF para WhatsApp:', err);
+            console.error('Error al generar comprobante para WhatsApp:', err);
             window.abrirVentanaWhatsAppCentrada(tel, msgBreve);
         }
     };
@@ -890,9 +1026,28 @@ ${pie}${telContacto}`;
 
             <div id="whatsModalAlert" style="display:none;padding:10px 14px;border-radius:8px;font-size:12px;margin-bottom:14px;background:rgba(239,68,68,0.15);border:1px solid #ef4444;color:#ef4444;"></div>
 
+            <!-- Buscador Rápido de Socio para Cargar Teléfono Automático -->
+            <div style="margin-bottom:14px;position:relative;">
+                <label style="display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:700;margin-bottom:6px;color:var(--text,#f8fafc);">
+                    <span><i class="fa-solid fa-user-tag" style="color:#38bdf8;"></i> Buscar socio (Nombre o Clave):</span>
+                    <span style="font-size:11px;color:#38bdf8;font-weight:600;">Carga teléfono automático</span>
+                </label>
+                <div style="position:relative;">
+                    <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#38bdf8;font-size:13px;pointer-events:none;"></i>
+                    <input type="text" id="whatsModalBuscarSocio" class="form-control" placeholder="Escribe nombre o clave del socio (ej. 1002)..." autocomplete="off"
+                           oninput="buscarSocioParaWhatsAppLive(this.value)"
+                           style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.05);border:1px solid rgba(56,189,248,0.35);border-radius:8px;padding:9px 34px 9px 34px;color:#fff;font-size:13px;" />
+                    <button type="button" onclick="limpiarBuscadorSocioWhats()" id="btnLimpiarBuscarSocioWhats"
+                            style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#94a3b8;cursor:pointer;font-size:13px;" title="Limpiar">✕</button>
+                    <div id="whatsModalSocioDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:190px;overflow-y:auto;background:#0f172a;border:1px solid rgba(56,189,248,0.5);border-radius:8px;margin-top:4px;z-index:1000005;box-shadow:0 12px 28px rgba(0,0,0,0.75);"></div>
+                </div>
+            </div>
+
+            <!-- Campo de Teléfono Manual o Auto-cargado -->
             <div style="margin-bottom:14px;">
-                <label style="display:block;font-size:12px;font-weight:700;margin-bottom:6px;color:var(--text,#f8fafc);">
-                    <i class="fa-solid fa-mobile-screen" style="color:#25D366;"></i> Número de WhatsApp del Socio (10 dígitos):
+                <label style="display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:700;margin-bottom:6px;color:var(--text,#f8fafc);">
+                    <span><i class="fa-solid fa-mobile-screen" style="color:#25D366;"></i> Número de WhatsApp (10 dígitos):</span>
+                    <span style="font-size:10.5px;color:#94a3b8;font-weight:normal;">Manual para no socios</span>
                 </label>
                 <div style="display:flex;gap:8px;">
                     <span style="display:flex;align-items:center;padding:0 12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:8px;font-size:13px;font-weight:700;color:#94a3b8;">+52</span>
@@ -930,6 +1085,103 @@ ${pie}${telContacto}`;
 
         document.body.appendChild(modal);
     }
+
+    // ── 5.1 BÚSQUEDA Y AUTOCOMPLETADO DE SOCIOS PARA WHATSAPP ──────────────────
+    let debTimerSocioWhats = null;
+    window.buscarSocioParaWhatsAppLive = function(q) {
+        clearTimeout(debTimerSocioWhats);
+        const dropdown = document.getElementById('whatsModalSocioDropdown');
+        const btnClear = document.getElementById('btnLimpiarBuscarSocioWhats');
+        if (!dropdown) return;
+
+        const term = (q || '').trim();
+        if (btnClear) btnClear.style.display = term ? 'block' : 'none';
+
+        if (!term) {
+            dropdown.style.display = 'none';
+            dropdown.innerHTML = '';
+            return;
+        }
+
+        debTimerSocioWhats = setTimeout(async () => {
+            try {
+                const resp = await fetch(`/Home/BuscarSociosQuick?q=${encodeURIComponent(term)}`);
+                const socios = await resp.json();
+
+                if (!Array.isArray(socios) || socios.length === 0) {
+                    dropdown.innerHTML = `<div style="padding:10px 14px;font-size:12px;color:#94a3b8;"><i class="fa-solid fa-user-slash"></i> No se encontraron socios activos con "${term}".</div>`;
+                    dropdown.style.display = 'block';
+                    return;
+                }
+
+                let html = '';
+                socios.forEach(s => {
+                    const telClean = (s.telefono || '').replace(/\D/g, '');
+                    const telDisplay = telClean.length >= 10 ? telClean.slice(-10) : (telClean || 'Sin teléfono');
+                    html += `
+                        <div onclick="seleccionarSocioParaWhats(${s.idSocio}, '${s.nombre.replace(/'/g, "\\'")}', '${telClean}')"
+                             style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer;transition:background 0.15s;"
+                             onmouseover="this.style.background='rgba(56,189,248,0.15)'" onmouseout="this.style.background='transparent'">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <div style="width:28px;height:28px;border-radius:50%;background:#1e293b;border:1px solid #38bdf8;display:flex;align-items:center;justify-content:center;color:#38bdf8;font-size:11px;font-weight:700;">
+                                    ${s.idSocio}
+                                </div>
+                                <div>
+                                    <div style="font-weight:700;color:#fff;font-size:12.5px;">${s.nombre}</div>
+                                    <div style="font-size:11px;color:#94a3b8;">Clave: #${s.idSocio}</div>
+                                </div>
+                            </div>
+                            <div style="font-size:12px;font-weight:700;color:#4ade80;">
+                                <i class="fa-brands fa-whatsapp"></i> ${telDisplay}
+                            </div>
+                        </div>
+                    `;
+                });
+                dropdown.innerHTML = html;
+                dropdown.style.display = 'block';
+            } catch (err) {
+                console.warn('Error al buscar socios para whats:', err);
+            }
+        }, 200);
+    };
+
+    window.seleccionarSocioParaWhats = function(idSocio, nombre, tel) {
+        const inputBuscar = document.getElementById('whatsModalBuscarSocio');
+        const inputTel = document.getElementById('whatsModalTelefono');
+        const dropdown = document.getElementById('whatsModalSocioDropdown');
+        const btnClear = document.getElementById('btnLimpiarBuscarSocioWhats');
+
+        if (inputBuscar) inputBuscar.value = `${nombre} (Clave: #${idSocio})`;
+        if (btnClear) btnClear.style.display = 'block';
+        if (dropdown) dropdown.style.display = 'none';
+
+        const cleanTel = (tel || '').replace(/\D/g, '');
+        if (inputTel) {
+            inputTel.value = cleanTel.length >= 10 ? cleanTel.slice(-10) : cleanTel;
+            inputTel.focus();
+        }
+
+        if (currentWhatsPayload) {
+            currentWhatsPayload.socio = nombre;
+            currentWhatsPayload.socioNombre = nombre;
+            currentWhatsPayload.socioId = idSocio;
+            currentWhatsPayload.idSocio = idSocio;
+            currentWhatsPayload.socioTelefono = cleanTel;
+            const previewText = document.getElementById('whatsModalPreview');
+            if (previewText) {
+                previewText.value = generarTextoTicketWhatsApp(currentWhatsPayload);
+            }
+        }
+    };
+
+    window.limpiarBuscadorSocioWhats = function() {
+        const inputBuscar = document.getElementById('whatsModalBuscarSocio');
+        const dropdown = document.getElementById('whatsModalSocioDropdown');
+        const btnClear = document.getElementById('btnLimpiarBuscarSocioWhats');
+        if (inputBuscar) inputBuscar.value = '';
+        if (dropdown) dropdown.style.display = 'none';
+        if (btnClear) btnClear.style.display = 'none';
+    };
 
     // ── 6. MENSAJE DIRECTO INDIVIDUAL A SOCIO ─────────────────────────────────
     let currentDirectoSocio = null;

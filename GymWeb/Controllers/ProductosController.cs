@@ -139,7 +139,7 @@ public class ProductosController : AuthController
 
     // ── Cobrar Venta (Carrito POS Multi-producto) ────────────────────────
     [HttpPost]
-    [ValidateAntiForgeryToken]
+    [IgnoreAntiforgeryToken]
     public async Task<IActionResult> CobrarVenta([FromBody] CheckoutRequestDto dto)
     {
         if (dto == null || dto.Items == null || !dto.Items.Any())
@@ -356,6 +356,192 @@ public class ProductosController : AuthController
             gymPieTicket = !string.IsNullOrWhiteSpace(config?.Mensaje) ? config.Mensaje : AppSettings.GymPieTicket,
             gymLogo = AppSettings.HasCustomLogo ? "/img/logo-custom.png" : "/img/gym.jpeg",
             items = detalles
+        });
+    }
+
+    // ── Eliminar / Cancelar Venta con Devolución de Stock al Inventario ──
+    [HttpPost]
+    public async Task<IActionResult> EliminarVenta(int idSalida)
+    {
+        using var tx = await _db.Database.BeginTransactionAsync();
+        try
+        {
+            var salida = await _db.Salida
+                .Include(s => s.Detallesalida)
+                    .ThenInclude(d => d.IdProductoNavigation)
+                .FirstOrDefaultAsync(s => s.IdSalida == idSalida);
+
+            if (salida == null)
+            {
+                return Json(new { ok = false, msg = "No se encontró el registro de la venta." });
+            }
+
+            if (salida.IdEstado != 1)
+            {
+                return Json(new { ok = false, msg = "Esta venta ya ha sido eliminada o cancelada previamente." });
+            }
+
+            var itemsDevueltos = new List<object>();
+
+            // 1. Reincorporar stock al inventario de cada producto vendido
+            foreach (var det in salida.Detallesalida)
+            {
+                if (det.IdProducto.HasValue)
+                {
+                    var prod = await _db.Productos.FindAsync(det.IdProducto.Value);
+                    if (prod != null)
+                    {
+                        prod.Stock += det.Cantidad;
+                        itemsDevueltos.Add(new
+                        {
+                            idProducto = prod.IdProducto,
+                            nombre = prod.Nombre,
+                            cantidadDevuelta = det.Cantidad,
+                            nuevoStock = prod.Stock
+                        });
+                    }
+                }
+            }
+
+            // 2. Si fue venta a crédito y tenía saldo pendiente, anular el saldo pendiente
+            if (salida.EsCredito)
+            {
+                salida.SaldoPendiente = 0m;
+            }
+
+            // 3. Marcar la venta como eliminada/cancelada (IdEstado = 2)
+            salida.IdEstado = 2;
+            salida.Notas = $"[ELIMINADA {DateTime.Now:dd/MM/yyyy HH:mm} por {User.Identity?.Name ?? "Usuario"}] " + (salida.Notas ?? "");
+
+            await _db.SaveChangesAsync();
+            await tx.CommitAsync();
+
+            return Json(new
+            {
+                ok = true,
+                msg = $"Venta {salida.Folio ?? ("#" + salida.IdSalida)} eliminada correctamente. El stock de los productos ha sido reintegrado al inventario.",
+                items = itemsDevueltos
+            });
+        }
+        catch (Exception ex)
+        {
+            await tx.RollbackAsync();
+            return Json(new { ok = false, msg = "Error al cancelar la venta: " + ex.Message });
+        }
+    }
+
+    // ── Consultar Historial de Ventas Filtrado con Totales ───────────────
+    [HttpGet]
+    public async Task<IActionResult> GetHistorialVentas(string? desde, string? hasta, string? metodo, string? q)
+    {
+        var query = _db.Salida
+            .Include(s => s.IdUsuarioCreoNavigation)
+            .Include(s => s.IdSocioNavigation)
+            .Include(s => s.Detallesalida)
+                .ThenInclude(d => d.IdProductoNavigation)
+            .Where(s => s.IdEstado == 1);
+
+        if (!string.IsNullOrWhiteSpace(desde) && DateTime.TryParse(desde, out var dtDesde))
+        {
+            var fDesde = dtDesde.Date;
+            query = query.Where(s => s.FechaCreacion >= fDesde);
+        }
+
+        if (!string.IsNullOrWhiteSpace(hasta) && DateTime.TryParse(hasta, out var dtHasta))
+        {
+            var fHasta = dtHasta.Date.AddDays(1).AddTicks(-1);
+            query = query.Where(s => s.FechaCreacion <= fHasta);
+        }
+
+        if (!string.IsNullOrWhiteSpace(metodo))
+        {
+            metodo = metodo.Trim();
+            if (metodo.Equals("Crédito", StringComparison.OrdinalIgnoreCase) || metodo.Equals("Credito", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(s => s.EsCredito);
+            }
+            else
+            {
+                query = query.Where(s => !s.EsCredito && s.MetodoPago == metodo);
+            }
+        }
+
+        var list = await query
+            .OrderByDescending(s => s.FechaCreacion)
+            .ToListAsync();
+
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var qTerm = q.Trim().ToLower();
+            list = list.Where(s =>
+                (s.Folio != null && s.Folio.ToLower().Contains(qTerm)) ||
+                (s.IdSocioNavigation != null && ($"{s.IdSocioNavigation.Nombre} {s.IdSocioNavigation.Paterno}").ToLower().Contains(qTerm)) ||
+                s.Detallesalida.Any(d => d.IdProductoNavigation != null && !string.IsNullOrEmpty(d.IdProductoNavigation.Nombre) && d.IdProductoNavigation.Nombre.ToLower().Contains(qTerm))
+            ).ToList();
+        }
+
+        decimal totalPeriodo = 0m;
+        decimal totalEfectivo = 0m;
+        decimal totalTransferencia = 0m;
+        decimal totalTarjeta = 0m;
+        decimal totalCredito = 0m;
+        int totalArticulos = 0;
+
+        var resultados = list.Select(s =>
+        {
+            var totalVenta = s.Total ?? s.Detallesalida.Sum(d => (decimal)(d.Cantidad * (d.PrecioUnitario ?? 0m)));
+            var cantArticulos = s.Detallesalida.Sum(d => d.Cantidad);
+
+            totalPeriodo += totalVenta;
+            totalArticulos += cantArticulos;
+
+            if (s.EsCredito) totalCredito += totalVenta;
+            else if (string.Equals(s.MetodoPago, "Transferencia", StringComparison.OrdinalIgnoreCase)) totalTransferencia += totalVenta;
+            else if (string.Equals(s.MetodoPago, "Tarjeta", StringComparison.OrdinalIgnoreCase)) totalTarjeta += totalVenta;
+            else totalEfectivo += totalVenta;
+
+            var prodsNombres = s.Detallesalida
+                .Select(d => $"{d.Cantidad}x {d.IdProductoNavigation?.Nombre ?? "Producto"}")
+                .ToList();
+
+            var socioNombre = s.IdSocioNavigation != null
+                ? $"{s.IdSocioNavigation.Nombre} {s.IdSocioNavigation.Paterno}".Trim()
+                : null;
+
+            return new
+            {
+                idSalida = s.IdSalida,
+                folio = s.Folio ?? $"#{s.IdSalida:D6}",
+                fecha = s.FechaCreacion?.ToString("dd/MM/yyyy HH:mm") ?? "—",
+                fechaIso = s.FechaCreacion?.ToString("yyyy-MM-dd") ?? "",
+                hora = s.FechaCreacion?.ToString("HH:mm") ?? "",
+                metodoPago = s.MetodoPago ?? "Efectivo",
+                esCredito = s.EsCredito,
+                saldoPendiente = s.SaldoPendiente,
+                socioNombre = socioNombre,
+                socioTelefono = s.IdSocioNavigation?.Telefono,
+                usuario = s.IdUsuarioCreoNavigation?.Nombre ?? "Recepción",
+                total = totalVenta,
+                cantArticulos = cantArticulos,
+                resumenArticulos = string.Join(", ", prodsNombres.Take(3)) + (prodsNombres.Count > 3 ? "..." : ""),
+                todosArticulos = string.Join(", ", prodsNombres)
+            };
+        }).ToList();
+
+        return Json(new
+        {
+            ok = true,
+            ventas = resultados,
+            resumen = new
+            {
+                total = totalPeriodo,
+                efectivo = totalEfectivo,
+                transferencia = totalTransferencia,
+                tarjeta = totalTarjeta,
+                credito = totalCredito,
+                cantidadVentas = resultados.Count,
+                articulos = totalArticulos
+            }
         });
     }
 

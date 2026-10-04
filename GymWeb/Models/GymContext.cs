@@ -684,5 +684,51 @@ public partial class GymContext : DbContext
         OnModelCreatingPartial(modelBuilder);
     }
 
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        base.ConfigureConventions(configurationBuilder);
+        configurationBuilder.Properties<DateOnly>().HaveConversion<SafeDateOnlyConverter>();
+        configurationBuilder.Properties<DateOnly?>().HaveConversion<SafeNullableDateOnlyConverter>();
+    }
+
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
 }
+
+public class SafeDateOnlyConverter : Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<DateOnly, string>
+{
+    public SafeDateOnlyConverter() : base(
+        d => d.ToString("yyyy-MM-dd"),
+        s => ParseSafeDateOnly(s))
+    {
+    }
+
+    private static DateOnly ParseSafeDateOnly(string s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return default;
+        if (s.Length >= 10 && DateOnly.TryParse(s.Substring(0, 10), out var d))
+            return d;
+        if (DateTime.TryParse(s, out var dt))
+            return DateOnly.FromDateTime(dt);
+        return default;
+    }
+}
+
+public class SafeNullableDateOnlyConverter : Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<DateOnly?, string?>
+{
+    public SafeNullableDateOnlyConverter() : base(
+        d => d.HasValue ? d.Value.ToString("yyyy-MM-dd") : null,
+        s => ParseSafeNullableDateOnly(s))
+    {
+    }
+
+    private static DateOnly? ParseSafeNullableDateOnly(string? s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return null;
+        if (s.Length >= 10 && DateOnly.TryParse(s.Substring(0, 10), out var d))
+            return d;
+        if (DateTime.TryParse(s, out var dt))
+            return DateOnly.FromDateTime(dt);
+        return null;
+    }
+}
+
