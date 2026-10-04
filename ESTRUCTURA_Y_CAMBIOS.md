@@ -544,6 +544,18 @@ Esta sección documenta la mecánica técnica y los componentes ajustados para m
 * **Experiencia de Usuario:** El cliente solo recibe **un único archivo ejecutable: `ACTUALIZAR.bat`**, evitando cualquier duda o confusión.
 * **Seguridad de Datos:** El parche es compatible con clientes migrados y clientes nuevos; actualiza binarios y scripts **sin tocar jamás la base de datos `gym.db`**.
 
+#### G. Sincronización Incremental de Cobros de MySQL y Supresión de Falsos Deudores
+* **Archivos:** [`GymWeb/Helpers/MySqlToSqliteMigrator.cs`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/GymWeb/Helpers/MySqlToSqliteMigrator.cs), [`GymWeb/Controllers/SociosController.cs`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/GymWeb/Controllers/SociosController.cs), [`GymWeb/Controllers/BackupController.cs`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/GymWeb/Controllers/BackupController.cs)
+* **Diagnóstico de Falsos Deudores:**  
+  El cálculo anterior sumaba el precio de todas las membresías históricas acumuladas en la vida del socio (`Sum(sm.Precio)`). En bases de datos migradas desde MySQL donde los cobros pasados no se capturaron en la tabla `pago`, socios que ya pagaron su cuota del mes aparecían debiendo miles de pesos de membresías vencidas de meses atrás.
+* **Solución Implementada:**  
+  1. `SociosController` ahora evalúa exclusivamente el **ciclo actual / membresía activa reciente**. Si el socio tiene pagos en su ciclo que cubren el precio de su membresía actual, su saldo deudor es **$0.00**.
+  2. Si la membresía ya venció hace más de 15 días, el socio queda catalogado como inactivo/vencido pero no arrastra un adeudo ficticio.
+* **Sincronización Incremental de Cobros de MySQL:**  
+  Para clientes que cobraron en XAMPP/MySQL en los días de transición:
+  1. Método `MySqlToSqliteMigrator.SincronizarCobrosRecientesAsync`: importa pagos y membresías de MySQL `>= 2026-09-20` asignando IDs autoincrementales libres, sin colisionar ni sobrescribir cobros nuevos registrados en SQLite (como los del día en curso).
+  2. Disponible tanto en la interfaz web ([`/Backup`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/GymWeb/Views/Backup/Index.cshtml) con un clic) como mediante el script auxiliar [`IMPORTAR_COBROS_DE_MYSQL.bat`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/IMPORTAR_COBROS_DE_MYSQL.bat).
+
 
 
 
