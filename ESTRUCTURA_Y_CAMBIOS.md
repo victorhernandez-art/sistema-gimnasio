@@ -492,6 +492,58 @@ Cuando se hagan nuevas mejoras o correcciones en el sistema:
    * Reemplazar este archivo dentro del release `v2.1` en GitHub para que el botón de Vercel entregue la versión nueva a los que compren por primera vez.
 6. **Efecto Inmediato:** Todos los clientes con versiones anteriores verán el modal a los 3 segundos de entrar al Dashboard y podrán actualizarse con un solo clic.
 
+---
+
+### 8. Registro de Mejoras Críticas, Correcciones y Estabilización (Octubre 2026)
+
+Esta sección documenta la mecánica técnica y los componentes ajustados para mantener la línea de trabajo intacta para cualquier futuro agente o desarrollador:
+
+#### A. Tickets PDF y Código de Barras (Canvas 2D PNG en memoria)
+* **Archivo:** [`GymWeb/wwwroot/js/gym-tickets-whatsapp.js`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/GymWeb/wwwroot/js/gym-tickets-whatsapp.js)
+* **Diagnóstico previo:** Los códigos de barras generados como `<svg>` por librerías externas sufrían truncamientos o salían del margen derecho en `html2canvas` al imprimir en tickets térmicos de 58mm y 80mm.
+* **Solución Implementada:**  
+  Implementación del generador `BarcodeUtil.generateCode128Png(text, width, height)`. Dibuja los patrones de barras Code 128 directamente sobre un elemento `<canvas>` HTML5 offscreen en memoria y exporta un PNG rasterizado de alta definición (`image/png;base64,...`).  
+  El código de barras se renderiza centrado, con márgenes nítidos y compatibilidad universal en cualquier navegador e impresora térmica POS.
+
+#### B. Cancelación / Eliminación de Ventas con Reintegro de Stock al Inventario
+* **Archivos:** [`GymWeb/Controllers/ProductosController.cs`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/GymWeb/Controllers/ProductosController.cs) y [`GymWeb/Views/Productos/Index.cshtml`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/GymWeb/Views/Productos/Index.cshtml)
+* **Endpoint:** `POST /Productos/EliminarVenta?idSalida=X`
+* **Mecánica Transaccional:**
+  1. Abre una transacción atómica `_db.Database.BeginTransactionAsync()`.
+  2. Itera sobre cada artículo de `Detallesalida` y devuelve las unidades al stock: `producto.Stock += detalle.Cantidad`.
+  3. Si la venta fue a crédito, anula el saldo pendiente: `salida.SaldoPendiente = 0`.
+  4. Marca el estado de la venta como anulada: `salida.IdEstado = 0`.
+  5. **Impacto Contable Inmediato:** Todos los reportes diarios, cortes de caja y métricas excluyen ventas con `IdEstado != 1`, por lo que el monto se descuenta automáticamente del corte.
+  6. **Respuesta Reactiva:** Retorna JSON con el nuevo stock de cada producto para refrescar las tarjetas del catálogo sin requerir recarga completa del navegador.
+
+#### C. Buscador Dinámico para Envío de Tickets por WhatsApp
+* **Archivos:** [`GymWeb/Views/Productos/Index.cshtml`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/GymWeb/Views/Productos/Index.cshtml) y [`GymWeb/wwwroot/js/gym-tickets-whatsapp.js`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/GymWeb/wwwroot/js/gym-tickets-whatsapp.js)
+* **Funcionalidad:**
+  * En la ventana modal de ticket WhatsApp se incorporó un buscador en tiempo real para localizar al socio por **clave** o **nombre**.
+  * Al seleccionar al socio, se autocompleta su número de teléfono celular registrado.
+  * Se mantiene la edición manual libre para clientes no socios o ventas de mostrador.
+
+#### D. Sincronización Total de Membresías y Cobros (Cero Falsos Adeudos)
+* **Archivos:** [`GymWeb/Controllers/SociosController.cs`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/GymWeb/Controllers/SociosController.cs), [`GymWeb/Views/Socios/Membresia.cshtml`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/GymWeb/Views/Socios/Membresia.cshtml), [`GymWeb/Controllers/PagosController.cs`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/GymWeb/Controllers/PagosController.cs)
+* **Diagnóstico previo:** Asignar una membresía en `Socios -> Membresía` solo creaba la vigencia y precio en `sociomembresia`, pero no creaba el pago en la tabla `pago`. Como el sistema calculaba los adeudos restando pagos a membresías, el socio quedaba marcado con adeudo en rojo inmediatamente.
+* **Solución Implementada:**
+  1. **Cobro Inmediato en Membresía:** En `Socios/Membresia.cshtml`, se agregó la opción `☑ Registrar cobro e ingresar a caja de inmediato` (por defecto activa), con autocompletado del precio de la membresía y selector de método de pago (Efectivo, Tarjeta, Transferencia). Al guardar, `SociosController.AsignarMembresia` crea el registro en `sociomembresia` **y** crea el `Pago` correspondiente.
+  2. **Renovación Inversa desde Cobros:** En `PagosController.Create`, si se registra un pago seleccionando un plan de membresía, el backend crea o extiende la membresía en `sociomembresia` con la vigencia adecuada de forma automática.
+  3. **Cálculo de Deudas Tolerante:** En `Index`, `GetEstadoCuenta` y `DescargarExcelDeudores`, el cálculo de adeudos de membresía ya no ignora pagos con `IdMembresia == null` (a menos que sean de fiados de tienda), eliminando adeudos fantasmas para socios que ya pagaron.
+
+#### E. Pestaña e Historial de Ventas en Tiempo Real
+* **Archivos:** [`GymWeb/Views/Productos/Index.cshtml`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/GymWeb/Views/Productos/Index.cshtml) y [`GymWeb/Controllers/ProductosController.cs`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/GymWeb/Controllers/ProductosController.cs)
+* **Blindaje:** `window.cambiarTabModulo = function(tab)` se definió globalmente al inicio del bloque `<script>` con listeners directos en `DOMContentLoaded` para evitar fallos de ejecución.
+* **Filtros Rápidos:** Pastillas de un solo clic para "Hoy", "Ayer", "Esta Semana", "Este Mes" y "Todas las fechas".
+* **Métricas en Vivo:** Resumen instantáneo de ventas totales, piezas vendidas, desglose por efectivo, tarjeta, transferencia y crédito.
+
+#### F. Micro-Parche Ligero y Limpieza de Scripts
+* **Archivos:** [`generar_parche_ligero.ps1`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/generar_parche_ligero.ps1), [`Publish/ACTUALIZAR.bat`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/Publish/ACTUALIZAR.bat)
+* **Paquete resultante:** `dist/Parche_Ligero_GymWeb.zip` (~6.54 MB).
+* **Regla:** Se eliminó la inclusión de `REPARAR_FECHAS_CLIENTE.bat` en el ZIP. La reparación de fechas de SQLite ahora se hace en C# automáticamente dentro de `DbInitializer.cs` al iniciar la app.
+* **Experiencia de Usuario:** El cliente solo recibe **un único archivo ejecutable: `ACTUALIZAR.bat`**, evitando cualquier duda o confusión.
+* **Seguridad de Datos:** El parche es compatible con clientes migrados y clientes nuevos; actualiza binarios y scripts **sin tocar jamás la base de datos `gym.db`**.
+
 
 
 
