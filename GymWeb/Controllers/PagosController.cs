@@ -69,21 +69,53 @@ public class PagosController : AuthController
             TempData["Error"] = "El monto debe ser mayor a $0.";
             return RedirectToAction(nameof(Index));
         }
-        if (!DateOnly.TryParse(fechaPago, out var fecha))
-            fecha = DateOnly.FromDateTime(DateTime.Today);
+        string[] formats = { "yyyy-MM-dd", "dd/MM/yyyy", "d/M/yyyy", "yyyy/MM/dd", "dd-MM-yyyy" };
+        if (!DateOnly.TryParseExact(fechaPago, formats, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var fecha))
+        {
+            if (!DateOnly.TryParse(fechaPago, out fecha))
+                fecha = DateOnly.FromDateTime(DateTime.Today);
+        }
 
-        // Advertir si el socio no tiene membresía activa
+        // Advertir o renovar membresía activa
         var hoyDt = DateTime.Today;
         var ultimaMem = await _db.Vwsociomembresias
             .Where(v => v.IdSocio == idSocio && v.IdEstado == 1)
             .OrderByDescending(v => v.FechaCreacion)
             .FirstOrDefaultAsync();
-        bool sinMembresia = ultimaMem == null;
-        bool memVencida   = ultimaMem != null && ultimaMem.Vencimiento.HasValue && ultimaMem.Vencimiento.Value < hoyDt;
-        if (sinMembresia)
-            TempData["Warning"] = "⚠️ El socio no tiene membresía asignada. El pago se registró, pero considera asignarle una.";
-        else if (memVencida)
-            TempData["Warning"] = "⚠️ La membresía del socio está vencida desde " + ultimaMem!.Vencimiento!.Value.ToString("dd/MM/yyyy") + ". El pago se registró.";
+
+        // Si se seleccionó un plan/membresía, renovarla o asignarla automáticamente en sociomembresia
+        if (idMembresia.HasValue && idMembresia.Value > 0)
+        {
+            var mem = await _db.Membresia.FindAsync(idMembresia.Value);
+            if (mem != null)
+            {
+                DateTime fInicio = DateTime.Today;
+                if (ultimaMem != null && ultimaMem.Vencimiento.HasValue && ultimaMem.Vencimiento.Value > hoyDt)
+                {
+                    fInicio = ultimaMem.Vencimiento.Value.AddDays(1);
+                }
+
+                _db.Sociomembresia.Add(new Sociomembresium
+                {
+                    IdSocio = idSocio,
+                    IdMembresia = idMembresia.Value,
+                    Precio = mem.Precio ?? monto,
+                    FechaInicioMembresia = fInicio,
+                    FechaCreacion = DateTime.Now,
+                    IdUsuarioCreo = UsuarioId,
+                    IdEstado = 1
+                });
+            }
+        }
+        else
+        {
+            bool sinMembresia = ultimaMem == null;
+            bool memVencida   = ultimaMem != null && ultimaMem.Vencimiento.HasValue && ultimaMem.Vencimiento.Value < hoyDt;
+            if (sinMembresia)
+                TempData["Warning"] = "⚠️ El socio no tiene membresía asignada. El pago se registró, pero considera asignarle una.";
+            else if (memVencida)
+                TempData["Warning"] = "⚠️ La membresía del socio está vencida desde " + ultimaMem!.Vencimiento!.Value.ToString("dd/MM/yyyy") + ". El pago se registró.";
+        }
 
         var pago = new Pago
         {

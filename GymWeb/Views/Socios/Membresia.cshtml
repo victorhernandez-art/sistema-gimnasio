@@ -63,13 +63,13 @@
             </div>
         }
 
-        <form asp-action="AsignarMembresia" method="post">
+        <form asp-action="AsignarMembresia" method="post" id="formAsignarMembresia">
             @Html.AntiForgeryToken()
             <input type="hidden" name="idSocio" value="@socio?.IdSocio" />
             <div class="form-grid">
                 <div class="form-group" style="grid-column:1/-1;">
-                    <label class="form-label">Membresía</label>
-                    <select name="idMembresia" class="form-select" required>
+                    <label class="form-label">Membresía <span style="color:#f87171;">*</span></label>
+                    <select name="idMembresia" id="selMembresia" class="form-select" required onchange="onMembresiaChange(this)">
                         <option value="">Seleccionar...</option>
                         @foreach (var m in membresias ?? Enumerable.Empty<GymWeb.Models.Membresium>())
                         {
@@ -82,7 +82,7 @@
                                 var x when x.HasValue => $"{x.Value} días",
                                 _ => "Personalizada"
                             };
-                            <option value="@m.IdMembresia">@m.Nombre — @durLabel — $@m.Precio</option>
+                            <option value="@m.IdMembresia" data-precio="@(m.Precio ?? 0)">@m.Nombre — @durLabel — $@m.Precio</option>
                         }
                     </select>
                 </div>
@@ -91,14 +91,59 @@
                     <input type="date" name="fechaInicio" class="form-control"
                            value="@fechaSugerida.ToString("yyyy-MM-dd")" required />
                 </div>
+
+                <!-- Opciones de Cobro de Contado vs Adeudo -->
+                <div class="form-group" style="grid-column:1/-1;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);padding:14px;border-radius:10px;margin-top:6px;">
+                    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:10px;">
+                        <input type="checkbox" name="registrarPago" id="chkRegistrarPago" value="true" checked onchange="toggleCobroMembresia(this.checked)" style="width:18px;height:18px;accent-color:#00e5ff;" />
+                        <span style="font-weight:700;color:#00e5ff;font-size:13.5px;"><i class="fa-solid fa-cash-register"></i> Registrar cobro e ingresar a caja de inmediato</span>
+                    </label>
+
+                    <div id="seccionCamposCobro" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;">
+                        <div>
+                            <label class="form-label" style="font-size:12px;">Monto a Cobrar ($MXN)</label>
+                            <input type="number" name="montoPago" id="inputMontoPago" class="form-control" step="0.01" min="0.01" placeholder="0.00" />
+                        </div>
+                        <div>
+                            <label class="form-label" style="font-size:12px;">Método de Pago</label>
+                            <select name="metodoPago" class="form-select">
+                                <option value="Efectivo">Efectivo</option>
+                                <option value="Tarjeta">Tarjeta</option>
+                                <option value="Transferencia">Transferencia</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="avisoCobroPendiente" style="display:none;margin-top:6px;font-size:12px;color:#f87171;background:rgba(239,68,68,0.1);padding:8px 12px;border-radius:6px;border:1px solid rgba(239,68,68,0.2);">
+                        <i class="fa-solid fa-triangle-exclamation"></i> <strong>Atención:</strong> La membresía se activará pero quedará registrada como <strong>adeudo pendiente</strong> en el estado de cuenta del socio.
+                    </div>
+                </div>
             </div>
             <div style="margin-top:16px;">
                 <button type="submit" class="btn @(vencida ? "btn-danger" : "btn-primary")">
                     <i class="fa-solid @(vencida ? "fa-rotate" : "fa-plus")"></i>
-                    @(vencida ? "Renovar Membresía" : "Asignar")
+                    @(vencida ? "Renovar Membresía" : "Asignar Membresía")
                 </button>
             </div>
         </form>
+
+        <script>
+            function onMembresiaChange(sel) {
+                const opt = sel.options[sel.selectedIndex];
+                const precio = opt ? opt.dataset.precio : '';
+                const inputMonto = document.getElementById('inputMontoPago');
+                if (inputMonto && precio) {
+                    inputMonto.value = parseFloat(precio).toFixed(2);
+                }
+            }
+
+            function toggleCobroMembresia(checked) {
+                const campos = document.getElementById('seccionCamposCobro');
+                const aviso = document.getElementById('avisoCobroPendiente');
+                if (campos) campos.style.display = checked ? 'grid' : 'none';
+                if (aviso) aviso.style.display = checked ? 'none' : 'block';
+            }
+        </script>
     </div>
 
     <!-- History -->

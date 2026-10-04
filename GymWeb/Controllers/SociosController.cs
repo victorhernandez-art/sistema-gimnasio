@@ -39,9 +39,9 @@ public class SociosController : AuthController
             .Select(g => new { IdSocio = g.Key, Total = g.Sum(x => x.Precio ?? 0m) })
             .ToDictionaryAsync(x => x.IdSocio, x => x.Total);
 
-        // ── 3. Pagos realizados para membresías ──
+        // ── 3. Pagos realizados para membresías (incluye pagos generales que no son abono de tienda fiada) ──
         var pagosMembresias = await _db.Pagos
-            .Where(p => p.IdEstado == 1 && p.IdMembresia != null)
+            .Where(p => p.IdEstado == 1 && (p.IdMembresia != null || p.Notas == null || !p.Notas.Contains("[TIENDA_CREDITO]")))
             .GroupBy(p => p.IdSocio)
             .Select(g => new { IdSocio = g.Key, Total = g.Sum(x => x.Monto) })
             .ToDictionaryAsync(x => x.IdSocio, x => x.Total);
@@ -272,7 +272,8 @@ public class SociosController : AuthController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> AsignarMembresia(int idSocio, int idMembresia, DateTime fechaInicio)
+    public async Task<IActionResult> AsignarMembresia(int idSocio, int idMembresia, DateTime fechaInicio,
+        bool registrarPago = true, string metodoPago = "Efectivo", decimal? montoPago = null)
     {
         var mem = await _db.Membresia.FindAsync(idMembresia);
         if (mem == null) return NotFound();
@@ -297,7 +298,31 @@ public class SociosController : AuthController
             IdEstado = 1
         });
         await _db.SaveChangesAsync();
-        TempData["Success"] = "Membresía asignada.";
+
+        if (registrarPago && ((montoPago ?? mem.Precio ?? 0m) > 0))
+        {
+            var pago = new Pago
+            {
+                IdSocio = idSocio,
+                IdMembresia = idMembresia,
+                Monto = montoPago ?? mem.Precio ?? 0m,
+                MetodoPago = string.IsNullOrWhiteSpace(metodoPago) ? "Efectivo" : metodoPago,
+                FechaPago = DateOnly.FromDateTime(DateTime.Today),
+                Notas = $"Cobro membresía: {mem.Nombre}",
+                IdEstado = 1,
+                FechaCreacion = DateTime.Now,
+                IdUsuarioCreo = UsuarioId
+            };
+            _db.Pagos.Add(pago);
+            await _db.SaveChangesAsync();
+            TempData["UltimoPagoId"] = pago.IdPago;
+            TempData["Success"] = $"Membresía asignada y cobro de ${(montoPago ?? mem.Precio ?? 0m):N2} registrado en caja correctamente.";
+        }
+        else
+        {
+            TempData["Success"] = "Membresía asignada (pendiente de cobro / registrada con adeudo).";
+        }
+
         return RedirectToAction(nameof(Membresia), new { id = idSocio });
     }
 
@@ -473,7 +498,7 @@ public class SociosController : AuthController
                 .OrderBy(p => p.FechaPago)
                 .ToListAsync();
 
-            decimal bolsaPagado = pagosSocio.Where(p => p.IdMembresia != null).Sum(p => p.Monto);
+            decimal bolsaPagado = pagosSocio.Where(p => p.IdMembresia != null || p.Notas == null || !p.Notas.Contains("[TIENDA_CREDITO]")).Sum(p => p.Monto);
             var membresiasAdeudadas = new List<object>();
             decimal deudaMembresias = 0m;
 
@@ -644,7 +669,7 @@ public class SociosController : AuthController
             .ToDictionaryAsync(x => x.IdSocio, x => x.Total);
 
         var pagosMembresias = await _db.Pagos
-            .Where(p => p.IdEstado == 1 && p.IdMembresia != null)
+            .Where(p => p.IdEstado == 1 && (p.IdMembresia != null || p.Notas == null || !p.Notas.Contains("[TIENDA_CREDITO]")))
             .GroupBy(p => p.IdSocio)
             .Select(g => new { IdSocio = g.Key, Total = g.Sum(x => x.Monto) })
             .ToDictionaryAsync(x => x.IdSocio, x => x.Total);

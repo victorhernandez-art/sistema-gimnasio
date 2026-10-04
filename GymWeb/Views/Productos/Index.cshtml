@@ -3018,6 +3018,52 @@
      LÓGICA JAVASCRIPT: CARRITO POS + CHECKOUT + ATRIBUTOS REACTIVOS
 ══════════════════════════════════════════════════════════════════════════ -->
 <script>
+// Exposición inmediata e incondicional de cambio de pestañas Tienda / Historial
+window.cambiarTabModulo = function(tab) {
+    try {
+        const btnProd = document.getElementById('tabBtnProductos');
+        const btnHist = document.getElementById('tabBtnHistorial');
+        const secProd = document.getElementById('seccionProductos');
+        const secHist = document.getElementById('seccionHistorial');
+        const wrapStock = document.getElementById('wrapperFiltroStock');
+
+        if (tab === 'historial') {
+            if (btnHist) btnHist.classList.add('active');
+            if (btnProd) btnProd.classList.remove('active');
+            if (secProd) secProd.style.display = 'none';
+            if (wrapStock) wrapStock.style.display = 'none';
+            if (secHist) secHist.style.display = 'flex';
+
+            const desdeVal = document.getElementById('histFilterDesde')?.value;
+            const hastaVal = document.getElementById('histFilterHasta')?.value;
+            if (!desdeVal && !hastaVal && typeof window.establecerFiltroFechaRapido === 'function') {
+                window.establecerFiltroFechaRapido('hoy');
+            } else if (typeof window.cargarHistorialVentasAjax === 'function') {
+                window.cargarHistorialVentasAjax();
+            }
+        } else {
+            if (btnProd) btnProd.classList.add('active');
+            if (btnHist) btnHist.classList.remove('active');
+            if (secProd) secProd.style.display = 'grid';
+            if (wrapStock) wrapStock.style.display = 'flex';
+            if (secHist) secHist.style.display = 'none';
+        }
+    } catch(err) {
+        console.error('Error al cambiar pestaña:', err);
+    }
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('tabBtnHistorial')?.addEventListener('click', function(e) {
+        e.preventDefault();
+        window.cambiarTabModulo('historial');
+    });
+    document.getElementById('tabBtnProductos')?.addEventListener('click', function(e) {
+        e.preventDefault();
+        window.cambiarTabModulo('productos');
+    });
+});
+
 (function() {
     const CSRF = document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
 

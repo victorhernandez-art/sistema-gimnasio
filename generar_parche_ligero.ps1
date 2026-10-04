@@ -57,12 +57,9 @@ if (Test-Path (Join-Path $tempBuild "wwwroot")) {
     Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $patchFiles "wwwroot\backups")
 }
 
-# Copiar scripts de actualización automática
+# Copiar script de actualización automática (ÚNICO archivo ejecutable que el cliente debe tocar)
 Copy-Item -Force (Join-Path $root "Publish\ACTUALIZAR.bat") (Join-Path $patchOut "ACTUALIZAR.bat")
 Copy-Item -Force (Join-Path $root "Publish\actualizar.ps1") (Join-Path $patchOut "actualizar.ps1")
-if (Test-Path (Join-Path $root "Publish\REPARAR_FECHAS_CLIENTE.bat")) {
-    Copy-Item -Force (Join-Path $root "Publish\REPARAR_FECHAS_CLIENTE.bat") (Join-Path $patchOut "REPARAR_FECHAS_CLIENTE.bat")
-}
 
 try { Remove-Item -Recurse -Force $tempBuild -ErrorAction SilentlyContinue } catch { }
 try { Remove-Item -Recurse -Force $tempAppBuild -ErrorAction SilentlyContinue } catch { }
