@@ -51,6 +51,32 @@
         </div>
     </div>
 }
+else
+{
+    <!-- Tarjeta de Sincronización de Cobros de MySQL para usuarios ya migrados a SQLite -->
+    <div class="card" style="border:1px solid rgba(245,158,11,0.35);background:rgba(245,158,11,0.05);margin-bottom:24px;">
+        <div style="display:flex;align-items:flex-start;gap:16px;">
+            <div style="width:44px;height:44px;border-radius:10px;background:rgba(245,158,11,0.15);display:flex;align-items:center;justify-content:center;color:#fbbf24;font-size:20px;flex-shrink:0;">
+                <i class="fa-solid fa-cloud-arrow-down"></i>
+            </div>
+            <div style="flex:1;">
+                <h3 style="font-size:16px;font-weight:700;margin:0 0 6px 0;color:#f8fafc;">
+                    ¿Cobraste membresías en XAMPP / MySQL recientemente?
+                </h3>
+                <p style="color:#cbd5e1;font-size:13px;line-height:1.5;margin-bottom:12px;">
+                    Si realizaste cobros o renovaciones en la versión anterior de MySQL mientras probabas el sistema, puedes importarlos a SQLite con un solo clic. 
+                    <strong style="color:#fbbf24;">No se sobreescribe ni se borra ningún registro existente en SQLite.</strong>
+                </p>
+                <form method="post" asp-action="SincronizarCobrosMySql" onsubmit="return confirm('¿Deseas buscar e importar los cobros recientes de MySQL que no estén en SQLite? Asegúrate de que MySQL esté activo en XAMPP.');">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-warning" style="background:#f59e0b;color:#0b111a;font-weight:700;display:inline-flex;align-items:center;gap:8px;border:none;">
+                        <i class="fa-solid fa-arrows-rotate"></i> Importar Cobros Recientes de MySQL
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+}
 
 <!-- Generate backup card -->
 <div class="card" style="max-width:600px;margin-bottom:28px;">

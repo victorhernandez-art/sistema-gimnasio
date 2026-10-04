@@ -226,4 +226,177 @@ public static class MySqlToSqliteMigrator
         catch { }
         return false;
     }
+
+    /// <summary>
+    /// Sincroniza e importa de forma segura los cobros y membresías registrados en MySQL
+    /// que no existan en SQLite, sin sobreescribir ni eliminar ningún registro existente en SQLite.
+    /// </summary>
+    public static async Task<(bool Success, string Message, int PagosNuevos, int MembresiasNuevas)> SincronizarCobrosRecientesAsync(string mySqlConnStr, string sqliteDbPath, string fechaDesde = "2026-09-20")
+    {
+        try
+        {
+            if (!File.Exists(sqliteDbPath))
+                return (false, "No se encontró el archivo gym.db de SQLite.", 0, 0);
+
+            await using var mySqlConn = new MySqlConnection(mySqlConnStr);
+            await mySqlConn.OpenAsync();
+
+            var sqliteConnStr = $"Data Source={sqliteDbPath}";
+            await using var sqliteConn = new SqliteConnection(sqliteConnStr);
+            await sqliteConn.OpenAsync();
+
+            int pagosImportados = 0;
+            int membresiasImportadas = 0;
+
+            // 1. Obtener pagos existentes en SQLite para evitar duplicados
+            var pagosExistentesSqlite = new HashSet<string>();
+            int maxIdPagoSqlite = 0;
+            await using (var cmdExist = new SqliteCommand("SELECT idPago, idSocio, fechaPago, monto FROM pago;", sqliteConn))
+            await using (var r = await cmdExist.ExecuteReaderAsync())
+            {
+                while (await r.ReadAsync())
+                {
+                    int idp = r.GetInt32(0);
+                    if (idp > maxIdPagoSqlite) maxIdPagoSqlite = idp;
+
+                    int ids = r.IsDBNull(1) ? 0 : r.GetInt32(1);
+                    string fp = r.IsDBNull(2) ? "" : r.GetString(2);
+                    if (fp.Length > 10) fp = fp.Substring(0, 10);
+                    decimal m = r.IsDBNull(3) ? 0m : r.GetDecimal(3);
+
+                    pagosExistentesSqlite.Add($"{ids}|{fp}|{m:F2}");
+                }
+            }
+
+            // 2. Consultar pagos en MySQL desde la fecha de corte
+            var sqlPagosMySql = $"SELECT idPago, idSocio, idMembresia, monto, metodoPago, fechaPago, notas, idEstado, fechaCreacion, idUsuarioCreo FROM pago WHERE fechaPago >= '{fechaDesde}' ORDER BY fechaPago, idPago;";
+            await using (var cmdMySql = new MySqlCommand(sqlPagosMySql, mySqlConn))
+            await using (var rMySql = await cmdMySql.ExecuteReaderAsync())
+            {
+                var pagosParaInsertar = new List<Dictionary<string, object?>>();
+                while (await rMySql.ReadAsync())
+                {
+                    int idSocio = rMySql.IsDBNull(1) ? 0 : rMySql.GetInt32(1);
+                    var dtPago = rMySql.IsDBNull(5) ? DateTime.MinValue : rMySql.GetDateTime(5);
+                    string fPagoStr = dtPago.ToString("yyyy-MM-dd");
+                    decimal monto = rMySql.IsDBNull(3) ? 0m : rMySql.GetDecimal(3);
+
+                    string key = $"{idSocio}|{fPagoStr}|{monto:F2}";
+                    if (!pagosExistentesSqlite.Contains(key))
+                    {
+                        var dict = new Dictionary<string, object?>
+                        {
+                            ["idSocio"] = idSocio,
+                            ["idMembresia"] = rMySql.IsDBNull(2) ? DBNull.Value : rMySql.GetInt32(2),
+                            ["monto"] = monto,
+                            ["metodoPago"] = rMySql.IsDBNull(4) ? "Efectivo" : rMySql.GetString(4),
+                            ["fechaPago"] = fPagoStr,
+                            ["notas"] = rMySql.IsDBNull(6) ? DBNull.Value : rMySql.GetString(6),
+                            ["idEstado"] = rMySql.IsDBNull(7) ? 1 : rMySql.GetInt32(7),
+                            ["fechaCreacion"] = rMySql.IsDBNull(8) ? DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") : rMySql.GetDateTime(8).ToString("yyyy-MM-dd HH:mm:ss"),
+                            ["idUsuarioCreo"] = rMySql.IsDBNull(9) ? DBNull.Value : rMySql.GetInt32(9)
+                        };
+                        pagosParaInsertar.Add(dict);
+                        pagosExistentesSqlite.Add(key);
+                    }
+                }
+                rMySql.Close();
+
+                // Insertar los pagos nuevos en SQLite con ID autoincremental seguro
+                foreach (var p in pagosParaInsertar)
+                {
+                    maxIdPagoSqlite++;
+                    var insertSql = "INSERT INTO pago (idPago, idSocio, idMembresia, monto, metodoPago, fechaPago, notas, idEstado, fechaCreacion, idUsuarioCreo) VALUES (@idPago, @idSocio, @idMembresia, @monto, @metodoPago, @fechaPago, @notas, @idEstado, @fechaCreacion, @idUsuarioCreo);";
+                    await using var cmdIns = new SqliteCommand(insertSql, sqliteConn);
+                    cmdIns.Parameters.AddWithValue("@idPago", maxIdPagoSqlite);
+                    cmdIns.Parameters.AddWithValue("@idSocio", p["idSocio"]);
+                    cmdIns.Parameters.AddWithValue("@idMembresia", p["idMembresia"] ?? DBNull.Value);
+                    cmdIns.Parameters.AddWithValue("@monto", p["monto"]);
+                    cmdIns.Parameters.AddWithValue("@metodoPago", p["metodoPago"]);
+                    cmdIns.Parameters.AddWithValue("@fechaPago", p["fechaPago"]);
+                    cmdIns.Parameters.AddWithValue("@notas", p["notas"] ?? DBNull.Value);
+                    cmdIns.Parameters.AddWithValue("@idEstado", p["idEstado"]);
+                    cmdIns.Parameters.AddWithValue("@fechaCreacion", p["fechaCreacion"]);
+                    cmdIns.Parameters.AddWithValue("@idUsuarioCreo", p["idUsuarioCreo"] ?? DBNull.Value);
+                    await cmdIns.ExecuteNonQueryAsync();
+                    pagosImportados++;
+                }
+            }
+
+            // 3. Sincronizar membresías asignadas en MySQL (sociomembresia)
+            var memExistentesSqlite = new HashSet<string>();
+            int maxIdMemSqlite = 0;
+            await using (var cmdMem = new SqliteCommand("SELECT idSocioMembresia, idSocio, idMembresia, fechaInicioMembresia FROM sociomembresia;", sqliteConn))
+            await using (var r = await cmdMem.ExecuteReaderAsync())
+            {
+                while (await r.ReadAsync())
+                {
+                    int idsm = r.GetInt32(0);
+                    if (idsm > maxIdMemSqlite) maxIdMemSqlite = idsm;
+
+                    int ids = r.IsDBNull(1) ? 0 : r.GetInt32(1);
+                    int idm = r.IsDBNull(2) ? 0 : r.GetInt32(2);
+                    string fi = r.IsDBNull(3) ? "" : r.GetString(3);
+                    if (fi.Length > 10) fi = fi.Substring(0, 10);
+
+                    memExistentesSqlite.Add($"{ids}|{idm}|{fi}");
+                }
+            }
+
+            var sqlMemMySql = $"SELECT idSocioMembresia, idSocio, idMembresia, precio, fechaInicioMembresia, fechaCreacion, idUsuarioCreo, idEstado FROM sociomembresia WHERE (fechaInicioMembresia >= '{fechaDesde}' OR fechaCreacion >= '{fechaDesde}') ORDER BY idSocioMembresia;";
+            await using (var cmdMySqlMem = new MySqlCommand(sqlMemMySql, mySqlConn))
+            await using (var rMySqlMem = await cmdMySqlMem.ExecuteReaderAsync())
+            {
+                var memParaInsertar = new List<Dictionary<string, object?>>();
+                while (await rMySqlMem.ReadAsync())
+                {
+                    int ids = rMySqlMem.IsDBNull(1) ? 0 : rMySqlMem.GetInt32(1);
+                    int idm = rMySqlMem.IsDBNull(2) ? 0 : rMySqlMem.GetInt32(2);
+                    var dtInicio = rMySqlMem.IsDBNull(4) ? DateTime.MinValue : rMySqlMem.GetDateTime(4);
+                    string fiStr = dtInicio.ToString("yyyy-MM-dd");
+
+                    string key = $"{ids}|{idm}|{fiStr}";
+                    if (!memExistentesSqlite.Contains(key))
+                    {
+                        var dict = new Dictionary<string, object?>
+                        {
+                            ["idSocio"] = ids,
+                            ["idMembresia"] = idm,
+                            ["precio"] = rMySqlMem.IsDBNull(3) ? 0m : rMySqlMem.GetDecimal(3),
+                            ["fechaInicioMembresia"] = dtInicio.ToString("yyyy-MM-dd HH:mm:ss"),
+                            ["fechaCreacion"] = rMySqlMem.IsDBNull(5) ? DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") : rMySqlMem.GetDateTime(5).ToString("yyyy-MM-dd HH:mm:ss"),
+                            ["idUsuarioCreo"] = rMySqlMem.IsDBNull(6) ? DBNull.Value : rMySqlMem.GetInt32(6),
+                            ["idEstado"] = rMySqlMem.IsDBNull(7) ? 1 : rMySqlMem.GetInt32(7)
+                        };
+                        memParaInsertar.Add(dict);
+                        memExistentesSqlite.Add(key);
+                    }
+                }
+                rMySqlMem.Close();
+
+                foreach (var m in memParaInsertar)
+                {
+                    maxIdMemSqlite++;
+                    var insMemSql = "INSERT INTO sociomembresia (idSocioMembresia, idSocio, idMembresia, precio, fechaInicioMembresia, fechaCreacion, idUsuarioCreo, idEstado) VALUES (@idSocioMembresia, @idSocio, @idMembresia, @precio, @fechaInicioMembresia, @fechaCreacion, @idUsuarioCreo, @idEstado);";
+                    await using var cmdInsM = new SqliteCommand(insMemSql, sqliteConn);
+                    cmdInsM.Parameters.AddWithValue("@idSocioMembresia", maxIdMemSqlite);
+                    cmdInsM.Parameters.AddWithValue("@idSocio", m["idSocio"]);
+                    cmdInsM.Parameters.AddWithValue("@idMembresia", m["idMembresia"]);
+                    cmdInsM.Parameters.AddWithValue("@precio", m["precio"]);
+                    cmdInsM.Parameters.AddWithValue("@fechaInicioMembresia", m["fechaInicioMembresia"]);
+                    cmdInsM.Parameters.AddWithValue("@fechaCreacion", m["fechaCreacion"]);
+                    cmdInsM.Parameters.AddWithValue("@idUsuarioCreo", m["idUsuarioCreo"] ?? DBNull.Value);
+                    cmdInsM.Parameters.AddWithValue("@idEstado", m["idEstado"]);
+                    await cmdInsM.ExecuteNonQueryAsync();
+                    membresiasImportadas++;
+                }
+            }
+
+            return (true, $"Sincronización completada exitosamente. Se importaron {pagosImportados} cobros nuevos y {membresiasImportadas} membresías desde MySQL sin alterar los registros existentes.", pagosImportados, membresiasImportadas);
+        }
+        catch (Exception ex)
+        {
+            return (false, $"Error al sincronizar con MySQL: {ex.Message}", 0, 0);
+        }
+    }
 }

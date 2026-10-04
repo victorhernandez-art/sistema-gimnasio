@@ -95,6 +95,33 @@ if (args.Contains("--migrar-mysql", StringComparer.OrdinalIgnoreCase))
     return;
 }
 
+// Manejo de comando CLI para sincronizar cobros recientes de MySQL a SQLite sin sobreescribir datos
+if (args.Contains("--sincronizar-mysql", StringComparer.OrdinalIgnoreCase))
+{
+    Console.WriteLine("============================================================");
+    Console.WriteLine("  GymWeb - Sincronizador de Cobros Recientes: MySQL -> SQLite");
+    Console.WriteLine("============================================================");
+
+    var mySqlConnStr = isMySql ? connStr : "Server=localhost;Database=gym;User=root;Password=;";
+    var sqliteDbPath = Path.Combine(builder.Environment.ContentRootPath, "gym.db");
+
+    Console.WriteLine("[1/2] Conectando a MySQL local y SQLite...");
+    var resultado = await MySqlToSqliteMigrator.SincronizarCobrosRecientesAsync(mySqlConnStr, sqliteDbPath, "2026-09-20");
+
+    if (resultado.Success)
+    {
+        Console.WriteLine("\n[EXITO] " + resultado.Message);
+        Console.WriteLine($"Cobros importados: {resultado.PagosNuevos}");
+        Console.WriteLine($"Membresías importadas: {resultado.MembresiasNuevas}");
+    }
+    else
+    {
+        Console.WriteLine("\n[ERROR] " + resultado.Message);
+    }
+
+    return;
+}
+
 builder.Services.AddDbContext<GymContext>(options =>
 {
     if (isMySql)

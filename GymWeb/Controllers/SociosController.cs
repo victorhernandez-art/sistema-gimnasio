@@ -32,27 +32,71 @@ public class SociosController : AuthController
             .Select(g => new { IdSocio = g.Key, Total = g.Sum(x => x.SaldoPendiente) })
             .ToDictionaryAsync(x => x.IdSocio, x => x.Total);
 
-        // ── 2. Precios totales de membresías asignadas ──
-        var preciosMembresias = await _db.Sociomembresia
+        // ── 2. Membresías recientes y activas por socio (evalúa únicamente el ciclo actual/reciente) ──
+        var hoyDt = DateTime.Today;
+        var membresiasRecientes = await _db.Sociomembresia
+            .Include(sm => sm.IdMembresiaNavigation)
             .Where(sm => sm.IdEstado == 1 && sm.IdSocio != null)
-            .GroupBy(sm => sm.IdSocio!.Value)
-            .Select(g => new { IdSocio = g.Key, Total = g.Sum(x => x.Precio ?? 0m) })
-            .ToDictionaryAsync(x => x.IdSocio, x => x.Total);
+            .OrderByDescending(sm => sm.FechaInicioMembresia ?? sm.FechaCreacion)
+            .ToListAsync();
 
-        // ── 3. Pagos realizados para membresías (incluye pagos generales que no son abono de tienda fiada) ──
-        var pagosMembresias = await _db.Pagos
+        var ultimaMembresiaPorSocio = membresiasRecientes
+            .GroupBy(sm => sm.IdSocio!.Value)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var todosPagos = await _db.Pagos
             .Where(p => p.IdEstado == 1 && (p.IdMembresia != null || p.Notas == null || !p.Notas.Contains("[TIENDA_CREDITO]")))
+            .ToListAsync();
+
+        var pagosPorSocio = todosPagos
             .GroupBy(p => p.IdSocio)
-            .Select(g => new { IdSocio = g.Key, Total = g.Sum(x => x.Monto) })
-            .ToDictionaryAsync(x => x.IdSocio, x => x.Total);
+            .ToDictionary(g => g.Key, g => g.ToList());
 
         var deudasDict = new Dictionary<int, SocioDeudorItemDto>();
         foreach (var s in socios)
         {
             decimal dProd = deudasProductos.TryGetValue(s.IdSocio, out var dp) ? dp : 0m;
-            decimal tMem = preciosMembresias.TryGetValue(s.IdSocio, out var tm) ? tm : 0m;
-            decimal pMem = pagosMembresias.TryGetValue(s.IdSocio, out var pm) ? pm : 0m;
-            decimal dMem = Math.Max(0, tMem - pMem);
+            decimal dMem = 0m;
+
+            if (ultimaMembresiaPorSocio.TryGetValue(s.IdSocio, out var memReciente))
+            {
+                decimal precioReciente = memReciente.Precio ?? 0m;
+                var pagosSocio = pagosPorSocio.TryGetValue(s.IdSocio, out var lp) ? lp : new List<Pago>();
+
+                // Fecha de inicio de la membresía reciente
+                var fInicio = (memReciente.FechaInicioMembresia ?? memReciente.FechaCreacion ?? DateTime.Today).Date;
+                var fCortePagos = DateOnly.FromDateTime(fInicio.AddDays(-3));
+
+                // Pagos dirigidos a esta membresía o realizados en torno a su fecha de inicio o posteriores
+                decimal totalPagadoCiclo = pagosSocio
+                    .Where(p => p.IdMembresia == memReciente.IdMembresia || p.FechaPago >= fCortePagos)
+                    .Sum(p => p.Monto);
+
+                // Si no hay pagos en el ciclo pero el socio tiene pagos generales históricos acumulados que cubren el monto
+                if (totalPagadoCiclo < precioReciente)
+                {
+                    decimal totalPagadoHistorico = pagosSocio.Sum(p => p.Monto);
+                    if (totalPagadoHistorico >= precioReciente)
+                    {
+                        totalPagadoCiclo = Math.Max(totalPagadoCiclo, precioReciente);
+                    }
+                }
+
+                if (totalPagadoCiclo >= precioReciente)
+                {
+                    dMem = 0m;
+                }
+                else
+                {
+                    // Solo marcar como adeudo si la membresía está vigente o venció hace menos de 15 días
+                    int duracionDias = memReciente.IdMembresiaNavigation?.Meses ?? 30;
+                    DateTime fVence = fInicio.AddDays(duracionDias);
+                    if (fVence >= hoyDt.AddDays(-15))
+                    {
+                        dMem = Math.Max(0m, precioReciente - totalPagadoCiclo);
+                    }
+                }
+            }
 
             deudasDict[s.IdSocio] = new SocioDeudorItemDto
             {
@@ -486,39 +530,46 @@ public class SociosController : AuthController
 
             decimal deudaProductos = salidasCredito.Where(s => s.SaldoPendiente > 0).Sum(s => s.SaldoPendiente);
 
-            // 2. Membresías adeudadas
+            // 2. Membresías adeudadas (evalúa el ciclo actual/reciente)
             var membresiasAsignadas = await _db.Sociomembresia
                 .Include(sm => sm.IdMembresiaNavigation)
                 .Where(sm => sm.IdSocio == id && sm.IdEstado == 1)
-                .OrderBy(sm => sm.FechaCreacion ?? DateTime.MinValue)
+                .OrderByDescending(sm => sm.FechaInicioMembresia ?? sm.FechaCreacion)
                 .ToListAsync();
 
             var pagosSocio = await _db.Pagos
                 .Where(p => p.IdSocio == id && p.IdEstado == 1)
-                .OrderBy(p => p.FechaPago)
+                .OrderByDescending(p => p.FechaPago)
                 .ToListAsync();
 
-            decimal bolsaPagado = pagosSocio.Where(p => p.IdMembresia != null || p.Notas == null || !p.Notas.Contains("[TIENDA_CREDITO]")).Sum(p => p.Monto);
             var membresiasAdeudadas = new List<object>();
             decimal deudaMembresias = 0m;
 
-            foreach (var m in membresiasAsignadas)
+            if (membresiasAsignadas.Any())
             {
+                var m = membresiasAsignadas.First();
                 decimal precio = m.Precio ?? 0m;
-                decimal pagado = Math.Min(bolsaPagado, precio);
-                bolsaPagado -= pagado;
-                decimal pendiente = Math.Max(0m, precio - pagado);
+                var fInicio = (m.FechaInicioMembresia ?? m.FechaCreacion ?? DateTime.Today).Date;
+                var fCorte = DateOnly.FromDateTime(fInicio.AddDays(-3));
 
-                if (pendiente > 0)
+                decimal pagado = pagosSocio
+                    .Where(p => p.IdMembresia == m.IdMembresia || p.FechaPago >= fCorte)
+                    .Sum(p => p.Monto);
+
+                if (pagado < precio && pagosSocio.Sum(p => p.Monto) >= precio)
                 {
-                    deudaMembresias += pendiente;
+                    pagado = precio;
+                }
+
+                decimal pendiente = Math.Max(0m, precio - pagado);
+                int duracionDias = m.IdMembresiaNavigation?.Meses ?? 30;
+                DateTime fVence = fInicio.AddDays(duracionDias);
+
+                if (pendiente > 0 && fVence >= DateTime.Today.AddDays(-15))
+                {
+                    deudaMembresias = pendiente;
                     string fIni = m.FechaInicioMembresia?.ToString("dd/MM/yyyy") ?? m.FechaCreacion?.ToString("dd/MM/yyyy") ?? "—";
-                    string vigencia = $"Inicio: {fIni}";
-                    if (m.FechaInicioMembresia.HasValue && (m.IdMembresiaNavigation?.Meses ?? 0) > 0)
-                    {
-                        var fFin = m.FechaInicioMembresia.Value.AddMonths(m.IdMembresiaNavigation!.Meses!.Value);
-                        vigencia = $"{fIni} al {fFin:dd/MM/yyyy}";
-                    }
+                    string vigencia = $"{fIni} al {fVence:dd/MM/yyyy}";
 
                     membresiasAdeudadas.Add(new {
                         id = m.IdSocioMembresia,
@@ -662,25 +713,62 @@ public class SociosController : AuthController
             .Select(g => new { IdSocio = g.Key, Total = g.Sum(x => x.SaldoPendiente) })
             .ToDictionaryAsync(x => x.IdSocio, x => x.Total);
 
-        var preciosMembresias = await _db.Sociomembresia
+        var hoyDt = DateTime.Today;
+        var membresiasRecientes = await _db.Sociomembresia
+            .Include(sm => sm.IdMembresiaNavigation)
             .Where(sm => sm.IdEstado == 1 && sm.IdSocio != null)
-            .GroupBy(sm => sm.IdSocio!.Value)
-            .Select(g => new { IdSocio = g.Key, Total = g.Sum(x => x.Precio ?? 0m) })
-            .ToDictionaryAsync(x => x.IdSocio, x => x.Total);
+            .OrderByDescending(sm => sm.FechaInicioMembresia ?? sm.FechaCreacion)
+            .ToListAsync();
 
-        var pagosMembresias = await _db.Pagos
+        var ultimaMembresiaPorSocio = membresiasRecientes
+            .GroupBy(sm => sm.IdSocio!.Value)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var todosPagos = await _db.Pagos
             .Where(p => p.IdEstado == 1 && (p.IdMembresia != null || p.Notas == null || !p.Notas.Contains("[TIENDA_CREDITO]")))
+            .ToListAsync();
+
+        var pagosPorSocio = todosPagos
             .GroupBy(p => p.IdSocio)
-            .Select(g => new { IdSocio = g.Key, Total = g.Sum(x => x.Monto) })
-            .ToDictionaryAsync(x => x.IdSocio, x => x.Total);
+            .ToDictionary(g => g.Key, g => g.ToList());
 
         var deudores = new List<SocioDeudorItemDto>();
         foreach (var s in socios)
         {
             decimal dProd = deudasProductos.TryGetValue(s.IdSocio, out var dp) ? dp : 0m;
-            decimal tMem = preciosMembresias.TryGetValue(s.IdSocio, out var tm) ? tm : 0m;
-            decimal pMem = pagosMembresias.TryGetValue(s.IdSocio, out var pm) ? pm : 0m;
-            decimal dMem = Math.Max(0, tMem - pMem);
+            decimal dMem = 0m;
+
+            if (ultimaMembresiaPorSocio.TryGetValue(s.IdSocio, out var memReciente))
+            {
+                decimal precioReciente = memReciente.Precio ?? 0m;
+                var pagosSocio = pagosPorSocio.TryGetValue(s.IdSocio, out var lp) ? lp : new List<Pago>();
+
+                var fInicio = (memReciente.FechaInicioMembresia ?? memReciente.FechaCreacion ?? DateTime.Today).Date;
+                var fCortePagos = DateOnly.FromDateTime(fInicio.AddDays(-3));
+
+                decimal totalPagadoCiclo = pagosSocio
+                    .Where(p => p.IdMembresia == memReciente.IdMembresia || p.FechaPago >= fCortePagos)
+                    .Sum(p => p.Monto);
+
+                if (totalPagadoCiclo < precioReciente && pagosSocio.Sum(p => p.Monto) >= precioReciente)
+                {
+                    totalPagadoCiclo = precioReciente;
+                }
+
+                if (totalPagadoCiclo >= precioReciente)
+                {
+                    dMem = 0m;
+                }
+                else
+                {
+                    int duracionDias = memReciente.IdMembresiaNavigation?.Meses ?? 30;
+                    DateTime fVence = fInicio.AddDays(duracionDias);
+                    if (fVence >= hoyDt.AddDays(-15))
+                    {
+                        dMem = Math.Max(0m, precioReciente - totalPagadoCiclo);
+                    }
+                }
+            }
 
             if (dProd + dMem > 0)
             {

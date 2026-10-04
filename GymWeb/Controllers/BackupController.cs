@@ -240,6 +240,26 @@ public class BackupController : SuperAdminController
         return RedirectToAction("Index");
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SincronizarCobrosMySql()
+    {
+        var mySqlConnStr = _config.GetConnectionString("GymDb") ?? "Server=localhost;Database=gym;User=root;Password=;";
+        var sqliteDbPath = Path.Combine(_env.ContentRootPath, "gym.db");
+
+        var resultado = await MySqlToSqliteMigrator.SincronizarCobrosRecientesAsync(mySqlConnStr, sqliteDbPath, "2026-09-20");
+        if (resultado.Success)
+        {
+            TempData["Success"] = $"🎉 {resultado.Message}";
+        }
+        else
+        {
+            TempData["Error"] = resultado.Message;
+        }
+
+        return RedirectToAction("Index");
+    }
+
     public IActionResult Download(string fileName)
     {
         if (string.IsNullOrEmpty(fileName) || !Regex.IsMatch(fileName, @"^[\w\-\.]+$"))
