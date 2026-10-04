@@ -60,6 +60,8 @@ if (Test-Path (Join-Path $tempBuild "wwwroot")) {
 # Copiar script de actualización automática (ÚNICO archivo ejecutable que el cliente debe tocar)
 Copy-Item -Force (Join-Path $root "Publish\ACTUALIZAR.bat") (Join-Path $patchOut "ACTUALIZAR.bat")
 Copy-Item -Force (Join-Path $root "Publish\actualizar.ps1") (Join-Path $patchOut "actualizar.ps1")
+(Get-Item (Join-Path $patchOut "ACTUALIZAR.bat")).LastWriteTime = Get-Date
+(Get-Item (Join-Path $patchOut "actualizar.ps1")).LastWriteTime = Get-Date
 
 try { Remove-Item -Recurse -Force $tempBuild -ErrorAction SilentlyContinue } catch { }
 try { Remove-Item -Recurse -Force $tempAppBuild -ErrorAction SilentlyContinue } catch { }

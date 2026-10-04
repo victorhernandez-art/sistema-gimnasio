@@ -556,6 +556,11 @@ Esta sección documenta la mecánica técnica y los componentes ajustados para m
   1. Método `MySqlToSqliteMigrator.SincronizarCobrosRecientesAsync`: importa pagos y membresías de MySQL `>= 2026-09-20` asignando IDs autoincrementales libres, sin colisionar ni sobrescribir cobros nuevos registrados en SQLite (como los del día en curso).
   2. Disponible tanto en la interfaz web ([`/Backup`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/GymWeb/Views/Backup/Index.cshtml) con un clic) como mediante el script auxiliar [`IMPORTAR_COBROS_DE_MYSQL.bat`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/IMPORTAR_COBROS_DE_MYSQL.bat).
 
-
-
-
+#### H. Sincronización Automática de Marcas de Tiempo en Empaquetado de Parches
+* **Archivo:** [`generar_parche_ligero.ps1`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/generar_parche_ligero.ps1)
+* **Diagnóstico de Experiencia de Usuario:**
+  Al descomprimir el archivo `Parche_Ligero_GymWeb.zip`, la carpeta `archivos/` mostraba la fecha y hora de la compilación más reciente, pero Windows conservaba en `ACTUALIZAR.bat` y `actualizar.ps1` su fecha de creación original (24/08/2026). Esto generaba dudas visuales en el cliente al creer que se trataba de un archivo desactualizado.
+* **Solución Implementada:**
+  1. En `generar_parche_ligero.ps1`, tras copiar `ACTUALIZAR.bat` y `actualizar.ps1` a la carpeta del paquete, se actualiza forzosamente su propiedad `LastWriteTime` con `Get-Date`.
+  2. Todos los componentes del archivo ZIP (`archivos/GymWeb.dll`, `archivos/Gym.exe`, `ACTUALIZAR.bat`, `actualizar.ps1`) muestran ahora de forma homogénea la fecha y hora exacta de la generación del parche.
+  3. Se verificó que el contenido binario de `GymWeb.dll` (con la solución contable para Yanet Martínez y los 77 falsos deudores) está 100% incorporado y listo para despliegue sin riesgo para la base de datos `gym.db`.
