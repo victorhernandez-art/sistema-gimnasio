@@ -1,5 +1,5 @@
 # ==============================================================================
-#  GymWeb v2.5 - Generador del Paquete Instalador Completo para Windows
+#  GymWeb v2.6 - Generador del Paquete Instalador Completo para Windows
 # ==============================================================================
 $ErrorActionPreference = "Stop"
 
@@ -7,11 +7,11 @@ $root = $PSScriptRoot
 $dist = Join-Path $root "dist"
 $winOut = Join-Path $dist "GymWeb-Windows"
 $bioWinOut = Join-Path $winOut "BioService"
-$zipOut = Join-Path $dist "Instalador_GymWeb_Windows_v2.5.zip"
+$zipOut = Join-Path $dist "Instalador_GymWeb_Windows_v2.6.zip"
 $tempBuild = Join-Path $dist "temp_installer_build"
 
 Write-Host "`n============================================================" -ForegroundColor Cyan
-Write-Host "   GENERANDO INSTALADOR COMPLETO GYMWEB v2.5 (WINDOWS)" -ForegroundColor Cyan
+Write-Host "   GENERANDO INSTALADOR COMPLETO GYMWEB v2.6 (WINDOWS)" -ForegroundColor Cyan
 Write-Host "============================================================`n" -ForegroundColor Cyan
 
 # 1. Limpieza previa
@@ -137,21 +137,31 @@ New-Item -ItemType Directory -Force -Path (Join-Path $winOut "wwwroot\backups") 
 New-Item -ItemType Directory -Force -Path (Join-Path $winOut "logs") | Out-Null
 
 # 6. Empaquetar en ZIP final
-Write-Host " [6/6] Creando archivo ZIP final: Instalador_GymWeb_Windows_v2.5.zip..." -ForegroundColor Yellow
+Write-Host " [6/6] Creando archivo ZIP final: Instalador_GymWeb_Windows_v2.6.zip..." -ForegroundColor Yellow
 if (Test-Path $zipOut) { Remove-Item -Force $zipOut }
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [System.IO.Compression.ZipFile]::CreateFromDirectory($winOut, $zipOut, [System.IO.Compression.CompressionLevel]::Fastest, $false)
 
-# Copiar también con nombre v2.1 por compatibilidad si algún enlace previo aún lo requiere
+# Duplicar también con nombres previos por compatibilidad si tu página web tiene enlaces fijos
+$zipV25 = Join-Path $dist "Instalador_GymWeb_Windows_v2.5.zip"
+Copy-Item -Force $zipOut $zipV25
+
 $zipV21 = Join-Path $dist "Instalador_GymWeb_Windows_v2.1.zip"
 Copy-Item -Force $zipOut $zipV21
+
+# Crear también carpeta lista y limpia descomprimida para pruebas: dist/Instalador_GymWeb_Windows_v2.6
+$folderV26 = Join-Path $dist "Instalador_GymWeb_Windows_v2.6"
+if (Test-Path $folderV26) { Remove-Item -Recurse -Force $folderV26 }
+New-Item -ItemType Directory -Force -Path $folderV26 | Out-Null
+robocopy $winOut $folderV26 /E /R:1 /W:1 /NP | Out-Null
 
 $zipItem = Get-Item $zipOut
 $sizeMb = [math]::Round($zipItem.Length / 1MB, 2)
 
 Write-Host "`n============================================================" -ForegroundColor Green
-Write-Host " ¡INSTALADOR COMPLETO GENERADO CON EXITO!" -ForegroundColor Green
-Write-Host " Archivo listo para enviar al cliente:" -ForegroundColor Green
-Write-Host "  Ruta:   $zipOut" -ForegroundColor Cyan
-Write-Host "  Tamano: $sizeMb MB" -ForegroundColor Cyan
+Write-Host " ¡INSTALADOR COMPLETO v2.6 GENERADO CON EXITO!" -ForegroundColor Green
+Write-Host " Archivo listo para subir a tu pagina web:" -ForegroundColor Green
+Write-Host "  ZIP v2.6: $zipOut" -ForegroundColor Cyan
+Write-Host "  ZIP v2.5: $zipV25 (Copia identica por compatibilidad)" -ForegroundColor Cyan
+Write-Host "  Tamano:   $sizeMb MB" -ForegroundColor Cyan
 Write-Host "============================================================`n" -ForegroundColor Green
