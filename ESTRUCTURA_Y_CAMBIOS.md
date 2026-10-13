@@ -1013,6 +1013,57 @@ Esta sección documenta la mecánica técnica y los componentes ajustados para m
 * **Entregables:**
   - Actualizado en `Gym/Publish/` y compilado en `Gym/dist/Parche_Ligero_GymWeb.zip`.
 
+---
+
+### [2026-10-13] Lanzamiento Oficial v2.6: Corrección de Filtros de Difusión Masiva, Publicación de Release y Paquete Instalador Completo para Nuevos Clientes
+
+#### 1. Corrección Integral de Filtros en Difusión Masiva de WhatsApp:
+* **Archivos Modificados:**
+  - [`GymWeb/Controllers/SociosController.cs`](file:///c:/xampp/htdocs/Gym-Paises/Gym/GymWeb/Controllers/SociosController.cs)
+  - [`GymWeb/wwwroot/js/gym-tickets-whatsapp.js`](file:///c:/xampp/htdocs/Gym-Paises/Gym/GymWeb/wwwroot/js/gym-tickets-whatsapp.js)
+* **Diagnóstico:**
+  - En el modal de Difusión Masiva, al presionar los botones de filtro rápido (*Solo Inactivos*, *Con Deuda*, *Todos con Celular*), solo funcionaba *Solo Activos*.
+  - *Causas:*
+    1. **Discrepancia de Nomenclatura:** El backend catalogaba el estado de membresía como `"vencidos"` mientras el frontend esperaba el valor `"inactivos"`.
+    2. **Cálculo de Deudores Incompleto:** La bandera `tieneDeuda` no calculaba conjuntamente los saldos pendientes de membresía con las ventas a crédito de la tienda (`salida`), provocando listas vacías para el botón de deudores.
+    3. **Estado Visual de Botones:** Los botones de filtro no alternaban correctamente la clase activa visual (`active`), generando confusión sobre cuál filtro estaba seleccionado.
+* **Solución Implementada:**
+  - Se unificó el estado a `inactivos` para abarcar socios con membresías vencidas y socios sin membresía.
+  - Se incorporó la evaluación de adeudos de la tienda y cuotas de membresía en el endpoint `ObtenerAudienciaDifusion`.
+  - Se homogeneizó el comportamiento reactivo de los botones `difusion-btn-filtro` con actualización dinámica del contador de destinatarios en tiempo real.
+
+---
+
+#### 2. Establecimiento de Versión Oficial v2.6:
+* **Archivos Modificados:**
+  - [`GymWeb/Helpers/AppSettings.cs`](file:///c:/xampp/htdocs/Gym-Paises/Gym/GymWeb/Helpers/AppSettings.cs): Se actualizó `CurrentVersion = "v2.6"`.
+  - [`GymWeb/Views/Shared/_Layout.cshtml`](file:///c:/xampp/htdocs/Gym-Paises/Gym/GymWeb/Views/Shared/_Layout.cshtml): Reflejo de `Versión v2.6` en la barra lateral con gatillo de verificación en 1 clic.
+* **Publicación y Parche:**
+  - Publicación y compilación en Release a [`Gym/Publish/`](file:///c:/xampp/htdocs/Gym-Paises/Gym/Publish/).
+  - Generación del micro-parche ligero de transición: [`Gym/dist/Parche_Ligero_GymWeb.zip`](file:///c:/xampp/htdocs/Gym-Paises/Gym/dist/Parche_Ligero_GymWeb.zip) (~24.6 MB).
+  - Creación del Release oficial `v2.6` en GitHub con notas descriptivas clasificadas en Novedades y Correcciones.
+
+---
+
+#### 3. Generador del Paquete Instalador Completo v2.6 para Nuevos Clientes:
+* **Archivos Modificados:**
+  - [`generar_instalador.ps1`](file:///c:/xampp/htdocs/Gym-Paises/Gym/generar_instalador.ps1)
+* **Mejoras Implementadas en el Empaquetador:**
+  - Se actualizó el flujo para compilar y empaquetar de forma autocontenida (Self-Contained x64) todos los nuevos módulos de la v2.6:
+    - **GymWeb v2.6** (con In-App Auto-Updater, LiveSync en tiempo real y compatibilidad regional Multi-País).
+    - **WhatsApp Gateway** (microservicio Node.js desatendido con dependencias incluidas en `WhatsAppGateway/node_modules`).
+    - **Puente Biométrico DigitalPersona** (`PuenteBiometrico/DigitalPersonaBridge.exe` para lectores USB U.are.U 4500).
+    - **Visor de Escritorio Maximizado** (`Gym.exe` con WebView2).
+    - **BioService** para lectores biométricos ZKTeco.
+  - **Limpieza Estricta para Nuevos Clientes:**
+    - Exclusión total de bases de datos de prueba (`gym.db*`), fotos de socios (`wwwroot/img/socios/*`), respaldos antiguos (`wwwroot/backups/*`) y archivos de licencia (`license.json`).
+    - Al ejecutarse por primera vez en el equipo de un nuevo cliente, inicializa una base de datos SQLite limpia y activa el periodo de prueba oficial de 7 días.
+* **Entregables Generados:**
+  - **`dist/Instalador_GymWeb_Windows_v2.6.zip`** *(~146.37 MB)*: Instalador principal oficial de la versión v2.6.
+  - **`dist/Instalador_GymWeb_Windows_v2.5.zip`** y **`dist/Instalador_GymWeb_Windows_v2.1.zip`**: Copias idénticas actualizadas por compatibilidad para enlaces existentes de la página web.
+  - **`dist/Instalador_GymWeb_Windows_v2.6/`**: Carpeta limpia y lista para pruebas inmediatas sin necesidad de descomprimir.
+
+
 
 
 
