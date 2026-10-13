@@ -5,7 +5,7 @@ $ErrorActionPreference = "Continue"
 
 Write-Host "============================================================" -ForegroundColor Cyan
 Write-Host "  GymWeb - Parche de Actualizacion del Sistema" -ForegroundColor Cyan
-Write-Host "  Version: 2.0 (Biometrico Universal + Auto-Migracion)" -ForegroundColor Cyan
+Write-Host "  Version: 2.5 (Cobranza y Credito a Socios + Tickets WhatsApp + Auditoria)" -ForegroundColor Cyan
 Write-Host "============================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -163,8 +163,42 @@ if (Test-Path $patchBio) {
     Write-Host "       Modulo BioService instalado en: BioService\" -ForegroundColor Green
 }
 
+# Modulo Puente Biometrico DigitalPersona
+$patchDP = Join-Path $patchRoot "PuenteBiometrico"
+if (-not (Test-Path $patchDP)) { $patchDP = Join-Path $patchFiles "PuenteBiometrico" }
+$destDP = Join-Path $targetDir "PuenteBiometrico"
+if (Test-Path $patchDP) {
+    if (-not (Test-Path $destDP)) {
+        New-Item -ItemType Directory -Path $destDP -Force | Out-Null
+    }
+    Copy-Item -Path (Join-Path $patchDP "*") -Destination $destDP -Recurse -Force
+    Write-Host "       Modulo Puente Biometrico DigitalPersona instalado en: PuenteBiometrico\" -ForegroundColor Green
+}
+
+# Modulo WhatsApp Gateway (Envio Masivo 100% Automatico sin navegador)
+$patchWA = Join-Path $patchRoot "WhatsAppGateway"
+if (-not (Test-Path $patchWA)) { $patchWA = Join-Path $patchFiles "WhatsAppGateway" }
+$destWA = Join-Path $targetDir "WhatsAppGateway"
+if (Test-Path $patchWA) {
+    if (-not (Test-Path $destWA)) {
+        New-Item -ItemType Directory -Path $destWA -Force | Out-Null
+    }
+    Get-ChildItem -Path $patchWA -Recurse | ForEach-Object {
+        $rel = $_.FullName.Substring($patchWA.Length).TrimStart('\', '/')
+        if ($rel -notmatch "^auth_session") {
+            $targetSub = Join-Path $destWA $rel
+            if ($_.PSIsContainer) {
+                if (-not (Test-Path $targetSub)) { New-Item -ItemType Directory -Path $targetSub -Force | Out-Null }
+            } else {
+                Copy-Item -Path $_.FullName -Destination $targetSub -Force
+            }
+        }
+    }
+    Write-Host "       Modulo WhatsApp Gateway (Envio Masivo Desatendido) instalado en: WhatsAppGateway\" -ForegroundColor Green
+}
+
 # Copiar nuevos lanzadores en Modo App de Escritorio, visor nativo Gym.exe, icono y script de migración si vienen en el parche
-foreach ($utilFile in @("Iniciar GymWeb.bat", "AbrirGymWeb.vbs", "Crear Acceso Directo.bat", "MIGRAR-DATOS-MYSQL-A-SQLITE.bat", "app.ico", "Gym.exe", "Gym.dll", "Gym.runtimeconfig.json", "Microsoft.Web.WebView2.Core.dll", "Microsoft.Web.WebView2.WinForms.dll", "runtimes")) {
+foreach ($utilFile in @("Iniciar GymWeb.bat", "AbrirGymWeb.vbs", "Crear Acceso Directo.bat", "HABILITAR-RED-LAN.bat", "INICIAR-PUENTE-BIOMETRICO.bat", "INICIAR-WHATSAPP-GATEWAY.bat", "PROBAR-LECTOR-USB.bat", "PROBAR-LECTOR-USB.ps1", "MIGRAR-DATOS-MYSQL-A-SQLITE.bat", "app.ico", "Gym.exe", "Gym.dll", "Gym.runtimeconfig.json", "Microsoft.Web.WebView2.Core.dll", "Microsoft.Web.WebView2.WinForms.dll", "runtimes")) {
     $srcUtil = Join-Path $patchRoot $utilFile
     if (-not (Test-Path $srcUtil)) { $srcUtil = Join-Path $patchFiles $utilFile }
     if (Test-Path $srcUtil) {
@@ -175,8 +209,12 @@ foreach ($utilFile in @("Iniciar GymWeb.bat", "AbrirGymWeb.vbs", "Crear Acceso D
 # Preservar siempre los archivos del cliente (logo-custom.png, fondo-custom.jpg, fotos de socios y gym.db)
 Write-Host "       Datos, configuracion institucional y logotipo del cliente preservados intactos." -ForegroundColor Green
 
-Write-Host "       Archivos del sistema actualizados con exito." -ForegroundColor Green
-Write-Host ""
+# Configurar regla de Firewall para permitir acceso desde celulares/tablets en la red Wi-Fi (Puerto 5080)
+try {
+    & netsh.exe advfirewall firewall delete rule name="GymPro Web Server (Puerto 5080)" 2>$null | Out-Null
+    & netsh.exe advfirewall firewall add rule name="GymPro Web Server (Puerto 5080)" dir=in action=allow protocol=TCP localport=5080 profile=any | Out-Null
+    Write-Host "       Puerto 5080 TCP autorizado en el Firewall de Windows para red LAN / Movil." -ForegroundColor Green
+} catch { }
 
 # 5. Configurar Servicio de BioService
 Write-Host " [4/5] Configurando Servicio Biometrico..." -ForegroundColor Yellow
@@ -238,6 +276,7 @@ try {
     if (-not (Test-Path $icoPath)) { $icoPath = Join-Path $targetDir 'wwwroot\favicon.ico' }
     $sc.IconLocation = $icoPath + ',0'
     $sc.Description = 'Sistema de Control y Gestion para Gimnasio'
+    $sc.WindowStyle = 3 # 3 = Maximizado en pantalla completa
     $sc.Save()
     Write-Host "       Acceso directo con nuevo icono creado en el Escritorio." -ForegroundColor Green
 } catch { }
@@ -249,9 +288,10 @@ Write-Host ""
 Write-Host "  Mejoras y correcciones aplicadas:" -ForegroundColor Green
 Write-Host "    - Paleta de colores interactiva (6 temas de color)" -ForegroundColor Green
 Write-Host "    - Icono oficial de la pesa cian en escritorio y barra de tareas" -ForegroundColor Green
+Write-Host "    - Acceso por Red LAN desde celular/tablet y sincronizacion en tiempo real (LiveSync)" -ForegroundColor Green
+Write-Host "    - Integracion nativa para lectores DigitalPersona U.are.U 4500 (Puente WebSocket 8080)" -ForegroundColor Green
 Write-Host "    - Soporte nativo para SQLite y MySQL con proteccion de datos" -ForegroundColor Green
 Write-Host "    - Soporte nativo para lectores ZKTeco (ZK9500, ZK4500, SLK20R) y WBF" -ForegroundColor Green
-Write-Host "    - BioService corriendo en puerto 4500" -ForegroundColor Green
 
 # 8. Informar sobre el estado de la Base de Datos
 $appCfg = Join-Path $targetDir "appsettings.json"

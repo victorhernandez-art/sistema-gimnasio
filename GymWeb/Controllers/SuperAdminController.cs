@@ -7,6 +7,10 @@ public abstract class SuperAdminController : AuthController
 {
     public override void OnActionExecuting(ActionExecutingContext context)
     {
+        var hasAllowAnonymous = context.ActionDescriptor.EndpointMetadata
+            .Any(em => em is Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute);
+        if (hasAllowAnonymous) return;
+
         base.OnActionExecuting(context);
         if (context.Result != null) return; // ya redirigió por AuthController
 

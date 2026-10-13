@@ -1,3 +1,4 @@
+using GymWeb.Helpers;
 using GymWeb.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -44,6 +45,11 @@ public class RegistroController : AuthController
         var visitas = await _db.Vwultimamembresiadetallada
             .OrderBy(v => v.Paterno)
             .ToListAsync();
+
+        ViewBag.SociosDict = await _db.Socios
+            .AsNoTracking()
+            .ToDictionaryAsync(s => s.IdSocio);
+
         ViewBag.PrecioVisita = await ObtenerPrecioVisitaDiaAsync();
         return View(visitas);
     }
@@ -51,7 +57,7 @@ public class RegistroController : AuthController
     [HttpGet]
     public async Task<IActionResult> BuscarSocio(int id)
     {
-        if (id == 1000)
+        if (id == 1000 && !await _db.Socios.AnyAsync(s => s.IdSocio == 1000))
         {
             var precio = await ObtenerPrecioVisitaDiaAsync();
             return Json(new {
@@ -59,7 +65,7 @@ public class RegistroController : AuthController
                 esVisitaDia = true,
                 idSocio = 1000,
                 nombre = "Visita de Día (General)",
-                membresia = $"Visita de Día — ${precio:N2}",
+                membresia = $"Visita de Día — {GymWeb.Helpers.AppSettings.MonedaSimbolo}{precio:N2}",
                 precioVisita = precio,
                 vencimiento = DateTime.Today.ToString("dd/MM/yyyy"),
                 vencido = false,
@@ -68,7 +74,7 @@ public class RegistroController : AuthController
                 diasRestantes = 0
             });
         }
-        if (id < 1001) return Json(new { found = false });
+        if (id < 1) return Json(new { found = false });
         var s = await _db.Vwultimamembresiadetallada
             .FirstOrDefaultAsync(v => v.IdSocio == id);
         if (s == null) return Json(new { found = false });
@@ -80,7 +86,8 @@ public class RegistroController : AuthController
         return Json(new {
             found       = true,
             idSocio     = s.IdSocio,
-            nombre      = $"{s.NombreSocio} {s.Paterno} {s.Materno}".Trim(),
+            nombre      = s.NombreCompleto,
+            dni         = s.NumeroDocumento,
             membresia   = s.NombreMembresia ?? "Sin membresía",
             vencimiento = s.Vencimiento?.ToString("dd/MM/yyyy"),
             vencido,
@@ -94,17 +101,18 @@ public class RegistroController : AuthController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Registrar(int idSocio)
     {
-        if (idSocio == 1000)
+        if (idSocio == 1000 && !await _db.Socios.AnyAsync(s => s.IdSocio == 1000))
         {
             return await RegistrarVisita("1000");
         }
-        if (idSocio < 1001) { TempData["Error"] = "Clave inválida para socio."; return RedirectToAction(nameof(Index)); }
+        if (idSocio < 1) { TempData["Error"] = "Clave inválida para socio."; return RedirectToAction(nameof(Index)); }
         _db.Registros.Add(new Registro
         {
             IdSocio = idSocio,
             FechaCreacion = DateTime.Now
         });
         await _db.SaveChangesAsync();
+        LiveSyncService.NotifyVisitasChanged();
         TempData["Success"] = "Visita registrada.";
         return RedirectToAction(nameof(Index));
     }
@@ -114,7 +122,7 @@ public class RegistroController : AuthController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RegistrarAjax(int idSocio, string? nombreVisita = null)
     {
-        if (idSocio == 1000)
+        if (idSocio == 1000 && !await _db.Socios.AnyAsync(s => s.IdSocio == 1000))
         {
             var precio = await ObtenerPrecioVisitaDiaAsync();
             string nombreFinal = string.IsNullOrWhiteSpace(nombreVisita) || nombreVisita.Trim() == "1000"
@@ -130,13 +138,14 @@ public class RegistroController : AuthController
             };
             _db.Registros.Add(reg);
             await _db.SaveChangesAsync();
+            LiveSyncService.NotifyVisitasChanged();
 
             return Json(new {
                 ok = true,
                 esVisitaDia = true,
                 idSocio = 1000,
                 nombre = reg.NombreVisita,
-                membresia = $"Visita de Día — ${precio:N2}",
+                membresia = $"Visita de Día — {GymWeb.Helpers.AppSettings.MonedaSimbolo}{precio:N2}",
                 precio = precio,
                 vencimiento = DateTime.Today.ToString("dd/MM/yyyy"),
                 vencido = false,
@@ -147,7 +156,7 @@ public class RegistroController : AuthController
             });
         }
 
-        if (idSocio < 1001) return Json(new { ok = false, msg = "Clave inválida." });
+        if (idSocio < 1) return Json(new { ok = false, msg = "Clave inválida." });
         var s = await _db.Vwultimamembresiadetallada
             .FirstOrDefaultAsync(v => v.IdSocio == idSocio);
         if (s == null) return Json(new { ok = false, msg = "Socio no encontrado." });
@@ -164,6 +173,7 @@ public class RegistroController : AuthController
 
         _db.Registros.Add(new Registro { IdSocio = idSocio, FechaCreacion = DateTime.Now });
         await _db.SaveChangesAsync();
+        LiveSyncService.NotifyVisitasChanged();
 
         var vencido     = s.Vencimiento.HasValue && s.Vencimiento.Value < DateTime.Now;
         var sinMem      = !s.Vencimiento.HasValue;
@@ -173,7 +183,8 @@ public class RegistroController : AuthController
         return Json(new {
             ok          = true,
             idSocio     = s.IdSocio,
-            nombre      = $"{s.NombreSocio} {s.Paterno} {s.Materno}".Trim(),
+            nombre      = s.NombreCompleto,
+            dni         = s.NumeroDocumento,
             membresia   = s.NombreMembresia ?? "Sin membresía",
             vencimiento = s.Vencimiento?.ToString("dd/MM/yyyy"),
             vencido,
@@ -189,7 +200,7 @@ public class RegistroController : AuthController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RegistrarAjaxForzado(int idSocio)
     {
-        if (idSocio < 1001) return Json(new { ok = false, msg = "Clave inválida." });
+        if (idSocio < 1) return Json(new { ok = false, msg = "Clave inválida." });
         var s = await _db.Vwultimamembresiadetallada
             .FirstOrDefaultAsync(v => v.IdSocio == idSocio);
         if (s == null) return Json(new { ok = false, msg = "Socio no encontrado." });
@@ -197,6 +208,7 @@ public class RegistroController : AuthController
         // Registrar sin verificar duplicado — el recepcionista ya confirmó
         _db.Registros.Add(new Registro { IdSocio = idSocio, FechaCreacion = DateTime.Now });
         await _db.SaveChangesAsync();
+        LiveSyncService.NotifyVisitasChanged();
 
         var vencido     = s.Vencimiento.HasValue && s.Vencimiento.Value < DateTime.Now;
         var sinMem      = !s.Vencimiento.HasValue;
@@ -206,7 +218,8 @@ public class RegistroController : AuthController
         return Json(new {
             ok          = true,
             idSocio     = s.IdSocio,
-            nombre      = $"{s.NombreSocio} {s.Paterno} {s.Materno}".Trim(),
+            nombre      = s.NombreCompleto,
+            dni         = s.NumeroDocumento,
             membresia   = s.NombreMembresia ?? "Sin membresía",
             vencimiento = s.Vencimiento?.ToString("dd/MM/yyyy"),
             vencido,
@@ -239,6 +252,7 @@ public class RegistroController : AuthController
             FechaCreacion = DateTime.Now
         });
         await _db.SaveChangesAsync();
+        LiveSyncService.NotifyVisitasChanged();
 
         var precioStr = precio > 0 ? $" — ${precio:N2}" : "";
         TempData["Success"] = $"Visita de día registrada: {nombreFinal}{precioStr}";
@@ -267,6 +281,7 @@ public class RegistroController : AuthController
         };
         _db.Registros.Add(reg);
         await _db.SaveChangesAsync();
+        LiveSyncService.NotifyVisitasChanged();
 
         return Json(new {
             ok = true,

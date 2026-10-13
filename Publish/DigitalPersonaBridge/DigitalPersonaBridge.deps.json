@@ -1,0 +1,23 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v9.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v9.0": {
+      "DigitalPersonaBridge/1.0.0": {
+        "runtime": {
+          "DigitalPersonaBridge.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "DigitalPersonaBridge/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

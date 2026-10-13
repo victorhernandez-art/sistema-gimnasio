@@ -1,5 +1,6 @@
 using GymWeb.Helpers;
 using GymWeb.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,10 +23,28 @@ public class ConfiguracionController : SuperAdminController
             await _db.SaveChangesAsync();
         }
 
+        int port = HttpContext.Request.Host.Port ?? 5080;
         ViewBag.PcId = LicenseService.GetPcId();
         ViewBag.LicenseStatus = LicenseService.GetStatus();
+        ViewBag.RedLan = NetworkHelper.ObtenerInfoRed(port);
 
         return View(config);
+    }
+
+    [HttpGet]
+    [AllowAnonymous]
+    public IActionResult GetRedLanInfo()
+    {
+        int port = HttpContext.Request.Host.Port ?? 5080;
+        var info = NetworkHelper.ObtenerInfoRed(port);
+        return Json(new {
+            ok = true,
+            ip = info.IpPrincipal,
+            puerto = info.Puerto,
+            url = info.UrlCompleta,
+            nombreEquipo = info.NombreEquipo,
+            adaptadores = info.Adaptadores
+        });
     }
 
     [HttpPost]
@@ -110,6 +129,10 @@ public class ConfiguracionController : SuperAdminController
         string? Telefono,
         string? Mensaje,
         int? MensajeVencimiento, 
+        string? Pais,
+        string? MonedaSimbolo,
+        string? MonedaCodigo,
+        string? Lada,
         IFormFile? FotoFondo, 
         IFormFile? FotoLogo, 
         bool EliminarLogo = false)
@@ -125,14 +148,22 @@ public class ConfiguracionController : SuperAdminController
         existing.Telefono           = Telefono?.Trim();
         existing.Mensaje            = Mensaje?.Trim();
         existing.MensajeVencimiento = MensajeVencimiento ?? 5;
+        existing.Pais               = string.IsNullOrWhiteSpace(Pais) ? "MX" : Pais.Trim().ToUpperInvariant();
+        existing.MonedaSimbolo      = string.IsNullOrWhiteSpace(MonedaSimbolo) ? "$" : MonedaSimbolo.Trim();
+        existing.MonedaCodigo       = string.IsNullOrWhiteSpace(MonedaCodigo) ? "MXN" : MonedaCodigo.Trim().ToUpperInvariant();
+        existing.Lada               = string.IsNullOrWhiteSpace(Lada) ? "52" : Lada.Trim().Replace("+", "");
         existing.FechaModificacion  = DateTime.Now;
         existing.IdUsuarioModifico  = UsuarioId;
 
-        AppSettings.GymNombre    = string.IsNullOrWhiteSpace(NombreGimnacio) ? "GymPro" : NombreGimnacio.Trim();
-        AppSettings.GymDomicilio = Domicilio?.Trim() ?? "";
-        AppSettings.GymTelefono  = Telefono?.Trim() ?? "";
-        AppSettings.GymPieTicket = string.IsNullOrWhiteSpace(Mensaje) ? "¡Gracias por su preferencia!" : Mensaje.Trim();
-        AppSettings.DiasAviso    = MensajeVencimiento ?? 5;
+        AppSettings.GymNombre       = string.IsNullOrWhiteSpace(NombreGimnacio) ? "GymPro" : NombreGimnacio.Trim();
+        AppSettings.GymDomicilio    = Domicilio?.Trim() ?? "";
+        AppSettings.GymTelefono     = Telefono?.Trim() ?? "";
+        AppSettings.GymPieTicket    = string.IsNullOrWhiteSpace(Mensaje) ? "¡Gracias por su preferencia!" : Mensaje.Trim();
+        AppSettings.DiasAviso       = MensajeVencimiento ?? 5;
+        AppSettings.Pais            = existing.Pais;
+        AppSettings.MonedaSimbolo   = existing.MonedaSimbolo;
+        AppSettings.MonedaCodigo    = existing.MonedaCodigo;
+        AppSettings.Lada            = existing.Lada;
 
         // Manejo de eliminación del logo
         if (EliminarLogo)

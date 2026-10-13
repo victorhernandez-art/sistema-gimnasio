@@ -41,7 +41,7 @@
         </div>
         <div style="background:rgba(167,139,250,0.07);border:1px solid rgba(167,139,250,0.2);border-radius:10px;padding:12px 20px;min-width:130px;">
             <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">Ingresos visitas día</div>
-            <div style="font-size:22px;font-weight:700;color:#a78bfa;">$@ingresos.ToString("N2")</div>
+            <div style="font-size:22px;font-weight:700;color:#a78bfa;">@GymWeb.Helpers.AppSettings.MonedaSimbolo@ingresos.ToString("N2")</div>
         </div>
     </div>
 
@@ -61,7 +61,7 @@
             {
                 var esSocio = v.IdSocio != null;
                 var nombre  = esSocio
-                    ? $"{v.IdSocioNavigation?.Paterno} {v.IdSocioNavigation?.Materno}, {v.IdSocioNavigation?.Nombre}".Trim().Trim(',')
+                    ? (v.IdSocioNavigation?.NombreCompleto ?? $"Socio #{v.IdSocio}")
                     : (v.NombreVisita ?? "Visitante");
                 <tr>
                     <td class="text-muted" style="font-size:12px;">@v.FechaCreacion?.ToString("dd/MM/yyyy HH:mm")</td>
@@ -77,7 +77,7 @@
                     </td>
                     <td><strong>@nombre</strong></td>
                     <td style="text-align:right;color:@(v.PrecioVisita > 0 ? "#4ade80" : "var(--text-muted)");font-weight:600;">
-                        @(v.PrecioVisita > 0 ? "$" + v.PrecioVisita.ToString("N2") : "—")
+                        @(v.PrecioVisita > 0 ? GymWeb.Helpers.AppSettings.MonedaSimbolo + v.PrecioVisita.ToString("N2") : "—")
                     </td>
                 </tr>
             }

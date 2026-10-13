@@ -63,7 +63,7 @@
             </div>
             <div class="top-cart-text">
                 <span class="top-cart-label">Carrito</span>
-                <span id="topCartTotal" class="top-cart-amount">$0.00</span>
+                <span id="topCartTotal" class="top-cart-amount">@GymWeb.Helpers.AppSettings.MonedaSimbolo 0.00</span>
             </div>
         </button>
 
@@ -92,7 +92,7 @@
             <span class="kpi-title"><i class="fa-solid fa-dollar-sign kpi-icon green"></i> Ingresos de hoy</span>
             <span class="kpi-badge green">Total</span>
         </div>
-        <div class="kpi-value text-green">$@ingresosHoy.ToString("N2")</div>
+        <div class="kpi-value text-green">@GymWeb.Helpers.AppSettings.MonedaSimbolo@ingresosHoy.ToString("N2")</div>
         <div class="kpi-caption">Cobrado en efectivo, trans. y tarjeta</div>
     </div>
 
@@ -243,7 +243,7 @@
                         <h3 class="product-title" title="@p.Nombre">@p.Nombre</h3>
 
                         <div class="product-pricing-row">
-                            <div class="product-price">$@p.Precio?.ToString("N2")</div>
+                            <div class="product-price">@GymWeb.Helpers.AppSettings.MonedaSimbolo@p.Precio?.ToString("N2")</div>
                             <div class="product-stock-tag @(agotado ? "stock-cero" : (stockBajoItem ? "stock-alerta" : "stock-ok"))">
                                 <span class="stock-dot"></span>
                                 <span>Stock: @stock u</span>
@@ -314,19 +314,19 @@
             <div id="cartFooterSection" class="cart-footer" style="display:none;">
                 <div class="cart-summary-line">
                     <span>Subtotal</span>
-                    <span id="cartSubtotalText" class="font-bold">$0.00</span>
+                    <span id="cartSubtotalText" class="font-bold">@GymWeb.Helpers.AppSettings.MonedaSimbolo 0.00</span>
                 </div>
 
                 <div class="cart-discount-row">
                     <div class="discount-label">
-                        <i class="fa-solid fa-tag"></i> Descuento ($)
+                        <i class="fa-solid fa-tag"></i> Descuento (@GymWeb.Helpers.AppSettings.MonedaSimbolo)
                     </div>
                     <input type="number" id="cartDiscountInput" min="0" step="1" value="0" placeholder="0.00" oninput="actualizarTotalesCarrito()" />
                 </div>
 
                 <div class="cart-total-line">
                     <span class="total-label">Total</span>
-                    <span id="cartTotalText" class="total-amount">$0.00</span>
+                    <span id="cartTotalText" class="total-amount">@GymWeb.Helpers.AppSettings.MonedaSimbolo 0.00</span>
                 </div>
 
                 <!-- Botón Cobrar Venta -->
@@ -412,7 +412,7 @@
                 <span class="hist-kpi-title"><i class="fa-solid fa-circle-dollar-to-slot"></i> Total Vendido</span>
                 <span class="hist-kpi-sub" id="histKpiPeriodoTag">Hoy</span>
             </div>
-            <div class="hist-kpi-val text-green" id="histKpiTotal">$0.00</div>
+            <div class="hist-kpi-val text-green" id="histKpiTotal">@GymWeb.Helpers.AppSettings.MonedaSimbolo 0.00</div>
             <div class="hist-kpi-bottom" id="histKpiCantidades">0 ventas · 0 artículos</div>
         </div>
 
@@ -420,7 +420,7 @@
             <div class="hist-kpi-top">
                 <span class="hist-kpi-title"><i class="fa-solid fa-money-bill-wave" style="color:var(--pos-green);"></i> Efectivo</span>
             </div>
-            <div class="hist-kpi-val text-green" id="histKpiEfectivo">$0.00</div>
+            <div class="hist-kpi-val text-green" id="histKpiEfectivo">@GymWeb.Helpers.AppSettings.MonedaSimbolo 0.00</div>
             <div class="hist-kpi-bottom">Cobros en caja</div>
         </div>
 
@@ -428,7 +428,7 @@
             <div class="hist-kpi-top">
                 <span class="hist-kpi-title"><i class="fa-solid fa-building-columns" style="color:#38bdf8;"></i> Transferencia</span>
             </div>
-            <div class="hist-kpi-val text-cyan" id="histKpiTransfer">$0.00</div>
+            <div class="hist-kpi-val text-cyan" id="histKpiTransfer">@GymWeb.Helpers.AppSettings.MonedaSimbolo 0.00</div>
             <div class="hist-kpi-bottom">SPEI / Banco</div>
         </div>
 
@@ -436,7 +436,7 @@
             <div class="hist-kpi-top">
                 <span class="hist-kpi-title"><i class="fa-solid fa-credit-card" style="color:#c084fc;"></i> Tarjeta</span>
             </div>
-            <div class="hist-kpi-val" style="color:#c084fc;" id="histKpiTarjeta">$0.00</div>
+            <div class="hist-kpi-val" style="color:#c084fc;" id="histKpiTarjeta">@GymWeb.Helpers.AppSettings.MonedaSimbolo 0.00</div>
             <div class="hist-kpi-bottom">Terminal bancaria</div>
         </div>
 
@@ -444,7 +444,7 @@
             <div class="hist-kpi-top">
                 <span class="hist-kpi-title"><i class="fa-solid fa-handshake" style="color:#fbbf24;"></i> A Crédito</span>
             </div>
-            <div class="hist-kpi-val text-amber" id="histKpiCredito">$0.00</div>
+            <div class="hist-kpi-val text-amber" id="histKpiCredito">@GymWeb.Helpers.AppSettings.MonedaSimbolo 0.00</div>
             <div class="hist-kpi-bottom">Cuentas por cobrar</div>
         </div>
     </div>
@@ -502,7 +502,7 @@
             <!-- Gran Total en Pantalla -->
             <div class="checkout-amount-display">
                 <span class="checkout-amount-label">TOTAL A PAGAR</span>
-                <span id="checkoutTotalDisplay" class="checkout-amount-number">$0.00</span>
+                <span id="checkoutTotalDisplay" class="checkout-amount-number">@GymWeb.Helpers.AppSettings.MonedaSimbolo 0.00</span>
                 <span id="checkoutDiscountNote" class="checkout-amount-sub"></span>
             </div>
 
@@ -539,24 +539,24 @@
                 <div class="efectivo-calculator-box">
                     <label class="pos-field-label">Efectivo recibido de cliente:</label>
                     <div class="input-currency-wrapper">
-                        <span class="currency-symbol">$</span>
+                        <span class="currency-symbol">@GymWeb.Helpers.AppSettings.MonedaSimbolo</span>
                         <input type="number" id="inputEfectivoRecibido" step="any" min="0" placeholder="0.00" oninput="calcularCambioEfectivo()" />
                     </div>
 
                     <!-- Botones rápidos de billetes comunes -->
                     <div class="quick-cash-row">
                         <button type="button" onclick="setEfectivoExacto()" class="btn-cash-quick">Exacto</button>
-                        <button type="button" onclick="addEfectivoRecibido(50)" class="btn-cash-quick">$50</button>
-                        <button type="button" onclick="addEfectivoRecibido(100)" class="btn-cash-quick">$100</button>
-                        <button type="button" onclick="addEfectivoRecibido(200)" class="btn-cash-quick">$200</button>
-                        <button type="button" onclick="addEfectivoRecibido(500)" class="btn-cash-quick">$500</button>
-                        <button type="button" onclick="addEfectivoRecibido(1000)" class="btn-cash-quick">$1,000</button>
+                        <button type="button" onclick="addEfectivoRecibido(50)" class="btn-cash-quick">@GymWeb.Helpers.AppSettings.MonedaSimbolo 50</button>
+                        <button type="button" onclick="addEfectivoRecibido(100)" class="btn-cash-quick">@GymWeb.Helpers.AppSettings.MonedaSimbolo 100</button>
+                        <button type="button" onclick="addEfectivoRecibido(200)" class="btn-cash-quick">@GymWeb.Helpers.AppSettings.MonedaSimbolo 200</button>
+                        <button type="button" onclick="addEfectivoRecibido(500)" class="btn-cash-quick">@GymWeb.Helpers.AppSettings.MonedaSimbolo 500</button>
+                        <button type="button" onclick="addEfectivoRecibido(1000)" class="btn-cash-quick">@GymWeb.Helpers.AppSettings.MonedaSimbolo 1,000</button>
                     </div>
 
                     <!-- Resultado de Cambio -->
                     <div class="cambio-result-card" id="cambioBoxResult">
                         <span class="cambio-label">CAMBIO A DEVOLVER:</span>
-                        <span id="displayCambioCalculado" class="cambio-number">$0.00</span>
+                        <span id="displayCambioCalculado" class="cambio-number">@GymWeb.Helpers.AppSettings.MonedaSimbolo 0.00</span>
                     </div>
                     <div id="efectivoErrorMsg" class="cash-insufficient-alert" style="display:none;">
                         <i class="fa-solid fa-circle-exclamation"></i> El importe recibido es insuficiente.
@@ -613,7 +613,7 @@
                         {
                             foreach (var sc in (IEnumerable<dynamic>)ViewBag.SociosLista)
                             {
-                                <option value="@sc.IdSocio" data-deuda="@sc.DeudaTotal" data-tel="@sc.Telefono">@sc.NombreCompleto (Clave: @sc.IdSocio) @(sc.DeudaTotal > 0 ? $"— Debe: ${sc.DeudaTotal:N2}" : "— Al día")</option>
+                                <option value="@sc.IdSocio" data-deuda="@sc.DeudaTotal" data-tel="@sc.Telefono">@sc.NombreCompleto (Clave: @sc.IdSocio) @(sc.DeudaTotal > 0 ? $"— Debe: {GymWeb.Helpers.AppSettings.MonedaSimbolo}{sc.DeudaTotal:N2}" : "— Al día")</option>
                             }
                         }
                     </select>
@@ -729,15 +729,15 @@
             <div class="detalle-summary-box">
                 <div class="det-sum-line">
                     <span>Subtotal:</span>
-                    <span id="detSubtotalNum">$0.00</span>
+                    <span id="detSubtotalNum">@GymWeb.Helpers.AppSettings.MonedaSimbolo 0.00</span>
                 </div>
                 <div id="detDescuentoRow" class="det-sum-line" style="display:none;">
                     <span>Descuento:</span>
-                    <span id="detDescuentoNum" class="text-amber">-$0.00</span>
+                    <span id="detDescuentoNum" class="text-amber">-@GymWeb.Helpers.AppSettings.MonedaSimbolo 0.00</span>
                 </div>
                 <div class="det-sum-line det-total-big">
                     <span>TOTAL:</span>
-                    <span id="detTotalNum" class="text-green">$0.00</span>
+                    <span id="detTotalNum" class="text-green">@GymWeb.Helpers.AppSettings.MonedaSimbolo 0.00</span>
                 </div>
             </div>
         </div>
@@ -3222,13 +3222,14 @@ document.addEventListener('DOMContentLoaded', function() {
             if (container) container.innerHTML = '';
             if (emptyView) emptyView.style.display = 'flex';
             if (footerView) footerView.style.display = 'none';
-            if (topTotal) topTotal.textContent = '$0.00';
+            if (topTotal) topTotal.textContent = `${window.MONEDA_SIMBOLO || '$'}0.00`;
             return;
         }
 
         if (emptyView) emptyView.style.display = 'none';
         if (footerView) footerView.style.display = 'flex';
 
+        const mon = window.MONEDA_SIMBOLO || '$';
         let html = '';
         cart.forEach(item => {
             const subtotal = item.precio * item.cantidad;
@@ -3237,14 +3238,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     <img src="${item.img}" class="cart-item-thumb" alt="${item.nombre}" />
                     <div class="cart-item-info">
                         <div class="cart-item-name" title="${item.nombre}">${item.nombre}</div>
-                        <div class="cart-item-unit-price">$${item.precio.toFixed(2)} c/u</div>
+                        <div class="cart-item-unit-price">${mon}${item.precio.toFixed(2)} c/u</div>
                     </div>
                     <div class="cart-item-controls">
                         <button type="button" class="cart-btn-qty" onclick="cambiarCantidadItem(${item.id}, -1)">-</button>
                         <span class="cart-qty-text">${item.cantidad}</span>
                         <button type="button" class="cart-btn-qty" onclick="cambiarCantidadItem(${item.id}, 1)">+</button>
                     </div>
-                    <div class="cart-item-subtotal">$${subtotal.toFixed(2)}</div>
+                    <div class="cart-item-subtotal">${mon}${subtotal.toFixed(2)}</div>
                     <button type="button" class="cart-btn-del" onclick="eliminarItemCarrito(${item.id})" title="Quitar">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
@@ -3264,14 +3265,15 @@ document.addEventListener('DOMContentLoaded', function() {
         if (desc > subtotal) desc = subtotal;
 
         const total = Math.max(0, subtotal - desc);
+        const mon = window.MONEDA_SIMBOLO || '$';
 
         const subtotalEl = document.getElementById('cartSubtotalText');
         const totalEl = document.getElementById('cartTotalText');
         const topTotalEl = document.getElementById('topCartTotal');
 
-        if (subtotalEl) subtotalEl.textContent = `$${subtotal.toFixed(2)}`;
-        if (totalEl) totalEl.textContent = `$${total.toFixed(2)}`;
-        if (topTotalEl) topTotalEl.textContent = `$${total.toFixed(2)}`;
+        if (subtotalEl) subtotalEl.textContent = `${mon}${subtotal.toFixed(2)}`;
+        if (totalEl) totalEl.textContent = `${mon}${total.toFixed(2)}`;
+        if (topTotalEl) topTotalEl.textContent = `${mon}${total.toFixed(2)}`;
     };
 
     window.resetearBotonConfirmarVenta = function() {
@@ -3298,14 +3300,15 @@ document.addEventListener('DOMContentLoaded', function() {
         if (desc > subtotal) desc = subtotal;
 
         const total = Math.max(0, subtotal - desc);
+        const mon = window.MONEDA_SIMBOLO || '$';
 
         const totalDisplay = document.getElementById('checkoutTotalDisplay');
-        if (totalDisplay) totalDisplay.textContent = `$${total.toFixed(2)}`;
+        if (totalDisplay) totalDisplay.textContent = `${mon}${total.toFixed(2)}`;
 
         const descNote = document.getElementById('checkoutDiscountNote');
         if (descNote) {
             if (desc > 0) {
-                descNote.textContent = `(Descuento aplicado: -$${desc.toFixed(2)})`;
+                descNote.textContent = `(Descuento aplicado: -${mon}${desc.toFixed(2)})`;
                 descNote.style.display = 'block';
             } else {
                 descNote.textContent = '';
@@ -3437,10 +3440,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         const opt = select.options[select.selectedIndex];
         const deuda = parseFloat(opt.dataset.deuda || '0');
+        const mon = window.MONEDA_SIMBOLO || '$';
         if (box) box.style.display = 'block';
         if (deudaInfo) {
             if (deuda > 0) {
-                deudaInfo.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Saldo deudor actual del socio: $${deuda.toFixed(2)}`;
+                deudaInfo.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Saldo deudor actual del socio: ${mon}${deuda.toFixed(2)}`;
             } else {
                 deudaInfo.innerHTML = `<span style="color:#4ade80;"><i class="fa-solid fa-check"></i> El socio no tiene deudas pendientes.</span>`;
             }
@@ -3461,9 +3465,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const btn = document.getElementById('btnConfirmarVentaFinal');
         const err = document.getElementById('efectivoErrorMsg');
         const disp = document.getElementById('displayCambioCalculado');
+        const mon = window.MONEDA_SIMBOLO || '$';
 
         if (!val || val < total) {
-            if (disp) disp.textContent = '$0.00';
+            if (disp) disp.textContent = `${mon}0.00`;
             if (val > 0) {
                 if (err) err.style.display = 'block';
             } else {
@@ -3472,7 +3477,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (btn) btn.disabled = true;
         } else {
             const cambio = val - total;
-            if (disp) disp.textContent = '$' + cambio.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            if (disp) disp.textContent = mon + cambio.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
             if (err) err.style.display = 'none';
             if (btn) btn.disabled = false;
         }
@@ -3658,6 +3663,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const gymDom = data.gymDomicilio || '@Html.Raw(ViewBag.GymDomicilio ?? "")';
         const gymTel = data.gymTelefono || '@Html.Raw(ViewBag.GymTelefono ?? "")';
         const pie    = data.gymPieTicket || '@Html.Raw(ViewBag.GymPieTicket ?? "¡Gracias por su preferencia!")';
+        const mon    = (data.monedaSimbolo || window.MONEDA_SIMBOLO || window.GYM_CONFIG?.monedaSimbolo || '$').trim();
 
         const subtotal = Number(data.subtotal || data.total || 0);
         const descuento = Number(data.descuento || 0);
@@ -3678,10 +3684,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     <tr>
                         <td class="item-desc-cell">
                             <div class="item-name">${nom}</div>
-                            <div class="item-sub">${cant} x $${pu}</div>
+                            <div class="item-sub">${cant} x ${mon}${pu}</div>
                         </td>
                         <td class="item-total-cell">
-                            $${tot}
+                            ${mon}${tot}
                         </td>
                     </tr>
                 `;
@@ -3894,7 +3900,7 @@ document.addEventListener('DOMContentLoaded', function() {
             </tr>
             ${data.socioNombre ? `<tr><td class="meta-label">SOCIO:</td><td class="meta-val fw-bold">${data.socioNombre} ${data.idSocio || data.socioId ? '(#' + (data.idSocio || data.socioId) + ')' : ''}</td></tr>` : ''}
             ${data.esCredito ? `<tr><td class="meta-label">CONDICIÓN:</td><td class="meta-val fw-bold" style="color:#b91c1c;">PENDIENTE DE PAGO</td></tr>` : ''}
-            ${data.esCredito && data.saldoPendiente != null ? `<tr><td class="meta-label">SALDO PEND.:</td><td class="meta-val fw-bold">$${Number(data.saldoPendiente).toFixed(2)}</td></tr>` : ''}
+            ${data.esCredito && data.saldoPendiente != null ? `<tr><td class="meta-label">SALDO PEND.:</td><td class="meta-val fw-bold">${mon}${Number(data.saldoPendiente).toFixed(2)}</td></tr>` : ''}
             ${referencia ? `<tr><td class="meta-label">REF:</td><td class="meta-val">${referencia}</td></tr>` : ''}
         </table>
 
@@ -3918,27 +3924,27 @@ document.addEventListener('DOMContentLoaded', function() {
             ${descuento > 0 ? `
                 <tr>
                     <td class="fw-bold">SUBTOTAL:</td>
-                    <td class="text-right fw-bold">$${subtotal.toFixed(2)}</td>
+                    <td class="text-right fw-bold">${mon}${subtotal.toFixed(2)}</td>
                 </tr>
                 <tr>
                     <td class="fw-bold">DESCUENTO:</td>
-                    <td class="text-right fw-bold">-$${descuento.toFixed(2)}</td>
+                    <td class="text-right fw-bold">-${mon}${descuento.toFixed(2)}</td>
                 </tr>
             ` : ''}
             <tr class="total-big">
                 <td>TOTAL:</td>
-                <td class="text-right">$${total.toFixed(2)}</td>
+                <td class="text-right">${mon}${total.toFixed(2)}</td>
             </tr>
             ${montoRec != null && montoRec > 0 ? `
                 <tr>
                     <td class="fw-bold">RECIBIDO (${metodo}):</td>
-                    <td class="text-right fw-bold">$${montoRec.toFixed(2)}</td>
+                    <td class="text-right fw-bold">${mon}${montoRec.toFixed(2)}</td>
                 </tr>
             ` : ''}
             ${cambio != null && cambio > 0 ? `
                 <tr>
                     <td class="fw-black">CAMBIO:</td>
-                    <td class="text-right fw-black">$${cambio.toFixed(2)}</td>
+                    <td class="text-right fw-black">${mon}${cambio.toFixed(2)}</td>
                 </tr>
             ` : ''}
         </table>
@@ -4277,7 +4283,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // 1. Actualizar KPIs del período
             const res = data.resumen || { total: 0, efectivo: 0, transferencia: 0, tarjeta: 0, credito: 0, cantidadVentas: 0, articulos: 0 };
-            const fmtMoney = (n) => '$' + Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const fmtMoney = (n) => (window.MONEDA_SIMBOLO || '$') + Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
             const kpiTot = document.getElementById('histKpiTotal');
             const kpiCant = document.getElementById('histKpiCantidades');
@@ -4406,10 +4412,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
             ultimoDetalleConsultado = data;
 
+            const monDet = window.MONEDA_SIMBOLO || '$';
             document.getElementById('detFolioText').textContent = data.folio;
             document.getElementById('detFechaText').textContent = data.fecha;
             if (data.esCredito) {
-                document.getElementById('detMetodoText').innerHTML = `<span style="color:#fbbf24;font-weight:700;"><i class="fa-solid fa-handshake"></i> A Crédito</span>${data.socioNombre ? ' — Socio: <strong style="color:#fff;">' + data.socioNombre + '</strong>' : ''} ${data.saldoPendiente > 0 ? '<span style="color:#f87171;font-weight:700;">(Debe: $' + data.saldoPendiente.toFixed(2) + ')</span>' : '<span style="color:#4ade80;">(Liquidado)</span>'}`;
+                document.getElementById('detMetodoText').innerHTML = `<span style="color:#fbbf24;font-weight:700;"><i class="fa-solid fa-handshake"></i> A Crédito</span>${data.socioNombre ? ' — Socio: <strong style="color:#fff;">' + data.socioNombre + '</strong>' : ''} ${data.saldoPendiente > 0 ? '<span style="color:#f87171;font-weight:700;">(Debe: ' + monDet + data.saldoPendiente.toFixed(2) + ')</span>' : '<span style="color:#4ade80;">(Liquidado)</span>'}`;
             } else {
                 document.getElementById('detMetodoText').textContent = data.metodoPago;
             }
@@ -4433,24 +4440,24 @@ document.addEventListener('DOMContentLoaded', function() {
                             <div style="font-size:11px;color:var(--text-muted);">${it.categoria}</div>
                         </td>
                         <td style="text-align:center;">${it.cantidad}</td>
-                        <td style="text-align:right;">$${it.precioUnitario.toFixed(2)}</td>
-                        <td style="text-align:right;font-weight:700;color:var(--pos-cyan);">$${it.subtotal.toFixed(2)}</td>
+                        <td style="text-align:right;">${monDet}${it.precioUnitario.toFixed(2)}</td>
+                        <td style="text-align:right;font-weight:700;color:var(--pos-cyan);">${monDet}${it.subtotal.toFixed(2)}</td>
                     </tr>
                 `;
             });
             document.getElementById('detItemsTableBody').innerHTML = tbody;
 
-            document.getElementById('detSubtotalNum').textContent = '$' + data.subtotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            document.getElementById('detSubtotalNum').textContent = monDet + data.subtotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
             const descRow = document.getElementById('detDescuentoRow');
             if (data.descuento > 0) {
-                document.getElementById('detDescuentoNum').textContent = '-$' + data.descuento.toFixed(2);
+                document.getElementById('detDescuentoNum').textContent = '-' + monDet + data.descuento.toFixed(2);
                 descRow.style.display = 'flex';
             } else {
                 descRow.style.display = 'none';
             }
 
-            document.getElementById('detTotalNum').textContent = '$' + data.total.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            document.getElementById('detTotalNum').textContent = monDet + data.total.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
             document.getElementById('modalDetalleVenta').style.display = 'flex';
         } catch (e) {

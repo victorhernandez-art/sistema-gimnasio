@@ -17,6 +17,11 @@ public class HomeController : AuthController
     private static string? _cachedDownloadUrl;
     private static string? _cachedReleaseNotes;
     private static string? _cachedReleaseTitle;
+    private static List<string> _cachedNovedades = new();
+    private static List<string> _cachedCorrecciones = new();
+    private static string? _cachedAssetName;
+    private static long _cachedAssetSize;
+    private static string _cachedAssetSizeFormatted = "";
     private static DateTime _cacheExpiry = DateTime.MinValue;
 
     public HomeController(GymContext db, IHttpClientFactory http, IConfiguration config)
@@ -59,6 +64,69 @@ public class HomeController : AuthController
         return View();
     }
 
+    private static (List<string> novedades, List<string> correcciones) ParseReleaseNotes(string? body)
+    {
+        var nov = new List<string>();
+        var corr = new List<string>();
+        if (string.IsNullOrWhiteSpace(body)) return (nov, corr);
+
+        var lines = body.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+        bool sectionIsCorrections = false;
+
+        foreach (var rawLine in lines)
+        {
+            var line = rawLine.Trim();
+            if (string.IsNullOrWhiteSpace(line)) continue;
+
+            // Detectar encabezados de sección
+            var lower = line.ToLowerInvariant();
+            if (lower.StartsWith("#") || lower.EndsWith(":"))
+            {
+                if (lower.Contains("correcci") || lower.Contains("fix") || lower.Contains("solucion") || lower.Contains("arreglo"))
+                {
+                    sectionIsCorrections = true;
+                    continue;
+                }
+                else if (lower.Contains("novedad") || lower.Contains("mejora") || lower.Contains("nueva") || lower.Contains("cambio"))
+                {
+                    sectionIsCorrections = false;
+                    continue;
+                }
+            }
+
+            // Limpiar viñetas (- , * , • , 1. , etc.)
+            var clean = line.TrimStart('-', '*', '•', ' ', '\t');
+            if (clean.Length > 2 && char.IsDigit(clean[0]) && (clean[1] == '.' || clean[1] == ')'))
+            {
+                clean = clean.Substring(2).Trim();
+            }
+
+            if (string.IsNullOrWhiteSpace(clean)) continue;
+
+            if (sectionIsCorrections ||
+                clean.Contains("correg", StringComparison.OrdinalIgnoreCase) ||
+                clean.Contains("solucion", StringComparison.OrdinalIgnoreCase) ||
+                clean.Contains("fix", StringComparison.OrdinalIgnoreCase) ||
+                clean.Contains("bug", StringComparison.OrdinalIgnoreCase) ||
+                clean.Contains("error", StringComparison.OrdinalIgnoreCase) ||
+                clean.Contains("repar", StringComparison.OrdinalIgnoreCase))
+            {
+                corr.Add(clean);
+            }
+            else
+            {
+                nov.Add(clean);
+            }
+        }
+
+        if (nov.Count == 0 && corr.Count == 0)
+        {
+            nov.Add(body.Trim());
+        }
+
+        return (nov, corr);
+    }
+
     private static bool EsVersionMayor(string? tagRemoto, string? versionLocal)
     {
         if (string.IsNullOrWhiteSpace(tagRemoto) || string.IsNullOrWhiteSpace(versionLocal)) return false;
@@ -83,30 +151,33 @@ public class HomeController : AuthController
     {
         try
         {
-            // Usar cache de 24 horas para no martillar la API de GitHub
+            // Usar cache de 2 horas para no martillar la API de GitHub
             if (DateTime.UtcNow < _cacheExpiry && _cachedLatestVersion != null)
             {
                 bool cachedHasUpdate = EsVersionMayor(_cachedLatestVersion, AppSettings.CurrentVersion);
 
                 return Json(new
                 {
-                    hasUpdate    = cachedHasUpdate,
-                    current      = AppSettings.CurrentVersion,
-                    latest       = _cachedLatestVersion,
-                    downloadUrl  = _cachedDownloadUrl,
-                    releaseNotes = _cachedReleaseNotes ?? "",
-                    releaseTitle = _cachedReleaseTitle ?? ""
+                    hasUpdate          = cachedHasUpdate,
+                    current            = AppSettings.CurrentVersion,
+                    latest             = _cachedLatestVersion,
+                    downloadUrl        = _cachedDownloadUrl,
+                    releaseNotes       = _cachedReleaseNotes ?? "",
+                    releaseTitle       = _cachedReleaseTitle ?? "",
+                    novedades          = _cachedNovedades,
+                    correcciones       = _cachedCorrecciones,
+                    assetName          = _cachedAssetName ?? "Parche_Ligero_GymWeb.zip",
+                    assetSize          = _cachedAssetSize,
+                    assetSizeFormatted = _cachedAssetSizeFormatted
                 });
             }
 
-            // Configuración del repositorio desde appsettings.json
             var owner = _config["GitHub:Owner"] ?? "victorhernandez-art";
             var repo  = _config["GitHub:Repo"]  ?? "sistema-gimnasio";
             var apiUrl = $"https://api.github.com/repos/{owner}/{repo}/releases?per_page=10";
 
             var client = _http.CreateClient();
-            // GitHub requiere User-Agent para aceptar peticiones
-            client.DefaultRequestHeaders.Add("User-Agent", "GymWeb-UpdateChecker/2.1");
+            client.DefaultRequestHeaders.Add("User-Agent", "GymWeb-UpdateChecker/2.5");
             client.Timeout = TimeSpan.FromSeconds(8);
 
             var response = await client.GetAsync(apiUrl);
@@ -121,7 +192,6 @@ public class HomeController : AuthController
             System.Text.Json.JsonElement targetRelease = default;
             if (doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Array)
             {
-                // Buscar el release más reciente del sistema (tag que comience con 'v', ej: v2.3, v2.2)
                 foreach (var r in doc.RootElement.EnumerateArray())
                 {
                     if (r.TryGetProperty("tag_name", out var t) && (t.GetString() ?? "").StartsWith("v", StringComparison.OrdinalIgnoreCase))
@@ -145,56 +215,144 @@ public class HomeController : AuthController
                 return Json(new { hasUpdate = false, current = AppSettings.CurrentVersion });
             }
 
-            // Obtener datos del release del sistema
             var latestTag    = targetRelease.TryGetProperty("tag_name", out var tagEl) ? tagEl.GetString() ?? "" : "";
             var releaseTitle = targetRelease.TryGetProperty("name", out var nameEl)     ? nameEl.GetString() ?? "" : "";
             var releaseNotes = targetRelease.TryGetProperty("body", out var bodyEl)     ? bodyEl.GetString() ?? "" : "";
 
-            // Construir URL de descarga del parche ligero
+            var (novedades, correcciones) = ParseReleaseNotes(releaseNotes);
+
             string? downloadUrl = null;
+            string? assetName = null;
+            long assetSize = 0;
+
             if (targetRelease.TryGetProperty("assets", out var assets))
             {
+                // Prioridad 1: Parche ligero
                 foreach (var asset in assets.EnumerateArray())
                 {
-                    var assetName = asset.GetProperty("name").GetString() ?? "";
-                    if (assetName.Contains("Parche", StringComparison.OrdinalIgnoreCase) ||
-                        assetName.Contains("Instalador", StringComparison.OrdinalIgnoreCase))
+                    var aName = asset.GetProperty("name").GetString() ?? "";
+                    if (aName.Contains("Parche", StringComparison.OrdinalIgnoreCase))
                     {
                         downloadUrl = asset.GetProperty("browser_download_url").GetString();
+                        assetName = aName;
+                        if (asset.TryGetProperty("size", out var sEl)) assetSize = sEl.GetInt64();
                         break;
+                    }
+                }
+
+                // Prioridad 2: Cualquier .zip
+                if (string.IsNullOrEmpty(downloadUrl))
+                {
+                    foreach (var asset in assets.EnumerateArray())
+                    {
+                        var aName = asset.GetProperty("name").GetString() ?? "";
+                        if (aName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                        {
+                            downloadUrl = asset.GetProperty("browser_download_url").GetString();
+                            assetName = aName;
+                            if (asset.TryGetProperty("size", out var sEl)) assetSize = sEl.GetInt64();
+                            break;
+                        }
                     }
                 }
             }
 
-            // Fallback: página HTML del release en GitHub
             downloadUrl ??= targetRelease.TryGetProperty("html_url", out var htmlUrl)
                 ? htmlUrl.GetString()
                 : $"https://github.com/{owner}/{repo}/releases/latest";
 
-            // Guardar en cache por 24 horas
-            _cachedLatestVersion = latestTag;
-            _cachedDownloadUrl   = downloadUrl;
-            _cachedReleaseNotes  = releaseNotes;
-            _cachedReleaseTitle  = releaseTitle;
-            _cacheExpiry         = DateTime.UtcNow.AddHours(24);
+            var sizeFormatted = AutoUpdateService.FormatBytes(assetSize);
+
+            // Guardar en cache por 2 horas
+            _cachedLatestVersion       = latestTag;
+            _cachedDownloadUrl         = downloadUrl;
+            _cachedReleaseNotes        = releaseNotes;
+            _cachedReleaseTitle        = releaseTitle;
+            _cachedNovedades           = novedades;
+            _cachedCorrecciones        = correcciones;
+            _cachedAssetName           = assetName;
+            _cachedAssetSize           = assetSize;
+            _cachedAssetSizeFormatted  = sizeFormatted;
+            _cacheExpiry               = DateTime.UtcNow.AddHours(2);
 
             bool hasUpdate = EsVersionMayor(latestTag, AppSettings.CurrentVersion);
 
             return Json(new
             {
-                hasUpdate    = hasUpdate,
-                current      = AppSettings.CurrentVersion,
-                latest       = latestTag,
-                downloadUrl  = downloadUrl,
-                releaseNotes = releaseNotes,
-                releaseTitle = releaseTitle
+                hasUpdate          = hasUpdate,
+                current            = AppSettings.CurrentVersion,
+                latest             = latestTag,
+                downloadUrl        = downloadUrl,
+                releaseNotes       = releaseNotes,
+                releaseTitle       = releaseTitle,
+                novedades          = novedades,
+                correcciones       = correcciones,
+                assetName          = assetName ?? "Parche_Ligero_GymWeb.zip",
+                assetSize          = assetSize,
+                assetSizeFormatted = sizeFormatted
             });
         }
         catch
         {
-            // Si no hay internet o falla la API, simplemente no mostramos nada
             return Json(new { hasUpdate = false, current = AppSettings.CurrentVersion });
         }
+    }
+
+    // ── Iniciar Descarga e Instalación Automática en 1 Clic ──
+    [HttpPost]
+    public async Task<IActionResult> IniciarActualizacion()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(_cachedDownloadUrl))
+            {
+                await CheckUpdate();
+            }
+
+            var url = _cachedDownloadUrl;
+            if (string.IsNullOrEmpty(url))
+            {
+                return Json(new { ok = false, msg = "No se encontró el enlace de descarga del parche." });
+            }
+
+            var targetDir = AutoUpdateService.DetectTargetDirectory();
+            bool started = AutoUpdateService.StartUpdate(url, targetDir, _http);
+
+            if (!started)
+            {
+                return Json(new { ok = false, msg = "Ya existe una actualización en proceso." });
+            }
+
+            return Json(new { ok = true, msg = "Descarga iniciada correctamente." });
+        }
+        catch (Exception ex)
+        {
+            return Json(new { ok = false, msg = ex.Message });
+        }
+    }
+
+    // ── Consultar Progreso en Tiempo Real ──
+    [HttpGet]
+    public IActionResult ProgresoActualizacion()
+    {
+        var prog = AutoUpdateService.GetProgress();
+        return Json(prog);
+    }
+
+    // ── Cancelar Actualización ──
+    [HttpPost]
+    public IActionResult CancelarActualizacion()
+    {
+        AutoUpdateService.Cancel();
+        return Json(new { ok = true });
+    }
+
+    // ── Endpoint Ping para que el cliente detecte el reinicio del servidor ──
+    [HttpGet]
+    [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+    public IActionResult Ping()
+    {
+        return Json(new { ok = true, version = AppSettings.CurrentVersion });
     }
 
     [HttpGet]
@@ -215,7 +373,7 @@ public class HomeController : AuthController
         try
         {
             var client = _http.CreateClient();
-            client.DefaultRequestHeaders.Add("User-Agent", "GymWeb-Downloader/2.4");
+            client.DefaultRequestHeaders.Add("User-Agent", "GymWeb-Downloader/2.5");
             client.Timeout = TimeSpan.FromMinutes(3);
             var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
             if (!response.IsSuccessStatusCode)
@@ -346,20 +504,22 @@ public class HomeController : AuthController
             return Json(new List<object>());
 
         q = q.Trim().ToLower();
-        var socios = await _db.Socios
+        var sociosRaw = await _db.Socios
             .Where(s => s.IdEstado == 1 &&
                 (s.IdSocio.ToString().Contains(q) ||
                  (s.Nombre + " " + (s.Paterno ?? "") + " " + (s.Materno ?? "")).ToLower().Contains(q) ||
                  (s.Telefono != null && s.Telefono.Contains(q))))
             .Take(12)
-            .Select(s => new
-            {
-                idSocio = s.IdSocio,
-                nombre = $"{s.Nombre} {s.Paterno} {s.Materno}".Trim(),
-                telefono = s.Telefono ?? "",
-                foto = s.Foto
-            })
             .ToListAsync();
+
+        var socios = sociosRaw.Select(s => new
+        {
+            idSocio = s.IdSocio,
+            clave = s.ClaveFormateada,
+            nombre = s.NombreCompleto,
+            telefono = s.Telefono ?? "",
+            foto = s.Foto
+        }).ToList();
 
         return Json(socios);
     }

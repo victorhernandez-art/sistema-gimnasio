@@ -55,6 +55,18 @@ public static class ExcelReportHelper
         ws.PageSetup.ShowGridlines = true;
     }
 
+    public static string FormatoMonedaExcel()
+    {
+        var sim = string.IsNullOrWhiteSpace(AppSettings.MonedaSimbolo) ? "$" : AppSettings.MonedaSimbolo.Trim();
+        return $"\"{sim}\"#,##0.00";
+    }
+
+    public static string FormatearMonedaTexto(decimal monto)
+    {
+        var sim = string.IsNullOrWhiteSpace(AppSettings.MonedaSimbolo) ? "$" : AppSettings.MonedaSimbolo.Trim();
+        return $"{sim}{monto:N2}";
+    }
+
     /// <summary>
     /// Agrega el encabezado institucional y el logotipo en la hoja de cálculo de ClosedXML.
     /// </summary>
@@ -142,10 +154,10 @@ public static class ExcelReportHelper
         var ws = wb.Worksheets.Add("Socios");
         ConfigurarPaginaCarta(ws, XLPageOrientation.Portrait);
 
-        int row = AgregarEncabezado(ws, gymNombre, "DIRECTORIO GENERAL DE SOCIOS", $"Total: {socios.Count} socios registrados", logoBytes, 6);
+        int row = AgregarEncabezado(ws, gymNombre, "DIRECTORIO GENERAL DE SOCIOS", $"Total: {socios.Count} socios registrados", logoBytes, 7);
 
         // Encabezados de tabla
-        string[] headers = { "ID", "Apellidos", "Nombre(s)", "Teléfono", "Estado", "Fecha Registro" };
+        string[] headers = { "Clave", "Nombre Completo y Apellidos", "Tipo Doc.", "N° Documento", "Teléfono", "Estado", "Inicio Membresía" };
         for (int i = 0; i < headers.Length; i++)
         {
             var cell = ws.Cell(row, i + 1);
@@ -154,7 +166,7 @@ public static class ExcelReportHelper
             cell.Style.Font.FontColor = XLColor.White;
             cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#1E293B");
             cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
-            if (i == 0 || i >= 3) cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            if (i == 0 || i >= 2) cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
         }
         ws.Row(row).Height = 24;
 
@@ -166,31 +178,41 @@ public static class ExcelReportHelper
             ws.Row(row).Height = 20;
             var esActivo = s.IdEstado == 1;
 
-            ws.Cell(row, 1).Value = s.IdSocio;
+            ws.Cell(row, 1).Value = s.IdSocio.ToString("D4");
             ws.Cell(row, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
             ws.Cell(row, 1).Style.Font.Bold = true;
 
-            ws.Cell(row, 2).Value = $"{s.Paterno} {s.Materno}".Trim();
-            ws.Cell(row, 3).Value = s.Nombre ?? "";
-            ws.Cell(row, 3).Style.Font.Bold = true;
+            ws.Cell(row, 2).Value = s.NombreCompleto;
+            ws.Cell(row, 2).Style.Font.Bold = true;
 
-            ws.Cell(row, 4).Value = s.Telefono ?? "—";
+            ws.Cell(row, 3).Value = !string.IsNullOrWhiteSpace(s.TipoDocumento) ? s.TipoDocumento : "S/N";
+            ws.Cell(row, 3).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+            ws.Cell(row, 4).Value = !string.IsNullOrWhiteSpace(s.NumeroDocumento) ? s.NumeroDocumento : "—";
             ws.Cell(row, 4).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
-            var cellEstado = ws.Cell(row, 5);
+            ws.Cell(row, 5).Value = s.Telefono ?? "—";
+            ws.Cell(row, 5).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+            var cellEstado = ws.Cell(row, 6);
             cellEstado.Value = esActivo ? "ACTIVO" : "INACTIVO";
             cellEstado.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
             cellEstado.Style.Font.Bold = true;
             cellEstado.Style.Font.FontColor = esActivo ? XLColor.FromHtml("#16A34A") : XLColor.FromHtml("#DC2626");
 
-            var cellFecha = ws.Cell(row, 6);
-            if (s.FechaCreacion.HasValue)
+            var ultimaMem = s.Sociomembresia
+                .Where(sm => sm.IdEstado == 1)
+                .OrderByDescending(sm => sm.FechaInicioMembresia ?? sm.FechaCreacion)
+                .FirstOrDefault();
+
+            var cellFecha = ws.Cell(row, 7);
+            if (ultimaMem?.FechaInicioMembresia != null)
             {
-                cellFecha.Value = s.FechaCreacion.Value.ToString("dd/MM/yyyy");
+                cellFecha.Value = ultimaMem.FechaInicioMembresia.Value.ToString("dd/MM/yyyy");
             }
             else
             {
-                cellFecha.Value = "—";
+                cellFecha.Value = "Sin membresía";
             }
             cellFecha.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
@@ -208,12 +230,13 @@ public static class ExcelReportHelper
         dataRange.Style.Border.OutsideBorder = XLBorderStyleValues.Medium;
         dataRange.Style.Border.OutsideBorderColor = XLColor.FromHtml("#1E293B");
 
-        ws.Column(1).Width = 8;
-        ws.Column(2).Width = 18;
-        ws.Column(3).Width = 18;
-        ws.Column(4).Width = 14;
-        ws.Column(5).Width = 11;
-        ws.Column(6).Width = 13;
+        ws.Column(1).Width = 10;
+        ws.Column(2).Width = 32;
+        ws.Column(3).Width = 14;
+        ws.Column(4).Width = 16;
+        ws.Column(5).Width = 16;
+        ws.Column(6).Width = 12;
+        ws.Column(7).Width = 18;
 
         using var msOut = new MemoryStream();
         wb.SaveAs(msOut);
@@ -260,7 +283,7 @@ public static class ExcelReportHelper
             cellFecha.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
             var cellSocio = ws.Cell(row, 2);
-            cellSocio.Value = $"{p.IdSocioNavigation?.Nombre} {p.IdSocioNavigation?.Paterno}".Trim();
+            cellSocio.Value = p.IdSocioNavigation?.NombreCompleto ?? "—";
             cellSocio.Style.Font.Bold = true;
 
             ws.Cell(row, 3).Value = p.IdMembresiaNavigation?.Nombre ?? "Membresía / Acceso";
@@ -271,7 +294,7 @@ public static class ExcelReportHelper
 
             var cellMonto = ws.Cell(row, 5);
             cellMonto.Value = (double)p.Monto;
-            cellMonto.Style.NumberFormat.Format = "$#,##0.00";
+            cellMonto.Style.NumberFormat.Format = FormatoMonedaExcel();
             cellMonto.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
 
             ws.Cell(row, 6).Value = p.Notas ?? "—";
@@ -294,7 +317,7 @@ public static class ExcelReportHelper
 
         var cellTotalMonto = ws.Cell(row, 5);
         cellTotalMonto.Value = (double)total;
-        cellTotalMonto.Style.NumberFormat.Format = "$#,##0.00";
+        cellTotalMonto.Style.NumberFormat.Format = FormatoMonedaExcel();
         cellTotalMonto.Style.Font.Bold = true;
         cellTotalMonto.Style.Font.FontColor = XLColor.FromHtml("#16A34A");
         cellTotalMonto.Style.Fill.BackgroundColor = XLColor.FromHtml("#E2E8F0");
@@ -343,7 +366,7 @@ public static class ExcelReportHelper
         row++;
         ws.Row(row).Height = 35;
         
-        ws.Cell(row, 1).Value = "VISITAS DE DÍA\n" + totVisitas.ToString("C2");
+        ws.Cell(row, 1).Value = "VISITAS DE DÍA\n" + FormatearMonedaTexto(totVisitas);
         ws.Cell(row, 1).Style.Alignment.WrapText = true;
         ws.Cell(row, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
         ws.Cell(row, 1).Style.Font.Bold = true;
@@ -351,7 +374,7 @@ public static class ExcelReportHelper
         ws.Cell(row, 1).Style.Font.FontColor = XLColor.FromHtml("#1E40AF");
         ws.Cell(row, 1).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
 
-        ws.Cell(row, 2).Value = "VENTAS EN CAJA\n" + totVentasContado.ToString("C2") + (totVentasCredito > 0 ? $"\n(A Crédito: {totVentasCredito:C2})" : "");
+        ws.Cell(row, 2).Value = "VENTAS EN CAJA\n" + FormatearMonedaTexto(totVentasContado) + (totVentasCredito > 0 ? $"\n(A Crédito: {FormatearMonedaTexto(totVentasCredito)})" : "");
         ws.Cell(row, 2).Style.Alignment.WrapText = true;
         ws.Cell(row, 2).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
         ws.Cell(row, 2).Style.Font.Bold = true;
@@ -359,7 +382,7 @@ public static class ExcelReportHelper
         ws.Cell(row, 2).Style.Font.FontColor = XLColor.FromHtml("#166534");
         ws.Cell(row, 2).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
 
-        ws.Cell(row, 3).Value = "MEMBRESÍAS\n" + totPagos.ToString("C2");
+        ws.Cell(row, 3).Value = "MEMBRESÍAS\n" + FormatearMonedaTexto(totPagos);
         ws.Cell(row, 3).Style.Alignment.WrapText = true;
         ws.Cell(row, 3).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
         ws.Cell(row, 3).Style.Font.Bold = true;
@@ -369,7 +392,7 @@ public static class ExcelReportHelper
 
         var rangeTotalKpi = ws.Range(row, 4, row, 5);
         rangeTotalKpi.Merge();
-        rangeTotalKpi.Value = "TOTAL EN CAJA\n" + totGeneral.ToString("C2");
+        rangeTotalKpi.Value = "TOTAL EN CAJA\n" + FormatearMonedaTexto(totGeneral);
         rangeTotalKpi.Style.Alignment.WrapText = true;
         rangeTotalKpi.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
         rangeTotalKpi.Style.Font.Bold = true;
@@ -422,7 +445,7 @@ public static class ExcelReportHelper
 
                 var cMonto = ws.Cell(row, 4);
                 cMonto.Value = (double)v.PrecioVisita;
-                cMonto.Style.NumberFormat.Format = "$#,##0.00";
+                cMonto.Style.NumberFormat.Format = FormatoMonedaExcel();
                 cMonto.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
 
                 if ((row - startSec1) % 2 == 1)
@@ -436,7 +459,7 @@ public static class ExcelReportHelper
         ws.Range(row, 1, row, 3).Style.Fill.BackgroundColor = XLColor.FromHtml("#F1F5F9");
         var cSubVis = ws.Cell(row, 4);
         cSubVis.Value = (double)totVisitas;
-        cSubVis.Style.NumberFormat.Format = "$#,##0.00";
+        cSubVis.Style.NumberFormat.Format = FormatoMonedaExcel();
         cSubVis.Style.Font.Bold = true;
         cSubVis.Style.Fill.BackgroundColor = XLColor.FromHtml("#F1F5F9");
 
@@ -494,12 +517,12 @@ public static class ExcelReportHelper
 
                 var cPu = ws.Cell(row, 4);
                 cPu.Value = (double)pu;
-                cPu.Style.NumberFormat.Format = "$#,##0.00";
+                cPu.Style.NumberFormat.Format = FormatoMonedaExcel();
                 cPu.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
 
                 var cSub = ws.Cell(row, 5);
                 cSub.Value = (double)sub;
-                cSub.Style.NumberFormat.Format = "$#,##0.00";
+                cSub.Style.NumberFormat.Format = FormatoMonedaExcel();
                 cSub.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
 
                 if ((row - startSec2) % 2 == 1)
@@ -513,7 +536,7 @@ public static class ExcelReportHelper
         ws.Range(row, 1, row, 4).Style.Fill.BackgroundColor = XLColor.FromHtml("#F1F5F9");
         var cSubProd = ws.Cell(row, 5);
         cSubProd.Value = (double)totVentasContado;
-        cSubProd.Style.NumberFormat.Format = "$#,##0.00";
+        cSubProd.Style.NumberFormat.Format = FormatoMonedaExcel();
         cSubProd.Style.Font.Bold = true;
         cSubProd.Style.Fill.BackgroundColor = XLColor.FromHtml("#F1F5F9");
 
@@ -528,7 +551,7 @@ public static class ExcelReportHelper
 
             var cSubCred = ws.Cell(row, 5);
             cSubCred.Value = (double)totVentasCredito;
-            cSubCred.Style.NumberFormat.Format = "$#,##0.00";
+            cSubCred.Style.NumberFormat.Format = FormatoMonedaExcel();
             cSubCred.Style.Font.Bold = true;
             cSubCred.Style.Font.FontColor = XLColor.FromHtml("#B45309");
             cSubCred.Style.Fill.BackgroundColor = XLColor.FromHtml("#FFFBEB");
@@ -572,7 +595,7 @@ public static class ExcelReportHelper
                 ws.Cell(row, 1).Value = p.FechaPago.ToString("dd/MM/yyyy");
                 ws.Cell(row, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
-                ws.Cell(row, 2).Value = $"{p.IdSocioNavigation?.Nombre} {p.IdSocioNavigation?.Paterno}".Trim();
+                ws.Cell(row, 2).Value = p.IdSocioNavigation?.NombreCompleto ?? "—";
                 ws.Cell(row, 3).Value = p.IdMembresiaNavigation?.Nombre ?? (!string.IsNullOrWhiteSpace(p.Notas) ? p.Notas : "Abono / Cobranza");
 
                 ws.Cell(row, 4).Value = p.MetodoPago ?? "Efectivo";
@@ -580,7 +603,7 @@ public static class ExcelReportHelper
 
                 var cM = ws.Cell(row, 5);
                 cM.Value = (double)p.Monto;
-                cM.Style.NumberFormat.Format = "$#,##0.00";
+                cM.Style.NumberFormat.Format = FormatoMonedaExcel();
                 cM.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
 
                 if ((row - startSec3) % 2 == 1)
@@ -594,7 +617,7 @@ public static class ExcelReportHelper
         ws.Range(row, 1, row, 4).Style.Fill.BackgroundColor = XLColor.FromHtml("#F1F5F9");
         var cSubMem = ws.Cell(row, 5);
         cSubMem.Value = (double)totPagos;
-        cSubMem.Style.NumberFormat.Format = "$#,##0.00";
+        cSubMem.Style.NumberFormat.Format = FormatoMonedaExcel();
         cSubMem.Style.Font.Bold = true;
         cSubMem.Style.Fill.BackgroundColor = XLColor.FromHtml("#F1F5F9");
 
@@ -611,7 +634,7 @@ public static class ExcelReportHelper
 
         var cTotGen = ws.Cell(row, 5);
         cTotGen.Value = (double)totGeneral;
-        cTotGen.Style.NumberFormat.Format = "$#,##0.00";
+        cTotGen.Style.NumberFormat.Format = FormatoMonedaExcel();
         cTotGen.Style.Font.Bold = true;
         cTotGen.Style.Font.FontSize = 12;
         cTotGen.Style.Font.FontColor = XLColor.FromHtml("#16A34A");
@@ -643,7 +666,7 @@ public static class ExcelReportHelper
         decimal totalMembresias = deudores.Sum(d => d.DeudaMembresias);
         decimal granTotalDeuda = deudores.Sum(d => d.DeudaTotal);
 
-        int row = AgregarEncabezado(ws, gymNombre, "CUENTAS POR COBRAR — SOCIOS CON SALDO DEUDOR", $"Total por cobrar: ${granTotalDeuda:N2}  |  {deudores.Count} socios deudores", logoBytes, 6);
+        int row = AgregarEncabezado(ws, gymNombre, "CUENTAS POR COBRAR — SOCIOS CON SALDO DEUDOR", $"Total por cobrar: {FormatearMonedaTexto(granTotalDeuda)}  |  {deudores.Count} socios deudores", logoBytes, 6);
 
         // Encabezados de tabla
         string[] headers = { "Clave", "Nombre del Socio", "Teléfono", "Deuda Productos", "Deuda Membresía", "Total Deudor" };
@@ -678,19 +701,19 @@ public static class ExcelReportHelper
 
             var cProd = ws.Cell(row, 4);
             cProd.Value = (double)d.DeudaProductos;
-            cProd.Style.NumberFormat.Format = "$#,##0.00";
+            cProd.Style.NumberFormat.Format = FormatoMonedaExcel();
             cProd.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
             if (d.DeudaProductos > 0) cProd.Style.Font.FontColor = XLColor.FromHtml("#B45309");
 
             var cMem = ws.Cell(row, 5);
             cMem.Value = (double)d.DeudaMembresias;
-            cMem.Style.NumberFormat.Format = "$#,##0.00";
+            cMem.Style.NumberFormat.Format = FormatoMonedaExcel();
             cMem.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
             if (d.DeudaMembresias > 0) cMem.Style.Font.FontColor = XLColor.FromHtml("#2563EB");
 
             var cTot = ws.Cell(row, 6);
             cTot.Value = (double)d.DeudaTotal;
-            cTot.Style.NumberFormat.Format = "$#,##0.00";
+            cTot.Style.NumberFormat.Format = FormatoMonedaExcel();
             cTot.Style.Font.Bold = true;
             cTot.Style.Font.FontColor = XLColor.FromHtml("#DC2626"); // Rojo deudor
             cTot.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
@@ -712,19 +735,19 @@ public static class ExcelReportHelper
 
         var cTotProd = ws.Cell(row, 4);
         cTotProd.Value = (double)totalProductos;
-        cTotProd.Style.NumberFormat.Format = "$#,##0.00";
+        cTotProd.Style.NumberFormat.Format = FormatoMonedaExcel();
         cTotProd.Style.Font.Bold = true;
         cTotProd.Style.Fill.BackgroundColor = XLColor.FromHtml("#FDE68A");
 
         var cTotMem = ws.Cell(row, 5);
         cTotMem.Value = (double)totalMembresias;
-        cTotMem.Style.NumberFormat.Format = "$#,##0.00";
+        cTotMem.Style.NumberFormat.Format = FormatoMonedaExcel();
         cTotMem.Style.Font.Bold = true;
         cTotMem.Style.Fill.BackgroundColor = XLColor.FromHtml("#FDE68A");
 
         var cGranTot = ws.Cell(row, 6);
         cGranTot.Value = (double)granTotalDeuda;
-        cGranTot.Style.NumberFormat.Format = "$#,##0.00";
+        cGranTot.Style.NumberFormat.Format = FormatoMonedaExcel();
         cGranTot.Style.Font.Bold = true;
         cGranTot.Style.Font.FontColor = XLColor.FromHtml("#DC2626");
         cGranTot.Style.Fill.BackgroundColor = XLColor.FromHtml("#FDE68A");
@@ -757,8 +780,8 @@ public static class ExcelReportHelper
         var ws = wb.Worksheets.Add("Asistencias");
         ConfigurarPaginaCarta(ws, XLPageOrientation.Portrait);
 
-        string nombreSocio = $"{socio.Nombre} {socio.Paterno} {socio.Materno}".Trim();
-        int row = AgregarEncabezado(ws, gymNombre, $"HISTORIAL DE ASISTENCIAS — {nombreSocio.ToUpper()}", $"Período: {periodoTexto}  |  Clave Socio: #{socio.IdSocio}", logoBytes, 4);
+        string nombreSocio = socio.NombreCompleto;
+        int row = AgregarEncabezado(ws, gymNombre, $"HISTORIAL DE ASISTENCIAS — {nombreSocio.ToUpper()}", $"Período: {periodoTexto}  |  Clave Socio: #{socio.ClaveFormateada}", logoBytes, 4);
 
         // Encabezados
         string[] headers = { "#", "Fecha", "Día de la Semana", "Hora de Ingreso" };

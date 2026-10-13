@@ -63,22 +63,33 @@ public class SociosController : AuthController
                 decimal precioReciente = memReciente.Precio ?? 0m;
                 var pagosSocio = pagosPorSocio.TryGetValue(s.IdSocio, out var lp) ? lp : new List<Pago>();
 
-                // Fecha de inicio de la membresía reciente
+                // Fecha de inicio y fecha de registro de la membresía
                 var fInicio = (memReciente.FechaInicioMembresia ?? memReciente.FechaCreacion ?? DateTime.Today).Date;
-                var fCortePagos = DateOnly.FromDateTime(fInicio.AddDays(-3));
+                var fRegistro = (memReciente.FechaCreacion ?? fInicio).Date;
+                var fMinima = DateOnly.FromDateTime(fInicio < fRegistro ? fInicio.AddDays(-7) : fRegistro.AddDays(-7));
 
-                // Pagos dirigidos a esta membresía o realizados en torno a su fecha de inicio o posteriores
+                // 1. Pagos explícitamente dirigidos a esta membresía o realizados en el ciclo
                 decimal totalPagadoCiclo = pagosSocio
-                    .Where(p => p.IdMembresia == memReciente.IdMembresia || p.FechaPago >= fCortePagos)
+                    .Where(p => (p.IdMembresia.HasValue && p.IdMembresia == memReciente.IdMembresia) || p.FechaPago >= fMinima)
                     .Sum(p => p.Monto);
 
-                // Si no hay pagos en el ciclo pero el socio tiene pagos generales históricos acumulados que cubren el monto
+                // 2. Pagos generales / abonos registrados desde la fecha de registro de esta membresía
+                if (totalPagadoCiclo < precioReciente)
+                {
+                    var fCreacionOnly = DateOnly.FromDateTime(fRegistro.AddDays(-1));
+                    decimal pagosDesdeCreacion = pagosSocio
+                        .Where(p => p.FechaPago >= fCreacionOnly)
+                        .Sum(p => p.Monto);
+                    totalPagadoCiclo = Math.Max(totalPagadoCiclo, pagosDesdeCreacion);
+                }
+
+                // 3. Respaldo histórico para evitar falsos adeudos en clientes migrados
                 if (totalPagadoCiclo < precioReciente)
                 {
                     decimal totalPagadoHistorico = pagosSocio.Sum(p => p.Monto);
                     if (totalPagadoHistorico >= precioReciente)
                     {
-                        totalPagadoCiclo = Math.Max(totalPagadoCiclo, precioReciente);
+                        totalPagadoCiclo = precioReciente;
                     }
                 }
 
@@ -101,7 +112,7 @@ public class SociosController : AuthController
             deudasDict[s.IdSocio] = new SocioDeudorItemDto
             {
                 IdSocio = s.IdSocio,
-                NombreCompleto = $"{s.Nombre} {s.Paterno} {s.Materno}".Trim(),
+                NombreCompleto = s.NombreCompleto,
                 Telefono = s.Telefono ?? "",
                 DeudaProductos = dProd,
                 DeudaMembresias = dMem
@@ -111,6 +122,7 @@ public class SociosController : AuthController
         ViewBag.Deudas = deudasDict;
         ViewBag.TotalDeudoresCount = deudasDict.Values.Count(d => d.DeudaTotal > 0);
         ViewBag.TotalMontoPorCobrar = deudasDict.Values.Sum(d => d.DeudaTotal);
+        ViewBag.UltimasMembresias = ultimaMembresiaPorSocio;
 
         return View(socios);
     }
@@ -125,7 +137,8 @@ public class SociosController : AuthController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(Socio socio, string? FotoBase64, int? IdMembresia, DateTime? FechaInicioMembresia)
+    public async Task<IActionResult> Create(Socio socio, string? FotoBase64, int? IdMembresia, DateTime? FechaInicioMembresia,
+        bool registrarPago = false, string metodoPago = "Efectivo", decimal? montoPago = null)
     {
         if (!ModelState.IsValid)
         {
@@ -133,11 +146,14 @@ public class SociosController : AuthController
             ViewBag.Membresias = await _db.Membresia.Where(m => m.IdEstado == 1).OrderBy(m => m.Nombre).ToListAsync();
             return View(socio);
         }
-        if (socio.FechaCreacion == null || (socio.FechaCreacion.Value.Date == DateTime.Today && FechaInicioMembresia.HasValue && FechaInicioMembresia.Value.Date != DateTime.Today))
+        socio.Nombre = socio.Nombre?.Trim();
+        socio.Paterno = "";
+        socio.Materno = socio.Materno?.Trim();
+        socio.TipoDocumento = string.IsNullOrWhiteSpace(socio.TipoDocumento) ? "S/N" : socio.TipoDocumento.Trim();
+
+        if (socio.FechaCreacion == null)
         {
-            socio.FechaCreacion = FechaInicioMembresia.HasValue
-                ? FechaInicioMembresia.Value.Date.Add(DateTime.Now.TimeOfDay)
-                : DateTime.Now;
+            socio.FechaCreacion = DateTime.Now;
         }
         else if (socio.FechaCreacion.Value.Date == DateTime.Today)
         {
@@ -155,8 +171,38 @@ public class SociosController : AuthController
             var b64 = FotoBase64.Contains(',') ? FotoBase64.Split(',')[1] : FotoBase64;
             socio.Foto = Convert.FromBase64String(b64);
         }
+
+        // Asignar primera clave consecutiva entera >= 1 disponible (0001, 0002, ...)
+        // Condición: Una clave se considera OCUPADA si existe un socio registrado (ya sea ACTIVO o INACTIVO).
+        // Si la clave 1 (0001) no está ocupada, se asigna 1. Si está ocupada (inactivo o activo), se evalúa la siguiente (0002, etc.).
+        var idsOcupados = await _db.Socios.Select(s => s.IdSocio).ToListAsync();
+        var setOcupados = new HashSet<int>(idsOcupados);
+        int nuevaClave = 1;
+        while (setOcupados.Contains(nuevaClave))
+        {
+            nuevaClave++;
+        }
+        socio.IdSocio = nuevaClave;
+
         _db.Socios.Add(socio);
         await _db.SaveChangesAsync();
+
+        // Mantener sincronizado sqlite_sequence en SQLite
+        try
+        {
+            if (_db.Database.IsSqlite())
+            {
+                var maxId = await _db.Socios.MaxAsync(s => (int?)s.IdSocio) ?? 0;
+                await _db.Database.ExecuteSqlRawAsync("DELETE FROM sqlite_sequence WHERE name = 'socio';");
+                if (maxId > 0)
+                {
+                    await _db.Database.ExecuteSqlRawAsync(
+                        "INSERT INTO sqlite_sequence (name, seq) VALUES ('socio', {0});", maxId);
+                }
+            }
+        }
+        catch { }
+
         if (IdMembresia.HasValue && FechaInicioMembresia.HasValue)
         {
             var mem = await _db.Membresia.FindAsync(IdMembresia.Value);
@@ -171,8 +217,65 @@ public class SociosController : AuthController
                 IdUsuarioCreo = UsuarioId
             });
             await _db.SaveChangesAsync();
+
+            // Verificar si el usuario marcó registrar el cobro al crear el socio
+            bool cobrar = false;
+            if (Request.HasFormContentType && Request.Form.TryGetValue("registrarPago", out var regVal))
+            {
+                cobrar = regVal.Any(v => string.Equals(v, "true", StringComparison.OrdinalIgnoreCase) || 
+                                         string.Equals(v, "on", StringComparison.OrdinalIgnoreCase) || 
+                                         string.Equals(v, "1", StringComparison.OrdinalIgnoreCase));
+            }
+
+            decimal montoFinal = 0m;
+            if (montoPago.HasValue && montoPago.Value > 0)
+            {
+                montoFinal = montoPago.Value;
+            }
+            else if (Request.Form.TryGetValue("montoPago", out var rawMonto) && !string.IsNullOrWhiteSpace(rawMonto))
+            {
+                var clean = rawMonto.ToString().Trim().Replace("$", "");
+                if (decimal.TryParse(clean, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsedVal) ||
+                    decimal.TryParse(clean, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.CurrentCulture, out parsedVal))
+                {
+                    montoFinal = parsedVal;
+                }
+            }
+
+            if (montoFinal <= 0 && mem?.Precio != null)
+            {
+                montoFinal = mem.Precio.Value;
+            }
+
+            if (cobrar && montoFinal > 0)
+            {
+                var pago = new Pago
+                {
+                    IdSocio = socio.IdSocio,
+                    IdMembresia = IdMembresia.Value,
+                    Monto = montoFinal,
+                    MetodoPago = string.IsNullOrWhiteSpace(metodoPago) ? "Efectivo" : metodoPago,
+                    FechaPago = DateOnly.FromDateTime(DateTime.Today),
+                    Notas = $"Cobro membresía inicial: {mem?.Nombre ?? "Membresía"}",
+                    IdEstado = 1,
+                    FechaCreacion = DateTime.Now,
+                    IdUsuarioCreo = UsuarioId
+                };
+                _db.Pagos.Add(pago);
+                await _db.SaveChangesAsync();
+                TempData["UltimoPagoId"] = pago.IdPago;
+                TempData["Success"] = $"Socio registrado y cobro de ${montoFinal:N2} ingresado a caja correctamente.";
+            }
+            else
+            {
+                TempData["Success"] = "Socio registrado con membresía a crédito (pendiente de cobro en caja).";
+            }
         }
-        TempData["Success"] = "Socio registrado correctamente.";
+        else
+        {
+            TempData["Success"] = "Socio registrado correctamente.";
+        }
+        LiveSyncService.NotifySociosChanged();
         return RedirectToAction(nameof(Index));
     }
 
@@ -182,12 +285,20 @@ public class SociosController : AuthController
         ViewData["Title"] = "Editar Socio";
         var socio = await _db.Socios.FindAsync(id);
         if (socio == null) return NotFound();
+
+        var memActiva = await _db.Sociomembresia
+            .Include(sm => sm.IdMembresiaNavigation)
+            .Where(sm => sm.IdSocio == id && sm.IdEstado == 1)
+            .OrderByDescending(sm => sm.FechaInicioMembresia ?? sm.FechaCreacion)
+            .FirstOrDefaultAsync();
+        ViewBag.MembresiaActiva = memActiva;
+
         return View(socio);
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(Socio socio, string? FotoBase64)
+    public async Task<IActionResult> Edit(Socio socio, string? FotoBase64, int? IdSocioMembresia, DateTime? FechaInicioMembresia)
     {
         ModelState.Remove(nameof(socio.IdEstadoNavigation));
         ModelState.Remove(nameof(socio.IdUsuarioCreoNavigation));
@@ -204,6 +315,12 @@ public class SociosController : AuthController
         if (!ModelState.IsValid)
         {
             ViewData["Title"] = "Editar Socio";
+            if (IdSocioMembresia.HasValue)
+            {
+                ViewBag.MembresiaActiva = await _db.Sociomembresia
+                    .Include(sm => sm.IdMembresiaNavigation)
+                    .FirstOrDefaultAsync(sm => sm.IdSocioMembresia == IdSocioMembresia.Value);
+            }
             return View(socio);
         }
 
@@ -211,8 +328,9 @@ public class SociosController : AuthController
         if (existing == null) return NotFound();
 
         existing.Nombre = socio.Nombre?.Trim();
-        existing.Paterno = socio.Paterno?.Trim();
+        existing.Paterno = "";
         existing.Materno = socio.Materno?.Trim();
+        existing.TipoDocumento = string.IsNullOrWhiteSpace(socio.TipoDocumento) ? "S/N" : socio.TipoDocumento.Trim();
         existing.Telefono = socio.Telefono?.Trim();
         existing.Observaciones = socio.Observaciones?.Trim();
         if (socio.FechaCreacion.HasValue)
@@ -225,9 +343,38 @@ public class SociosController : AuthController
             var b64 = FotoBase64.Contains(',') ? FotoBase64.Split(',')[1] : FotoBase64;
             existing.Foto = Convert.FromBase64String(b64);
         }
+
+        // Si se editó la fecha de inicio de su membresía
+        if (IdSocioMembresia.HasValue && FechaInicioMembresia.HasValue)
+        {
+            var sm = await _db.Sociomembresia.FindAsync(IdSocioMembresia.Value);
+            if (sm != null && sm.IdSocio == socio.IdSocio)
+            {
+                sm.FechaInicioMembresia = FechaInicioMembresia.Value.Date;
+            }
+        }
+
         await _db.SaveChangesAsync();
-        TempData["Success"] = "Socio actualizado correctamente.";
+        LiveSyncService.NotifySociosChanged();
+        TempData["Success"] = "Socio y vigencia de membresía actualizados correctamente.";
         return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ActualizarFechaInicioMembresia(int idSocioMembresia, int idSocio, DateTime nuevaFechaInicio)
+    {
+        var sm = await _db.Sociomembresia.FindAsync(idSocioMembresia);
+        if (sm == null || sm.IdSocio != idSocio)
+        {
+            TempData["Warning"] = "No se encontró el registro de membresía a actualizar.";
+            return RedirectToAction(nameof(Membresia), new { id = idSocio });
+        }
+
+        sm.FechaInicioMembresia = nuevaFechaInicio.Date;
+        await _db.SaveChangesAsync();
+        TempData["Success"] = $"Fecha de inicio de membresía actualizada a {nuevaFechaInicio:dd/MM/yyyy} correctamente.";
+        return RedirectToAction(nameof(Membresia), new { id = idSocio });
     }
 
     [HttpPost]
@@ -236,6 +383,7 @@ public class SociosController : AuthController
     {
         var socio = await _db.Socios.FindAsync(id);
         if (socio != null) { socio.IdEstado = 2; await _db.SaveChangesAsync(); }
+        LiveSyncService.NotifySociosChanged();
         TempData["Success"] = "Socio inactivado.";
         return RedirectToAction(nameof(Index));
     }
@@ -259,6 +407,24 @@ public class SociosController : AuthController
 
             _db.Socios.Remove(socio);
             await _db.SaveChangesAsync();
+
+            // Sincronizar sqlite_sequence tras eliminar
+            try
+            {
+                if (_db.Database.IsSqlite())
+                {
+                    var maxId = await _db.Socios.MaxAsync(s => (int?)s.IdSocio) ?? 0;
+                    await _db.Database.ExecuteSqlRawAsync("DELETE FROM sqlite_sequence WHERE name = 'socio';");
+                    if (maxId > 0)
+                    {
+                        await _db.Database.ExecuteSqlRawAsync(
+                            "INSERT INTO sqlite_sequence (name, seq) VALUES ('socio', {0});", maxId);
+                    }
+                }
+            }
+            catch { }
+
+            LiveSyncService.NotifySociosChanged();
             TempData["Success"] = "Socio eliminado permanentemente.";
         }
         catch (Exception ex)
@@ -285,6 +451,7 @@ public class SociosController : AuthController
         {
             socio.Foto = null;
             await _db.SaveChangesAsync();
+            LiveSyncService.NotifySociosChanged();
             TempData["Success"] = "Foto eliminada correctamente.";
         }
         return RedirectToAction(nameof(Edit), new { id });
@@ -296,6 +463,7 @@ public class SociosController : AuthController
     {
         var socio = await _db.Socios.FindAsync(id);
         if (socio != null) { socio.IdEstado = 1; await _db.SaveChangesAsync(); }
+        LiveSyncService.NotifySociosChanged();
         TempData["Success"] = "Socio activado correctamente.";
         return RedirectToAction(nameof(Index));
     }
@@ -317,7 +485,7 @@ public class SociosController : AuthController
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> AsignarMembresia(int idSocio, int idMembresia, DateTime fechaInicio,
-        bool registrarPago = true, string metodoPago = "Efectivo", decimal? montoPago = null)
+        bool registrarPago = false, string metodoPago = "Efectivo", decimal? montoPago = null)
     {
         var mem = await _db.Membresia.FindAsync(idMembresia);
         if (mem == null) return NotFound();
@@ -329,7 +497,7 @@ public class SociosController : AuthController
             .OrderByDescending(v => v.FechaCreacion)
             .FirstOrDefaultAsync();
         if (activa != null && activa.Vencimiento.HasValue && activa.Vencimiento.Value >= hoyDt)
-            TempData["Warning"] = $"⚠️ El socio ya tiene la membresía \u2018{activa.NombreMembresia}\u2019 activa hasta {activa.Vencimiento.Value:dd/MM/yyyy}. Se agregó la nueva de todas formas.";
+            TempData["Warning"] = $"⚠️ El socio ya tiene la membresía ‘{activa.NombreMembresia}’ activa hasta {activa.Vencimiento.Value:dd/MM/yyyy}. Se agregó la nueva de todas formas.";
 
         _db.Sociomembresia.Add(new Sociomembresium
         {
@@ -343,13 +511,41 @@ public class SociosController : AuthController
         });
         await _db.SaveChangesAsync();
 
-        if (registrarPago && ((montoPago ?? mem.Precio ?? 0m) > 0))
+        bool cobrar = false;
+        if (Request.HasFormContentType && Request.Form.TryGetValue("registrarPago", out var regVal))
+        {
+            cobrar = regVal.Any(v => string.Equals(v, "true", StringComparison.OrdinalIgnoreCase) || 
+                                     string.Equals(v, "on", StringComparison.OrdinalIgnoreCase) || 
+                                     string.Equals(v, "1", StringComparison.OrdinalIgnoreCase));
+        }
+
+        decimal montoFinal = 0m;
+        if (montoPago.HasValue && montoPago.Value > 0)
+        {
+            montoFinal = montoPago.Value;
+        }
+        else if (Request.Form.TryGetValue("montoPago", out var rawMonto) && !string.IsNullOrWhiteSpace(rawMonto))
+        {
+            var clean = rawMonto.ToString().Trim().Replace("$", "");
+            if (decimal.TryParse(clean, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsedVal) ||
+                decimal.TryParse(clean, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.CurrentCulture, out parsedVal))
+            {
+                montoFinal = parsedVal;
+            }
+        }
+
+        if (montoFinal <= 0 && mem.Precio != null)
+        {
+            montoFinal = mem.Precio.Value;
+        }
+
+        if (cobrar && montoFinal > 0)
         {
             var pago = new Pago
             {
                 IdSocio = idSocio,
                 IdMembresia = idMembresia,
-                Monto = montoPago ?? mem.Precio ?? 0m,
+                Monto = montoFinal,
                 MetodoPago = string.IsNullOrWhiteSpace(metodoPago) ? "Efectivo" : metodoPago,
                 FechaPago = DateOnly.FromDateTime(DateTime.Today),
                 Notas = $"Cobro membresía: {mem.Nombre}",
@@ -360,13 +556,14 @@ public class SociosController : AuthController
             _db.Pagos.Add(pago);
             await _db.SaveChangesAsync();
             TempData["UltimoPagoId"] = pago.IdPago;
-            TempData["Success"] = $"Membresía asignada y cobro de ${(montoPago ?? mem.Precio ?? 0m):N2} registrado en caja correctamente.";
+            TempData["Success"] = $"Membresía asignada y cobro de ${montoFinal:N2} registrado en caja correctamente.";
         }
         else
         {
-            TempData["Success"] = "Membresía asignada (pendiente de cobro / registrada con adeudo).";
+            TempData["Success"] = "Membresía asignada a crédito (pendiente de cobro en caja).";
         }
 
+        LiveSyncService.NotifySociosChanged();
         return RedirectToAction(nameof(Membresia), new { id = idSocio });
     }
 
@@ -374,7 +571,7 @@ public class SociosController : AuthController
     {
         var socio = await _db.Socios.FindAsync(id);
         if (socio == null) return NotFound();
-        ViewData["Title"] = $"Pagos de {socio.Nombre} {socio.Paterno}";
+        ViewData["Title"] = $"Pagos de {socio.NombreCompleto}";
         ViewBag.Socio = socio;
         var pagos = await _db.Pagos
             .Include(p => p.IdMembresiaNavigation)
@@ -388,17 +585,26 @@ public class SociosController : AuthController
     {
         var socios = await _db.Socios
             .Include(s => s.IdEstadoNavigation)
+            .Include(s => s.Sociomembresia.Where(sm => sm.IdEstado == 1))
+                .ThenInclude(sm => sm.IdMembresiaNavigation)
             .OrderBy(s => s.Paterno).ThenBy(s => s.Nombre)
             .ToListAsync();
 
         if (formato.Equals("csv", StringComparison.OrdinalIgnoreCase))
         {
             var sbCsv = new System.Text.StringBuilder();
-            sbCsv.AppendLine("Clave,Nombre,Paterno,Materno,Telefono,Estado,FechaRegistro");
+            sbCsv.AppendLine("Clave,Nombre,TipoDocumento,NumeroDocumento,Telefono,Estado,InicioMembresia");
             foreach (var s in socios)
             {
                 var estado = s.IdEstado == 1 ? "Activo" : "Inactivo";
-                sbCsv.AppendLine($"{s.IdSocio},\"{s.Nombre}\",\"{s.Paterno}\",\"{s.Materno}\",\"{s.Telefono}\",{estado},{s.FechaCreacion:dd/MM/yyyy}");
+                var fIni = s.Sociomembresia
+                    .Where(sm => sm.IdEstado == 1)
+                    .OrderByDescending(sm => sm.FechaInicioMembresia ?? sm.FechaCreacion)
+                    .FirstOrDefault()?.FechaInicioMembresia?.ToString("dd/MM/yyyy") ?? "Sin membresía";
+                var nombreCompleto = s.NombreCompleto;
+                var tipoDoc = !string.IsNullOrWhiteSpace(s.TipoDocumento) ? s.TipoDocumento : "S/N";
+                var numDoc = s.NumeroDocumento;
+                sbCsv.AppendLine($"{s.IdSocio:D4},\"{nombreCompleto}\",\"{tipoDoc}\",\"{numDoc}\",\"{s.Telefono}\",{estado},{fIni}");
             }
             var bytesCsv = System.Text.Encoding.UTF8.GetBytes(sbCsv.ToString());
             return File(bytesCsv, "text/csv", $"socios_{DateTime.Today:yyyyMMdd}.csv");
@@ -472,7 +678,8 @@ public class SociosController : AuthController
             ok = true,
             socio = new {
                 id = socio.IdSocio,
-                nombre = $"{socio.Nombre} {socio.Paterno} {socio.Materno}".Trim(),
+                nombre = socio.NombreCompleto,
+                dni = !string.IsNullOrWhiteSpace(socio.NumeroDocumento) ? socio.NumeroDocumento : "—",
                 telefono = socio.Telefono ?? "—"
             },
             periodo,
@@ -550,11 +757,21 @@ public class SociosController : AuthController
                 var m = membresiasAsignadas.First();
                 decimal precio = m.Precio ?? 0m;
                 var fInicio = (m.FechaInicioMembresia ?? m.FechaCreacion ?? DateTime.Today).Date;
-                var fCorte = DateOnly.FromDateTime(fInicio.AddDays(-3));
+                var fRegistro = (m.FechaCreacion ?? fInicio).Date;
+                var fMinima = DateOnly.FromDateTime(fInicio < fRegistro ? fInicio.AddDays(-7) : fRegistro.AddDays(-7));
 
                 decimal pagado = pagosSocio
-                    .Where(p => p.IdMembresia == m.IdMembresia || p.FechaPago >= fCorte)
+                    .Where(p => (p.IdMembresia.HasValue && p.IdMembresia == m.IdMembresia) || p.FechaPago >= fMinima)
                     .Sum(p => p.Monto);
+
+                if (pagado < precio)
+                {
+                    var fCreacionOnly = DateOnly.FromDateTime(fRegistro.AddDays(-1));
+                    decimal pagosDesdeCreacion = pagosSocio
+                        .Where(p => p.FechaPago >= fCreacionOnly)
+                        .Sum(p => p.Monto);
+                    pagado = Math.Max(pagado, pagosDesdeCreacion);
+                }
 
                 if (pagado < precio && pagosSocio.Sum(p => p.Monto) >= precio)
                 {
@@ -588,7 +805,8 @@ public class SociosController : AuthController
                 ok = true,
                 socio = new {
                     id = socio.IdSocio,
-                    nombre = $"{socio.Nombre} {socio.Paterno} {socio.Materno}".Trim(),
+                    nombre = socio.NombreCompleto,
+                    dni = !string.IsNullOrWhiteSpace(socio.NumeroDocumento) ? socio.NumeroDocumento : "—",
                     telefono = socio.Telefono ?? "—"
                 },
                 deudaTotal,
@@ -663,7 +881,15 @@ public class SociosController : AuthController
             {
                 idMemRef = await _db.Sociomembresia
                     .Where(sm => sm.IdSocio == dto.IdSocio && sm.IdEstado == 1)
-                    .OrderByDescending(sm => sm.FechaCreacion)
+                    .OrderByDescending(sm => sm.FechaInicioMembresia ?? sm.FechaCreacion)
+                    .Select(sm => sm.IdMembresia)
+                    .FirstOrDefaultAsync();
+            }
+            else if (tipoCobro == "General" && restante > 0)
+            {
+                idMemRef = await _db.Sociomembresia
+                    .Where(sm => sm.IdSocio == dto.IdSocio && sm.IdEstado == 1)
+                    .OrderByDescending(sm => sm.FechaInicioMembresia ?? sm.FechaCreacion)
                     .Select(sm => sm.IdMembresia)
                     .FirstOrDefaultAsync();
             }
@@ -685,6 +911,9 @@ public class SociosController : AuthController
             _db.Pagos.Add(pago);
             await _db.SaveChangesAsync();
             await tx.CommitAsync();
+
+            LiveSyncService.NotifySociosChanged();
+            LiveSyncService.NotifyVentasChanged();
 
             return Json(new {
                 ok = true,
@@ -744,11 +973,21 @@ public class SociosController : AuthController
                 var pagosSocio = pagosPorSocio.TryGetValue(s.IdSocio, out var lp) ? lp : new List<Pago>();
 
                 var fInicio = (memReciente.FechaInicioMembresia ?? memReciente.FechaCreacion ?? DateTime.Today).Date;
-                var fCortePagos = DateOnly.FromDateTime(fInicio.AddDays(-3));
+                var fRegistro = (memReciente.FechaCreacion ?? fInicio).Date;
+                var fMinima = DateOnly.FromDateTime(fInicio < fRegistro ? fInicio.AddDays(-7) : fRegistro.AddDays(-7));
 
                 decimal totalPagadoCiclo = pagosSocio
-                    .Where(p => p.IdMembresia == memReciente.IdMembresia || p.FechaPago >= fCortePagos)
+                    .Where(p => (p.IdMembresia.HasValue && p.IdMembresia == memReciente.IdMembresia) || p.FechaPago >= fMinima)
                     .Sum(p => p.Monto);
+
+                if (totalPagadoCiclo < precioReciente)
+                {
+                    var fCreacionOnly = DateOnly.FromDateTime(fRegistro.AddDays(-1));
+                    decimal pagosDesdeCreacion = pagosSocio
+                        .Where(p => p.FechaPago >= fCreacionOnly)
+                        .Sum(p => p.Monto);
+                    totalPagadoCiclo = Math.Max(totalPagadoCiclo, pagosDesdeCreacion);
+                }
 
                 if (totalPagadoCiclo < precioReciente && pagosSocio.Sum(p => p.Monto) >= precioReciente)
                 {
@@ -775,7 +1014,7 @@ public class SociosController : AuthController
                 deudores.Add(new SocioDeudorItemDto
                 {
                     IdSocio = s.IdSocio,
-                    NombreCompleto = $"{s.Nombre} {s.Paterno} {s.Materno}".Trim(),
+                    NombreCompleto = s.NombreCompleto,
                     Telefono = s.Telefono ?? "",
                     DeudaProductos = dProd,
                     DeudaMembresias = dMem
@@ -842,38 +1081,153 @@ public class SociosController : AuthController
     [HttpGet]
     public async Task<IActionResult> GetSociosParaDifusion(string filtro = "todos")
     {
-        var socios = await _db.Vwultimamembresiadetallada.ToListAsync();
+        var hoyDt = DateTime.Today;
+
+        // 1. Obtener todos los socios que tengan teléfono registrado
+        var socios = await _db.Socios
+            .Include(s => s.IdEstadoNavigation)
+            .Where(s => !string.IsNullOrWhiteSpace(s.Telefono))
+            .OrderBy(s => s.Nombre)
+            .ToListAsync();
+
+        // 2. Obtener deudas de productos fiados (crédito pendiente en tienda)
+        var deudasProductos = await _db.Salida
+            .Where(s => s.IdEstado == 1 && s.EsCredito && s.SaldoPendiente > 0 && s.IdSocio != null)
+            .GroupBy(s => s.IdSocio!.Value)
+            .Select(g => new { IdSocio = g.Key, Total = g.Sum(x => x.SaldoPendiente) })
+            .ToDictionaryAsync(x => x.IdSocio, x => x.Total);
+
+        // 3. Obtener última membresía de cada socio
+        var membresiasRecientes = await _db.Sociomembresia
+            .Include(sm => sm.IdMembresiaNavigation)
+            .Where(sm => sm.IdEstado == 1 && sm.IdSocio != null)
+            .OrderByDescending(sm => sm.FechaInicioMembresia ?? sm.FechaCreacion)
+            .ToListAsync();
+
+        var ultimaMembresiaPorSocio = membresiasRecientes
+            .GroupBy(sm => sm.IdSocio!.Value)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        // 4. Pagos para calcular deudas de membresías
+        var todosPagos = await _db.Pagos
+            .Where(p => p.IdEstado == 1 && (p.IdMembresia != null || p.Notas == null || !p.Notas.Contains("[TIENDA_CREDITO]")))
+            .ToListAsync();
+
+        var pagosPorSocio = todosPagos
+            .GroupBy(p => p.IdSocio)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
         var config = await _db.Configuracions.FirstOrDefaultAsync();
         string gymNombre = !string.IsNullOrWhiteSpace(config?.NombreGimnacio) ? config.NombreGimnacio : AppSettings.GymNombre;
 
-        var lista = socios
-            .Where(s => s.IdSocio.HasValue && !string.IsNullOrWhiteSpace(s.Telefono))
-            .Select(s => {
-                var vencido = s.Vencimiento.HasValue && s.Vencimiento.Value < DateTime.Now;
-                return new {
-                    idSocio = s.IdSocio!.Value,
-                    nombre = $"{s.NombreSocio} {s.Paterno}".Trim(),
-                    nombreCompleto = $"{s.NombreSocio} {s.Paterno} {s.Materno}".Trim(),
-                    telefono = s.Telefono!.Trim().Replace(" ", "").Replace("-", ""),
-                    membresia = s.NombreMembresia ?? "Sin membresía",
-                    vencimiento = s.Vencimiento?.ToString("dd/MM/yyyy") ?? "Sin fecha",
-                    vencido = vencido,
-                    activo = s.Vencimiento.HasValue && !vencido
-                };
-            }).ToList();
+        var lista = new List<dynamic>();
 
-        if (filtro == "activos")
+        foreach (var s in socios)
         {
-            lista = lista.Where(s => s.activo).ToList();
-        }
-        else if (filtro == "vencidos")
-        {
-            lista = lista.Where(s => s.vencido).ToList();
+            decimal dProd = deudasProductos.TryGetValue(s.IdSocio, out var dp) ? dp : 0m;
+            decimal dMem = 0m;
+            bool tieneMembresia = ultimaMembresiaPorSocio.TryGetValue(s.IdSocio, out var memReciente);
+            DateTime? fechaVencimiento = null;
+            string nombreMembresia = "Sin membresía";
+            bool activo = false;
+            bool vencido = true;
+
+            if (tieneMembresia && memReciente != null)
+            {
+                nombreMembresia = memReciente.IdMembresiaNavigation?.Nombre ?? "Membresía";
+                var fInicio = (memReciente.FechaInicioMembresia ?? memReciente.FechaCreacion ?? DateTime.Today).Date;
+                var fRegistro = (memReciente.FechaCreacion ?? fInicio).Date;
+                int duracionDias = memReciente.IdMembresiaNavigation?.Meses ?? 30;
+                fechaVencimiento = fInicio.AddDays(duracionDias);
+
+                // Activo si no ha vencido y el socio está activo
+                if (fechaVencimiento.Value >= hoyDt && s.IdEstado == 1)
+                {
+                    activo = true;
+                    vencido = false;
+                }
+                else
+                {
+                    activo = false;
+                    vencido = true;
+                }
+
+                // Cálculo de saldo pendiente de membresía
+                decimal precioReciente = memReciente.Precio ?? 0m;
+                var pagosSocio = pagosPorSocio.TryGetValue(s.IdSocio, out var lp) ? lp : new List<Pago>();
+                var fMinima = DateOnly.FromDateTime(fInicio < fRegistro ? fInicio.AddDays(-7) : fRegistro.AddDays(-7));
+
+                decimal totalPagadoCiclo = pagosSocio
+                    .Where(p => (p.IdMembresia.HasValue && p.IdMembresia == memReciente.IdMembresia) || p.FechaPago >= fMinima)
+                    .Sum(p => p.Monto);
+
+                if (totalPagadoCiclo < precioReciente)
+                {
+                    var fCreacionOnly = DateOnly.FromDateTime(fRegistro.AddDays(-1));
+                    decimal pagosDesdeCreacion = pagosSocio
+                        .Where(p => p.FechaPago >= fCreacionOnly)
+                        .Sum(p => p.Monto);
+                    totalPagadoCiclo = Math.Max(totalPagadoCiclo, pagosDesdeCreacion);
+                }
+
+                if (totalPagadoCiclo < precioReciente)
+                {
+                    decimal totalPagadoHistorico = pagosSocio.Sum(p => p.Monto);
+                    if (totalPagadoHistorico >= precioReciente)
+                    {
+                        totalPagadoCiclo = precioReciente;
+                    }
+                }
+
+                if (totalPagadoCiclo < precioReciente && fechaVencimiento.Value >= hoyDt.AddDays(-15))
+                {
+                    dMem = Math.Max(0m, precioReciente - totalPagadoCiclo);
+                }
+            }
+            else
+            {
+                activo = false;
+                vencido = true;
+            }
+
+            decimal deudaTotal = dProd + dMem;
+
+            lista.Add(new
+            {
+                idSocio = s.IdSocio,
+                nombre = s.NombreCompleto,
+                nombreCompleto = s.NombreCompleto,
+                dni = s.Materno ?? "",
+                telefono = s.Telefono!.Trim().Replace(" ", "").Replace("-", ""),
+                membresia = nombreMembresia,
+                vencimiento = fechaVencimiento.HasValue ? fechaVencimiento.Value.ToString("dd/MM/yyyy") : "Sin fecha",
+                vencido = vencido,
+                activo = activo,
+                deuda = deudaTotal,
+                tieneDeuda = deudaTotal > 0
+            });
         }
 
-        return Json(new {
+        // 5. Aplicar filtro seleccionado por el usuario
+        var fClean = (filtro ?? "todos").Trim().ToLowerInvariant();
+        if (fClean == "activos")
+        {
+            lista = lista.Where(s => (bool)s.activo == true).ToList();
+        }
+        else if (fClean == "inactivos" || fClean == "vencidos")
+        {
+            lista = lista.Where(s => (bool)s.activo == false).ToList();
+        }
+        else if (fClean == "deudores" || fClean == "deuda" || fClean == "con_deuda")
+        {
+            lista = lista.Where(s => (bool)s.tieneDeuda == true).ToList();
+        }
+
+        return Json(new
+        {
             ok = true,
             gymNombre = gymNombre,
+            filtro = fClean,
             total = lista.Count,
             socios = lista
         });

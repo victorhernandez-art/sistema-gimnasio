@@ -79,7 +79,7 @@
                 <strong style="color:#fbbf24;">@visitasSinPrecio visita(s) sin precio asignado</strong>
                 @if (precioConfig > 0)
                 {
-                    <div class="text-muted" style="font-size:12px;">Precio configurado: <strong style="color:#4ade80;">$@precioConfig.ToString("N2")</strong> — Haz clic en "Aplicar" para corregirlas</div>
+                    <div class="text-muted" style="font-size:12px;">Precio configurado: <strong style="color:#4ade80;">@GymWeb.Helpers.AppSettings.MonedaSimbolo@precioConfig.ToString("N2")</strong> — Haz clic en "Aplicar" para corregirlas</div>
                 }
                 else
                 {
@@ -93,7 +93,7 @@
                     <input type="hidden" name="fecha" value="@fecha" />
                     <input type="hidden" name="precio" value="@precioConfig.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" />
                     <button type="submit" class="btn btn-sm" style="background:rgba(251,191,36,0.15);border:1px solid rgba(251,191,36,0.4);color:#fbbf24;white-space:nowrap;">
-                        <i class="fa-solid fa-rotate"></i> Aplicar $@precioConfig.ToString("N2") a @visitasSinPrecio visita(s)
+                        <i class="fa-solid fa-rotate"></i> Aplicar @GymWeb.Helpers.AppSettings.MonedaSimbolo@precioConfig.ToString("N2") a @visitasSinPrecio visita(s)
                     </button>
                 </form>
             }
@@ -133,33 +133,33 @@
         <div style="background:rgba(167,139,250,0.08);border:1px solid rgba(167,139,250,0.25);border-radius:var(--radius);padding:14px 18px;">
             <div class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:1px;">Visitas de día</div>
             <div style="font-size:22px;font-weight:700;color:#a78bfa;margin-top:4px;">@visitas.Count</div>
-            <div style="font-size:13px;color:#a78bfa;margin-top:2px;">$@totalVisitas.ToString("N2")</div>
+            <div style="font-size:13px;color:#a78bfa;margin-top:2px;">@GymWeb.Helpers.AppSettings.MonedaSimbolo@totalVisitas.ToString("N2")</div>
         </div>
         <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:var(--radius);padding:14px 18px;">
             <div class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:1px;">Ventas en caja</div>
             <div style="font-size:22px;font-weight:700;color:#10b981;margin-top:4px;">@totalUnidadesVentas <span style="font-size:12px;font-weight:400;color:var(--text-muted);">unid.</span></div>
-            <div style="font-size:13px;color:#10b981;margin-top:2px;">$@totalVentasContado.ToString("N2")</div>
+            <div style="font-size:13px;color:#10b981;margin-top:2px;">@GymWeb.Helpers.AppSettings.MonedaSimbolo@totalVentasContado.ToString("N2")</div>
             @if (totalVentasCredito > 0)
             {
                 <div style="font-size:11px;color:#fb923c;margin-top:4px;" title="Ventas a crédito: no suman a caja hasta su cobro físico">
-                    <i class="fa-solid fa-clock"></i> A Crédito: $@totalVentasCredito.ToString("N2") (por cobrar)
+                    <i class="fa-solid fa-clock"></i> A Crédito: @GymWeb.Helpers.AppSettings.MonedaSimbolo@totalVentasCredito.ToString("N2") (por cobrar)
                 </div>
             }
         </div>
         <div style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);border-radius:var(--radius);padding:14px 18px;">
             <div class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:1px;">Cobranza Membresías / Abonos</div>
             <div style="font-size:22px;font-weight:700;color:#38bdf8;margin-top:4px;">@pagos.Count <span style="font-size:12px;font-weight:400;color:var(--text-muted);">recibos</span></div>
-            <div style="font-size:13px;color:#38bdf8;margin-top:2px;">$@totalPagos.ToString("N2")</div>
+            <div style="font-size:13px;color:#38bdf8;margin-top:2px;">@GymWeb.Helpers.AppSettings.MonedaSimbolo@totalPagos.ToString("N2")</div>
             @if (totalAbonos > 0)
             {
                 <div style="font-size:11px;color:#fbbf24;margin-top:4px;" title="Abonos a deudas de crédito cobrados e ingresados a caja">
-                    <i class="fa-solid fa-hand-holding-dollar"></i> Abonos: $@totalAbonos.ToString("N2")
+                    <i class="fa-solid fa-hand-holding-dollar"></i> Abonos: @GymWeb.Helpers.AppSettings.MonedaSimbolo@totalAbonos.ToString("N2")
                 </div>
             }
         </div>
         <div style="background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.3);border-radius:var(--radius);padding:14px 18px;">
             <div class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:1px;">@(modo=="mes"?"Total del mes":"Total en caja")</div>
-            <div style="font-size:26px;font-weight:800;color:#4ade80;margin-top:4px;">$@totalDia.ToString("N2")</div>
+            <div style="font-size:26px;font-weight:800;color:#4ade80;margin-top:4px;">@GymWeb.Helpers.AppSettings.MonedaSimbolo@totalDia.ToString("N2")</div>
             <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Ingreso real verificado</div>
         </div>
     </div>
@@ -186,14 +186,14 @@
                         <tr>
                             <td class="text-muted" style="font-size:12px;">@(modo=="mes" ? v.FechaCreacion?.ToString("dd/MM HH:mm") : v.FechaCreacion?.ToString("HH:mm"))</td>
                             <td class="name-cell">@v.NombreVisita</td>
-                            <td style="text-align:right;color:#a78bfa;font-weight:600;">$@v.PrecioVisita.ToString("N2")</td>
+                            <td style="text-align:right;color:#a78bfa;font-weight:600;">@GymWeb.Helpers.AppSettings.MonedaSimbolo@v.PrecioVisita.ToString("N2")</td>
                         </tr>
                     }
                     </tbody>
                     <tfoot>
                         <tr style="background:rgba(167,139,250,0.07);font-weight:700;">
                             <td colspan="2" style="text-align:right;font-size:13px;color:var(--text-muted);">Subtotal visitas</td>
-                            <td style="text-align:right;color:#a78bfa;">$@totalVisitas.ToString("N2")</td>
+                            <td style="text-align:right;color:#a78bfa;">@GymWeb.Helpers.AppSettings.MonedaSimbolo@totalVisitas.ToString("N2")</td>
                         </tr>
                     </tfoot>
                 </table>
@@ -213,7 +213,7 @@
         <div style="margin-bottom:24px;">
             <h3 style="font-size:14px;font-weight:600;color:#10b981;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;">
                 <span><i class="fa-solid fa-bag-shopping"></i> Ventas de productos (@totalUnidadesVentas @(totalUnidadesVentas == 1 ? "unidad" : "unidades"))</span>
-                <span style="font-size:12px;font-weight:normal;color:var(--text-muted);">Contado: $@totalVentasContado.ToString("N2") @(totalVentasCredito > 0 ? $"· A Crédito: ${totalVentasCredito:N2}" : "")</span>
+                <span style="font-size:12px;font-weight:normal;color:var(--text-muted);">Contado: @GymWeb.Helpers.AppSettings.MonedaSimbolo@totalVentasContado.ToString("N2") @(totalVentasCredito > 0 ? $"· A Crédito: {GymWeb.Helpers.AppSettings.MonedaSimbolo}{totalVentasCredito:N2}" : "")</span>
             </h3>
             <div class="table-responsive">
                 <table class="gym-table">
@@ -264,9 +264,9 @@
                                 }
                             </td>
                             <td style="text-align:right;color:var(--text-muted);">@v.Cantidad</td>
-                            <td style="text-align:right;color:#4ade80;font-weight:600;">$@((precioItem * v.Cantidad).ToString("N2"))</td>
+                            <td style="text-align:right;color:#4ade80;font-weight:600;">@GymWeb.Helpers.AppSettings.MonedaSimbolo@((precioItem * v.Cantidad).ToString("N2"))</td>
                             <td style="text-align:right;font-size:12px;color:#4ade80;">
-                                $@gananciaItem.ToString("N2")
+                                @GymWeb.Helpers.AppSettings.MonedaSimbolo@gananciaItem.ToString("N2")
                             </td>
                         </tr>
                     }
@@ -274,8 +274,8 @@
                     <tfoot>
                         <tr style="background:rgba(16,185,129,0.07);font-weight:700;">
                             <td colspan="3" style="text-align:right;font-size:13px;color:var(--text-muted);">Subtotal Contado (en caja):</td>
-                            <td style="text-align:right;color:#4ade80;">$@totalVentasContado.ToString("N2")</td>
-                            <td style="text-align:right;color:#4ade80;font-size:12px;" title="Ganancia realizada cobrada en caja">$@gananciaContado.ToString("N2")</td>
+                            <td style="text-align:right;color:#4ade80;">@GymWeb.Helpers.AppSettings.MonedaSimbolo@totalVentasContado.ToString("N2")</td>
+                            <td style="text-align:right;color:#4ade80;font-size:12px;" title="Ganancia realizada cobrada en caja">@GymWeb.Helpers.AppSettings.MonedaSimbolo@gananciaContado.ToString("N2")</td>
                         </tr>
                         @if (totalVentasCredito > 0)
                         {
@@ -283,8 +283,8 @@
                                 <td colspan="3" style="text-align:right;color:#fb923c;">
                                     <i class="fa-solid fa-clock"></i> Ventas a Crédito (No ingresan a caja de hoy):
                                 </td>
-                                <td style="text-align:right;color:#fb923c;font-weight:700;">$@totalVentasCredito.ToString("N2")</td>
-                                <td style="text-align:right;color:#fb923c;font-size:11px;" title="Ganancia pendiente de cobro en efectivo">$@gananciaCredito.ToString("N2") <span style="font-size:9.5px;">(por cobrar)</span></td>
+                                <td style="text-align:right;color:#fb923c;font-weight:700;">@GymWeb.Helpers.AppSettings.MonedaSimbolo@totalVentasCredito.ToString("N2")</td>
+                                <td style="text-align:right;color:#fb923c;font-size:11px;" title="Ganancia pendiente de cobro en efectivo">@GymWeb.Helpers.AppSettings.MonedaSimbolo@gananciaCredito.ToString("N2") <span style="font-size:9.5px;">(por cobrar)</span></td>
                             </tr>
                         }
                     </tfoot>
@@ -303,9 +303,9 @@
     @if (pagos.Any())
     {
         <div style="margin-bottom:28px;">
-            <h3 style="font-size:14px;font-weight:600;color:#38bdf8;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;">
+            <h3 style="font-size:14px;font-weight:600;color:#38bdf8;margin-bottom:10px;display:flex;align-items:justify-content:space-between;">
                 <span><i class="fa-solid fa-receipt"></i> Pagos y Cobranza Recibida (@pagos.Count)</span>
-                <span style="font-size:12px;font-weight:normal;color:var(--text-muted);">Membresías: $@totalMembresias.ToString("N2") @(totalAbonos > 0 ? $"· Abonos de Crédito: ${totalAbonos:N2}" : "")</span>
+                <span style="font-size:12px;font-weight:normal;color:var(--text-muted);">Membresías: @GymWeb.Helpers.AppSettings.MonedaSimbolo@totalMembresias.ToString("N2") @(totalAbonos > 0 ? $"· Abonos de Crédito: {GymWeb.Helpers.AppSettings.MonedaSimbolo}{totalAbonos:N2}" : "")</span>
             </h3>
             <div class="table-responsive">
                 <table class="gym-table">
@@ -327,8 +327,8 @@
                             <td class="name-cell">
                                 @if (p.IdSocioNavigation != null)
                                 {
-                                    <span>@p.IdSocioNavigation.Nombre @p.IdSocioNavigation.Paterno</span>
-                                    <span class="text-muted" style="font-size:11px;margin-left:5px;">#@p.IdSocio</span>
+                                    <span>@p.IdSocioNavigation.NombreCompleto</span>
+                                    <span class="text-muted" style="font-size:11px;margin-left:5px;">#@p.IdSocioNavigation.ClaveFormateada</span>
                                 }
                                 else { <span class="text-muted">—</span> }
                             </td>
@@ -358,14 +358,14 @@
                                 else
                                 { <span style="color:#4ade80;"><i class="fa-solid fa-money-bill-wave"></i> Efectivo</span> }
                             </td>
-                            <td style="text-align:right;color:#38bdf8;font-weight:600;">$@p.Monto.ToString("N2")</td>
+                            <td style="text-align:right;color:#38bdf8;font-weight:600;">@GymWeb.Helpers.AppSettings.MonedaSimbolo@p.Monto.ToString("N2")</td>
                         </tr>
                     }
                     </tbody>
                     <tfoot>
                         <tr style="background:rgba(56,189,248,0.07);font-weight:700;">
                             <td colspan="4" style="text-align:right;font-size:13px;color:var(--text-muted);">Subtotal Cobranza (Membresías + Abonos):</td>
-                            <td style="text-align:right;color:#38bdf8;">$@totalPagos.ToString("N2")</td>
+                            <td style="text-align:right;color:#38bdf8;">@GymWeb.Helpers.AppSettings.MonedaSimbolo@totalPagos.ToString("N2")</td>
                         </tr>
                     </tfoot>
                 </table>
@@ -395,7 +395,7 @@
                 <div style="font-size:11px;color:#4ade80;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">
                     <i class="fa-solid fa-money-bill-wave"></i> Efectivo Físico en Caja
                 </div>
-                <div style="font-size:22px;font-weight:800;color:#4ade80;margin-top:4px;">$@totalEfectivo.ToString("N2")</div>
+                <div style="font-size:22px;font-weight:800;color:#4ade80;margin-top:4px;">@GymWeb.Helpers.AppSettings.MonedaSimbolo@totalEfectivo.ToString("N2")</div>
                 <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Dinero físico en cajón</div>
             </div>
 
@@ -403,7 +403,7 @@
                 <div style="font-size:11px;color:#38bdf8;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">
                     <i class="fa-solid fa-building-columns"></i> Transferencias SPEI / Bancos
                 </div>
-                <div style="font-size:22px;font-weight:800;color:#38bdf8;margin-top:4px;">$@totalTransfer.ToString("N2")</div>
+                <div style="font-size:22px;font-weight:800;color:#38bdf8;margin-top:4px;">@GymWeb.Helpers.AppSettings.MonedaSimbolo@totalTransfer.ToString("N2")</div>
                 <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Comprobantes en banca móvil</div>
             </div>
 
@@ -411,7 +411,7 @@
                 <div style="font-size:11px;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">
                     <i class="fa-solid fa-credit-card"></i> Terminal Tarjetas / POS
                 </div>
-                <div style="font-size:22px;font-weight:800;color:#a78bfa;margin-top:4px;">$@totalTarjeta.ToString("N2")</div>
+                <div style="font-size:22px;font-weight:800;color:#a78bfa;margin-top:4px;">@GymWeb.Helpers.AppSettings.MonedaSimbolo@totalTarjeta.ToString("N2")</div>
                 <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Vouchers en terminal</div>
             </div>
         </div>
@@ -420,12 +420,12 @@
         {
             <div style="margin-top:14px;padding-top:12px;border-top:1px dashed rgba(255,255,255,0.08);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;font-size:12px;">
                 <div style="color:#fb923c;">
-                    <i class="fa-solid fa-clock"></i> <strong>Cuentas por cobrar generadas hoy:</strong> $@totalVentasCredito.ToString("N2") (no ingresan a caja hasta su cobro)
+                    <i class="fa-solid fa-clock"></i> <strong>Cuentas por cobrar generadas hoy:</strong> @GymWeb.Helpers.AppSettings.MonedaSimbolo@totalVentasCredito.ToString("N2") (no ingresan a caja hasta su cobro)
                 </div>
                 @if (totalAbonos > 0)
                 {
                     <div style="color:#4ade80;">
-                        <i class="fa-solid fa-hand-holding-dollar"></i> <strong>Abonos de crédito cobrados hoy:</strong> $@totalAbonos.ToString("N2") (ingresados a caja hoy)
+                        <i class="fa-solid fa-hand-holding-dollar"></i> <strong>Abonos de crédito cobrados hoy:</strong> @GymWeb.Helpers.AppSettings.MonedaSimbolo@totalAbonos.ToString("N2") (ingresados a caja hoy)
                     </div>
                 }
             </div>
@@ -436,11 +436,11 @@
     <div style="border-top:1px solid var(--border);padding-top:16px;display:flex;justify-content:flex-end;">
         <div style="background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.3);border-radius:var(--radius);padding:14px 26px;text-align:right;">
             <div class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:1px;">Total @(modo=="mes"?"del mes de":"generado el") @fechaDisplay</div>
-            <div style="font-size:32px;font-weight:800;color:#4ade80;margin-top:4px;">$@totalDia.ToString("N2")</div>
+            <div style="font-size:32px;font-weight:800;color:#4ade80;margin-top:4px;">@GymWeb.Helpers.AppSettings.MonedaSimbolo@totalDia.ToString("N2")</div>
             @if (totalDia > 0)
             {
                 <div class="text-muted" style="font-size:11.5px;margin-top:4px;">
-                    Visitas $@totalVisitas.ToString("N2") + Ventas contado $@totalVentasContado.ToString("N2") + Membresías $@totalMembresias.ToString("N2") @(totalAbonos > 0 ? $"+ Abonos ${totalAbonos:N2}" : "")
+                    Visitas @GymWeb.Helpers.AppSettings.MonedaSimbolo@totalVisitas.ToString("N2") + Ventas contado @GymWeb.Helpers.AppSettings.MonedaSimbolo@totalVentasContado.ToString("N2") + Membresías @GymWeb.Helpers.AppSettings.MonedaSimbolo@totalMembresias.ToString("N2") @(totalAbonos > 0 ? $"+ Abonos {GymWeb.Helpers.AppSettings.MonedaSimbolo}{totalAbonos:N2}" : "")
                 </div>
             }
         </div>

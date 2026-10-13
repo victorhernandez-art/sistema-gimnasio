@@ -1495,4 +1495,130 @@ input.scan-input:focus { outline: none; box-shadow: 0 0 0 3px rgba(0,242,255,0.2
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
+/* =====================================================
+   OPTIMIZACIÓN RESPONSIVA MULTI-MONITOR
+   Especialmente diseñado para monitores de 19" (1366x768, 1280x1024, 1440x900)
+   y pantallas compactas / laptops
+   ===================================================== */
+
+/* Estilos de barra de desplazamiento estilizada en tablas */
+.table-responsive::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+.table-responsive::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+}
+.table-responsive::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+}
+.table-responsive::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+/* Pantallas de 1440px y menores (Laptops widescreen / Monitores 19" 16:10) */
+@media (max-width: 1440px) {
+  :root {
+    --sidebar-w: 230px;
+  }
+  .page-content {
+    padding: 20px 20px;
+  }
+  .card {
+    padding: 20px;
+  }
+  table.gym-table th {
+    padding: 10px 12px;
+    font-size: 10.5px;
+  }
+  table.gym-table td {
+    padding: 9px 12px;
+    font-size: 13px;
+  }
+}
+
+/* Monitores estándar de 19 pulgadas (1366x768 y 1280x1024) */
+@media (max-width: 1366px) {
+  :root {
+    --sidebar-w: 210px;
+  }
+  .page-content {
+    padding: 16px 16px;
+  }
+  .card {
+    padding: 16px;
+  }
+  .topbar {
+    padding: 0 16px;
+  }
+  .card-header {
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    gap: 8px;
+  }
+  .card-title {
+    font-size: 15px;
+  }
+  table.gym-table th {
+    padding: 8px 10px;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+  }
+  table.gym-table td {
+    padding: 8px 10px;
+    font-size: 12.5px;
+  }
+  .socio-avatar {
+    width: 30px;
+    height: 30px;
+  }
+  .socio-avatar-icon {
+    width: 30px;
+    height: 30px;
+    font-size: 12px;
+  }
+  .socio-action-btn {
+    width: 25px !important;
+    height: 25px !important;
+    min-width: 25px !important;
+    max-width: 25px !important;
+    font-size: 10px !important;
+  }
+  .socio-actions-container {
+    gap: 2px !important;
+  }
+  .search-box input {
+    font-size: 12.5px;
+  }
+}
+
+/* Pantallas compactas <= 1220px (1280px con escalado de Windows al 125% o pantallas cuadradas 1024x768) */
+@media (max-width: 1220px) {
+  :root {
+    --sidebar-w: 195px;
+  }
+  .page-content {
+    padding: 12px 12px;
+  }
+  .card {
+    padding: 14px;
+  }
+  .toolbar {
+    gap: 8px !important;
+  }
+  .search-box input {
+    width: 180px;
+  }
+  table.gym-table th {
+    padding: 7px 8px;
+    font-size: 9.5px;
+  }
+  table.gym-table td {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+}
+
 

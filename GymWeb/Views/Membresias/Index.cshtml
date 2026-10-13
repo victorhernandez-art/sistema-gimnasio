@@ -46,7 +46,7 @@
                         }
                         <span class="badge badge-info" style="font-size:11px;">@durLabel</span>
                     </td>
-                    <td class="text-accent">$@m.Precio?.ToString("N2")</td>
+                    <td class="text-accent">@GymWeb.Helpers.AppSettings.MonedaSimbolo@m.Precio?.ToString("N2")</td>
                     <td style="font-size:12px;" class="text-muted">
                         @if (m.HoraInicio.HasValue)
                         { @($"{m.HoraInicio} - {m.HoraFinal}") }

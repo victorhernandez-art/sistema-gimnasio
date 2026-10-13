@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace GymWeb.Models;
@@ -53,4 +53,15 @@ public partial class Vwultimamembresiadetalladum
     /// hora en que termina la membresia para horarios especiales
     /// </summary>
     public TimeOnly? HoraFinal { get; set; }
+
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public string NombreCompleto => !string.IsNullOrWhiteSpace(Paterno)
+        ? $"{NombreSocio} {Paterno} {Materno}".Trim()
+        : (NombreSocio ?? "").Trim();
+
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public string ClaveFormateada => IdSocio.HasValue ? IdSocio.Value.ToString("D4") : "—";
+
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public string NumeroDocumento => !string.IsNullOrWhiteSpace(Paterno) ? "" : (Materno ?? "").Trim();
 }

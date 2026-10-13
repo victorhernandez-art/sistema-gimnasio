@@ -3,6 +3,7 @@
 @{
     var licStatus = ViewBag.LicenseStatus as LicenseInfo ?? LicenseService.GetStatus();
     var pcId = ViewBag.PcId as string ?? LicenseService.GetPcId();
+    var redLan = ViewBag.RedLan as RedLanInfo ?? NetworkHelper.ObtenerInfoRed(5080);
     var activeTab = TempData["ActiveTab"]?.ToString() ?? Context.Request.Query["tab"].ToString();
     if (string.IsNullOrEmpty(activeTab)) {
         activeTab = !licStatus.Valid ? "licencia" : "general";
@@ -59,6 +60,9 @@ else if (licStatus.IsFirstInstall)
     <button type="button" class="config-tab-btn @(activeTab == "tema" ? "active" : "")" data-tab="tema">
         <i class="fa-solid fa-palette"></i> Tema
     </button>
+    <button type="button" class="config-tab-btn @(activeTab == "redlan" ? "active" : "")" data-tab="redlan">
+        <i class="fa-solid fa-wifi"></i> Red LAN (Móvil)
+    </button>
 </div>
 
 <!-- ==========================================
@@ -90,6 +94,77 @@ else if (licStatus.IsFirstInstall)
                     <label class="form-label"><i class="fa-solid fa-receipt" style="color:#38bdf8;"></i> Mensaje al pie del Ticket de Venta</label>
                     <input name="Mensaje" value="@(string.IsNullOrWhiteSpace(Model.Mensaje) ? "¡Gracias por su preferencia!" : Model.Mensaje)" class="form-control" placeholder="Ej: ¡Gracias por tu compra! Conserva este comprobante." />
                     <small style="color:var(--text-muted);font-size:12px;">Texto de despedida o agradecimiento que aparecerá al final de cada ticket impreso.</small>
+                </div>
+
+                <!-- SECCIÓN: PAÍS, MONEDA Y LADA DE WHATSAPP -->
+                <div class="form-group" style="grid-column:1/-1;background:rgba(255,255,255,0.03);border:1px solid rgba(0,242,100,0.25);border-radius:12px;padding:16px;margin-top:6px;margin-bottom:6px;">
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                        <div style="width:32px;height:32px;border-radius:8px;background:rgba(0,242,100,0.15);display:flex;align-items:center;justify-content:center;color:#00f264;font-size:16px;">
+                            <i class="fa-solid fa-earth-americas"></i>
+                        </div>
+                        <div>
+                            <div style="font-weight:800;font-size:14px;color:#f8fafc;">Región, Moneda y LADA de WhatsApp</div>
+                            <div style="font-size:11.5px;color:var(--text-muted);">Al seleccionar el país, el sistema autoconfigura el símbolo de la moneda y la lada internacional para WhatsApp.</div>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom:14px;">
+                        <label class="form-label" style="font-size:12px;font-weight:700;">País de Operación</label>
+                        <select id="selectPaisConfig" name="Pais" class="form-control" onchange="alCambiarPais(this.value)" style="font-weight:600;background:rgba(15,23,42,0.85);border-color:rgba(0,242,100,0.4);color:#f8fafc;">
+                            @{
+                                var pSel = string.IsNullOrWhiteSpace(Model.Pais) ? "MX" : Model.Pais.ToUpperInvariant();
+                            }
+                            <option value="MX" selected="@(pSel == "MX" ? "selected" : null)">🇲🇽 México ($ MXN)</option>
+                            <option value="AR" selected="@(pSel == "AR" ? "selected" : null)">🇦🇷 Argentina ($ ARS)</option>
+                            <option value="CO" selected="@(pSel == "CO" ? "selected" : null)">🇨🇴 Colombia ($ COP)</option>
+                            <option value="CL" selected="@(pSel == "CL" ? "selected" : null)">🇨🇱 Chile ($ CLP)</option>
+                            <option value="PE" selected="@(pSel == "PE" ? "selected" : null)">🇵🇪 Perú (S/ PEN)</option>
+                            <option value="EC" selected="@(pSel == "EC" ? "selected" : null)">🇪🇨 Ecuador ($ USD)</option>
+                            <option value="GT" selected="@(pSel == "GT" ? "selected" : null)">🇬🇹 Guatemala (Q GTQ)</option>
+                            <option value="CR" selected="@(pSel == "CR" ? "selected" : null)">🇨🇷 Costa Rica (₡ CRC)</option>
+                            <option value="PA" selected="@(pSel == "PA" ? "selected" : null)">🇵🇦 Panamá (B/. PAB)</option>
+                            <option value="HN" selected="@(pSel == "HN" ? "selected" : null)">🇭🇳 Honduras (L HNL)</option>
+                            <option value="SV" selected="@(pSel == "SV" ? "selected" : null)">🇸🇻 El Salvador ($ USD)</option>
+                            <option value="NI" selected="@(pSel == "NI" ? "selected" : null)">🇳🇮 Nicaragua (C$ NIO)</option>
+                            <option value="DO" selected="@(pSel == "DO" ? "selected" : null)">🇩🇴 República Dominicana (RD$ DOP)</option>
+                            <option value="BO" selected="@(pSel == "BO" ? "selected" : null)">🇧🇴 Bolivia (Bs BOB)</option>
+                            <option value="PY" selected="@(pSel == "PY" ? "selected" : null)">🇵🇾 Paraguay (₲ PYG)</option>
+                            <option value="UY" selected="@(pSel == "UY" ? "selected" : null)">🇺🇾 Uruguay ($U UYU)</option>
+                            <option value="VE" selected="@(pSel == "VE" ? "selected" : null)">🇻🇪 Venezuela (Bs. VES)</option>
+                            <option value="PR" selected="@(pSel == "PR" ? "selected" : null)">🇵🇷 Puerto Rico ($ USD)</option>
+                            <option value="ES" selected="@(pSel == "ES" ? "selected" : null)">🇪🇸 España (€ EUR)</option>
+                            <option value="US" selected="@(pSel == "US" ? "selected" : null)">🇺🇸 Estados Unidos ($ USD)</option>
+                        </select>
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+                        <div>
+                            <label class="form-label" style="font-size:11.5px;font-weight:700;">Símbolo Moneda</label>
+                            <input id="inputMonedaSimbolo" name="MonedaSimbolo" value="@(string.IsNullOrWhiteSpace(Model.MonedaSimbolo) ? "$" : Model.MonedaSimbolo)" class="form-control" style="font-weight:700;" oninput="actualizarPreviewRegion()" />
+                        </div>
+                        <div>
+                            <label class="form-label" style="font-size:11.5px;font-weight:700;">Código Divisa</label>
+                            <input id="inputMonedaCodigo" name="MonedaCodigo" value="@(string.IsNullOrWhiteSpace(Model.MonedaCodigo) ? "ARS" : Model.MonedaCodigo)" class="form-control" style="font-weight:700;" oninput="actualizarPreviewRegion()" />
+                        </div>
+                        <div>
+                            <label class="form-label" style="font-size:11.5px;font-weight:700;"><i class="fa-brands fa-whatsapp" style="color:#25D366;"></i> LADA WhatsApp</label>
+                            <div style="display:flex;align-items:center;">
+                                <span style="background:rgba(255,255,255,0.08);border:1px solid var(--border);border-right:none;border-radius:8px 0 0 8px;padding:9px 10px;font-size:13px;font-weight:800;color:#00f264;">+</span>
+                                <input id="inputLada" name="Lada" value="@(string.IsNullOrWhiteSpace(Model.Lada) ? "54" : Model.Lada)" class="form-control" style="border-radius:0 8px 8px 0;font-weight:800;" oninput="actualizarPreviewRegion()" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="boxRegionPreview" style="margin-top:12px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:12px;">
+                        <div>
+                            <span style="color:var(--text-muted);">Ejemplo de Precio:</span> 
+                            <strong id="prevPrecioEjemplo" style="color:#00f264;margin-left:4px;font-size:13px;">$ 1,500.00 ARS</strong>
+                        </div>
+                        <div>
+                            <span style="color:var(--text-muted);"><i class="fa-brands fa-whatsapp" style="color:#25D366;"></i> WhatsApp Internacional:</span> 
+                            <strong id="prevWhatsEjemplo" style="color:#38bdf8;margin-left:4px;">+54 9 11 1234-5678</strong>
+                        </div>
+                    </div>
                 </div>
                 <div class="form-group" style="grid-column:1/-1;">
                     <label class="form-label">Logo del Gimnasio (Marca / Branding)</label>
@@ -388,13 +463,163 @@ else if (licStatus.IsFirstInstall)
     </div>
 </div>
 
+<!-- ==========================================
+     PESTAÑA 4: RED LAN (MÓVIL)
+     ========================================== -->
+<div id="tabContentRedLan" class="config-tab-content @(activeTab == "redlan" ? "" : "d-none")">
+    <div class="card" style="max-width:850px;">
+        <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+            <div class="card-title" style="display:flex;align-items:center;gap:10px;margin:0;">
+                <i class="fa-solid fa-wifi" style="color:#00f264;"></i> Servidor de Red Local Activo
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span style="display:inline-flex;align-items:center;gap:7px;background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;">
+                    <span style="width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 8px #10b981;display:inline-block;animation:pulseDot 1.8s infinite;"></span>
+                    ACTIVO EN TU RED
+                </span>
+                <span style="background:rgba(255,255,255,0.06);color:#94a3b8;border:1px solid rgba(255,255,255,0.1);padding:4px 10px;border-radius:8px;font-size:12px;font-weight:600;">
+                    Puerto: <span id="spanPuertoRedLan">@redLan.Puerto</span>
+                </span>
+            </div>
+        </div>
+
+        <div style="padding:6px 0 10px 0;">
+            <p style="color:var(--text-muted);font-size:13.5px;margin:0 0 18px 0;line-height:1.5;">
+                Conéctate desde cualquier <strong>celular, tablet u otra computadora</strong> conectada a tu misma red Wi-Fi para consultar reportes, registrar visitas o realizar cobros en tiempo real directamente sobre esta PC principal.
+            </p>
+
+            <!-- CAJA PRINCIPAL: QR Y DIRECCIÓN -->
+            <div class="redlan-hero-grid" style="display:grid;grid-template-columns:auto 1fr;gap:26px;background:linear-gradient(145deg, rgba(15,23,42,0.85), rgba(30,41,59,0.5));border:1px solid rgba(0,242,100,0.25);border-radius:16px;padding:24px;align-items:center;margin-bottom:22px;">
+                <!-- QR CODE -->
+                <div style="text-align:center;display:flex;flex-direction:column;align-items:center;">
+                    <div style="background:#ffffff;padding:12px;border-radius:14px;box-shadow:0 10px 28px rgba(0,0,0,0.45);display:inline-block;border:2px solid rgba(0,242,100,0.35);">
+                        <div id="redlanQrContainer" style="width:170px;height:170px;display:flex;align-items:center;justify-content:center;background:#fff;overflow:hidden;">
+                            <!-- QR se genera dinámicamente -->
+                        </div>
+                    </div>
+                    <span style="color:#94a3b8;font-size:11.5px;margin-top:10px;display:inline-flex;align-items:center;gap:6px;font-weight:500;">
+                        <i class="fa-solid fa-camera" style="color:#00f264;"></i> Escanea con la cámara del celular
+                    </span>
+                </div>
+
+                <!-- DETALLES Y ENLACE -->
+                <div>
+                    <label class="form-label" style="font-size:12px;text-transform:uppercase;letter-spacing:0.8px;color:#94a3b8;margin-bottom:8px;display:block;font-weight:700;">
+                        Dirección de Acceso en tu Red:
+                    </label>
+
+                    @if (redLan.Adaptadores.Count > 1)
+                    {
+                        <div style="margin-bottom:12px;">
+                            <label style="font-size:11.5px;color:#64748b;margin-bottom:4px;display:block;font-weight:600;">Adaptador de Red:</label>
+                            <select id="selectInterfazRed" class="form-control" style="font-size:12.5px;padding:7px 12px;height:auto;background:rgba(15,23,42,0.9);border-color:rgba(255,255,255,0.18);color:#f8fafc;" onchange="cambiarInterfazRed(this.value)">
+                                @foreach (var iface in redLan.Adaptadores)
+                                {
+                                    <option value="@iface.IpAddress" selected="@(iface.IpAddress == redLan.IpPrincipal ? "selected" : null)">
+                                        @iface.Name (@iface.IpAddress)
+                                    </option>
+                                }
+                            </select>
+                        </div>
+                    }
+
+                    <div style="margin-bottom:14px;">
+                        <input id="inputUrlRedLan" readonly value="@redLan.UrlCompleta" class="form-control" style="font-family:'Consolas', 'Courier New', monospace;font-size:15px;font-weight:800;letter-spacing:0.5px;color:#00f264;background:rgba(10,15,29,0.95);border:1.5px solid rgba(0,242,100,0.45);padding:11px 16px;border-radius:10px;width:100%;box-shadow:inset 0 2px 4px rgba(0,0,0,0.4);" />
+                    </div>
+
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                        <button type="button" class="btn btn-primary" onclick="copiarUrlRedLan()" style="background:#00f264;color:#052e16;font-weight:800;display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border-radius:10px;border:none;box-shadow:0 4px 14px rgba(0,242,100,0.25);cursor:pointer;">
+                            <i class="fa-solid fa-copy"></i> Copiar Enlace
+                        </button>
+                        <a id="btnAbrirRedLan" href="@redLan.UrlCompleta" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:10px;font-weight:600;text-decoration:none;">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir en Navegador
+                        </a>
+                        <button type="button" class="btn btn-secondary" onclick="refrescarIpRedLan()" title="Escanear adaptadores de red nuevamente" style="padding:9px 14px;border-radius:10px;" id="btnRefreshRedLan">
+                            <i class="fa-solid fa-arrows-rotate" id="iconRefreshRedLan"></i> Actualizar IP
+                        </button>
+                    </div>
+
+                    <div style="margin-top:14px;font-size:12px;color:#94a3b8;display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.02);padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.05);">
+                        <i class="fa-solid fa-circle-check" style="color:#00f264;font-size:14px;"></i>
+                        <span>Sincronización en tiempo real: cualquier cambio en el celular se refleja al instante en esta PC.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GUÍA PWA: AGREGAR COMO APP -->
+            <div style="margin-top:20px;">
+                <h4 style="font-size:13.5px;font-weight:700;color:#f8fafc;margin:0 0 12px 0;display:flex;align-items:center;gap:8px;">
+                    <i class="fa-solid fa-mobile-screen-button" style="color:#00f264;"></i> ¿Cómo guardarlo como Aplicación en la pantalla de inicio de tu celular?
+                </h4>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:14px;">
+                    <!-- ANDROID -->
+                    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px;">
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                            <div style="width:28px;height:28px;border-radius:7px;background:rgba(34,197,94,0.15);color:#22c55e;display:flex;align-items:center;justify-content:center;font-size:14px;">
+                                <i class="fa-brands fa-android"></i>
+                            </div>
+                            <strong style="color:#f8fafc;font-size:13px;">En Android (Google Chrome)</strong>
+                        </div>
+                        <ol style="margin:0;padding-left:18px;color:#cbd5e1;font-size:12px;line-height:1.65;">
+                            <li>Abre el enlace o escanea el QR desde tu celular.</li>
+                            <li>Toca los tres puntos <strong style="color:#fff;">(⋮)</strong> arriba a la derecha en Chrome.</li>
+                            <li>Elige <strong style="color:#00f264;">"Agregar a la pantalla principal"</strong> o <strong style="color:#00f264;">"Instalar aplicación"</strong>.</li>
+                        </ol>
+                    </div>
+
+                    <!-- IPHONE / IPAD -->
+                    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px;">
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                            <div style="width:28px;height:28px;border-radius:7px;background:rgba(56,189,248,0.15);color:#38bdf8;display:flex;align-items:center;justify-content:center;font-size:14px;">
+                                <i class="fa-brands fa-apple"></i>
+                            </div>
+                            <strong style="color:#f8fafc;font-size:13px;">En iPhone / iPad (Safari)</strong>
+                        </div>
+                        <ol style="margin:0;padding-left:18px;color:#cbd5e1;font-size:12px;line-height:1.65;">
+                            <li>Abre el enlace escaneado en el navegador <strong style="color:#fff;">Safari</strong>.</li>
+                            <li>Toca el botón <strong style="color:#38bdf8;">Compartir</strong> (ícono cuadrado con flecha arriba).</li>
+                            <li>Baja y presiona <strong style="color:#38bdf8;">"Agregar al inicio"</strong>.</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NOTA SOBRE FIREWALL / RED -->
+            <div style="margin-top:16px;background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.25);border-radius:12px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start;">
+                <div style="color:#eab308;font-size:18px;line-height:1;margin-top:2px;flex-shrink:0;">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <div style="font-size:12.5px;color:#cbd5e1;line-height:1.5;">
+                    <strong style="color:#fde047;">Requisito indispensable:</strong> Ambos dispositivos deben estar conectados a la misma red Wi-Fi. Si desde tu teléfono no carga la página, abre la carpeta del sistema y ejecuta <code>Habilitar_Red_LAN.bat</code> como administrador para autorizar el puerto 5080 en el Firewall de Windows en 1 clic.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@@keyframes pulseDot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.35; transform: scale(0.8); }
+}
+@@media (max-width: 680px) {
+    .redlan-hero-grid {
+        grid-template-columns: 1fr !important;
+        text-align: center;
+    }
+}
+</style>
+
 <!-- Toast flotante para avisos de copiado -->
 <div id="licenseToast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(120px);background:#10b981;color:#fff;font-weight:800;font-size:13.5px;padding:10px 22px;border-radius:30px;box-shadow:0 10px 30px rgba(0,0,0,0.6);transition:transform 0.3s cubic-bezier(0.175,0.885,0.32,1.275);z-index:99999;pointer-events:none;">
     ✓ Hardware PC ID copiado al portapapeles
 </div>
 
 @section Scripts {
+<script src="~/lib/qrcode.min.js"></script>
 <script>
+    let qrcodeInstancia = null;
+
     // Gestión de pestañas de Configuración
     document.querySelectorAll('.config-tab-btn').forEach(btn => {
         btn.addEventListener('click', function() {
@@ -411,6 +636,8 @@ else if (licStatus.IsFirstInstall)
         document.getElementById('tabContentGeneral').classList.add('d-none');
         document.getElementById('tabContentLicencia').classList.add('d-none');
         document.getElementById('tabContentTema').classList.add('d-none');
+        const tabRedLan = document.getElementById('tabContentRedLan');
+        if (tabRedLan) tabRedLan.classList.add('d-none');
 
         if (tab === 'licencia') {
             document.getElementById('tabContentLicencia').classList.remove('d-none');
@@ -418,6 +645,10 @@ else if (licStatus.IsFirstInstall)
         } else if (tab === 'tema') {
             document.getElementById('tabContentTema').classList.remove('d-none');
             window.location.hash = 'tema';
+        } else if (tab === 'redlan') {
+            if (tabRedLan) tabRedLan.classList.remove('d-none');
+            window.location.hash = 'redlan';
+            setTimeout(renderizarQrRedLan, 60);
         } else {
             document.getElementById('tabContentGeneral').classList.remove('d-none');
             window.location.hash = 'general';
@@ -433,8 +664,110 @@ else if (licStatus.IsFirstInstall)
             switchTab('licencia');
         } else if (hash === 'tema' || tabParam === 'tema') {
             switchTab('tema');
+        } else if (hash === 'redlan' || tabParam === 'redlan') {
+            switchTab('redlan');
+        } else {
+            // Renderizar QR en background para que esté listo al instante
+            setTimeout(renderizarQrRedLan, 200);
         }
     })();
+
+    // ── Funciones de Red LAN (Móvil) ──
+    function renderizarQrRedLan() {
+        const container = document.getElementById('redlanQrContainer');
+        const inputUrl = document.getElementById('inputUrlRedLan');
+        if (!container || !inputUrl) return;
+
+        const url = inputUrl.value.trim();
+        if (!url) return;
+
+        container.innerHTML = '';
+        try {
+            if (typeof QRCode !== 'undefined') {
+                qrcodeInstancia = new QRCode(container, {
+                    text: url,
+                    width: 170,
+                    height: 170,
+                    colorDark: "#020617",
+                    colorLight: "#ffffff",
+                    correctLevel: (QRCode.CorrectLevel ? QRCode.CorrectLevel.M : 2)
+                });
+            } else {
+                throw new Error("Librería QRCode no disponible");
+            }
+        } catch (e) {
+            console.warn("Fallback a imagen QR externa:", e);
+            container.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=${encodeURIComponent(url)}" style="width:170px;height:170px;display:block;border-radius:4px;" alt="QR Red LAN" />`;
+        }
+    }
+
+    function copiarUrlRedLan() {
+        const input = document.getElementById('inputUrlRedLan');
+        if (!input) return;
+        const texto = input.value.trim();
+
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(texto).then(() => {
+                mostrarToast('✓ Enlace de Red LAN copiado al portapapeles');
+            }).catch(() => fallbackCopiarUrl(input));
+        } else {
+            fallbackCopiarUrl(input);
+        }
+    }
+
+    function fallbackCopiarUrl(input) {
+        input.select();
+        document.execCommand('copy');
+        mostrarToast('✓ Enlace de Red LAN copiado al portapapeles');
+    }
+
+    function cambiarInterfazRed(ip) {
+        const spanPuerto = document.getElementById('spanPuertoRedLan');
+        const puerto = spanPuerto ? spanPuerto.textContent.trim() : '5080';
+        const nuevaUrl = `http://${ip}:${puerto}`;
+
+        const inputUrl = document.getElementById('inputUrlRedLan');
+        if (inputUrl) inputUrl.value = nuevaUrl;
+
+        const btnAbrir = document.getElementById('btnAbrirRedLan');
+        if (btnAbrir) btnAbrir.href = nuevaUrl;
+
+        renderizarQrRedLan();
+    }
+
+    async function refrescarIpRedLan() {
+        const icon = document.getElementById('iconRefreshRedLan');
+        if (icon) icon.classList.add('fa-spin');
+
+        try {
+            const resp = await fetch('@Url.Action("GetRedLanInfo", "Configuracion")');
+            if (!resp.ok) throw new Error('Error al consultar IP');
+            const data = await resp.json();
+
+            const urlFinal = data.url || data.urlCompleta;
+            const ipFinal = data.ip || data.ipLocal || '';
+            if (data && urlFinal) {
+                const inputUrl = document.getElementById('inputUrlRedLan');
+                if (inputUrl) inputUrl.value = urlFinal;
+
+                const btnAbrir = document.getElementById('btnAbrirRedLan');
+                if (btnAbrir) btnAbrir.href = urlFinal;
+
+                const spanPuerto = document.getElementById('spanPuertoRedLan');
+                if (spanPuerto) spanPuerto.textContent = data.puerto;
+
+                renderizarQrRedLan();
+                mostrarToast('✓ Información de red actualizada: ' + ipFinal);
+            }
+        } catch (err) {
+            console.error('Error refrescando red:', err);
+            mostrarToast('⚠️ No se pudo actualizar la IP');
+        } finally {
+            if (icon) {
+                setTimeout(() => icon.classList.remove('fa-spin'), 400);
+            }
+        }
+    }
 
     // Copiar Hardware PC ID
     function copiarPcId() {
@@ -514,5 +847,71 @@ else if (licStatus.IsFirstInstall)
             reader.readAsDataURL(input.files[0]);
         }
     }
+
+    // ── Mapeo de Países de Latinoamérica e Internacional (Moneda, Símbolo, LADA) ──
+    const DATOS_PAISES = {
+        'AR': { nombre: 'Argentina', simbolo: '$', codigo: 'ARS', lada: '54', formatoWhats: '+54 9 11 1234-5678' },
+        'MX': { nombre: 'México', simbolo: '$', codigo: 'MXN', lada: '52', formatoWhats: '+52 961 123 4567' },
+        'CO': { nombre: 'Colombia', simbolo: '$', codigo: 'COP', lada: '57', formatoWhats: '+57 300 123 4567' },
+        'CL': { nombre: 'Chile', simbolo: '$', codigo: 'CLP', lada: '56', formatoWhats: '+56 9 1234 5678' },
+        'PE': { nombre: 'Perú', simbolo: 'S/', codigo: 'PEN', lada: '51', formatoWhats: '+51 912 345 678' },
+        'EC': { nombre: 'Ecuador', simbolo: '$', codigo: 'USD', lada: '593', formatoWhats: '+593 9 1234 5678' },
+        'GT': { nombre: 'Guatemala', simbolo: 'Q', codigo: 'GTQ', lada: '502', formatoWhats: '+502 1234 5678' },
+        'CR': { nombre: 'Costa Rica', simbolo: '₡', codigo: 'CRC', lada: '506', formatoWhats: '+506 8123 4567' },
+        'PA': { nombre: 'Panamá', simbolo: 'B/.', codigo: 'PAB', lada: '507', formatoWhats: '+507 6123 4567' },
+        'HN': { nombre: 'Honduras', simbolo: 'L', codigo: 'HNL', lada: '504', formatoWhats: '+504 9123 4567' },
+        'SV': { nombre: 'El Salvador', simbolo: '$', codigo: 'USD', lada: '503', formatoWhats: '+503 7123 4567' },
+        'NI': { nombre: 'Nicaragua', simbolo: 'C$', codigo: 'NIO', lada: '505', formatoWhats: '+505 8123 4567' },
+        'DO': { nombre: 'República Dominicana', simbolo: 'RD$', codigo: 'DOP', lada: '1', formatoWhats: '+1 809 123 4567' },
+        'BO': { nombre: 'Bolivia', simbolo: 'Bs', codigo: 'BOB', lada: '591', formatoWhats: '+591 7123 4567' },
+        'PY': { nombre: 'Paraguay', simbolo: '₲', codigo: 'PYG', lada: '595', formatoWhats: '+595 981 123456' },
+        'UY': { nombre: 'Uruguay', simbolo: '$U', codigo: 'UYU', lada: '598', formatoWhats: '+598 99 123 456' },
+        'VE': { nombre: 'Venezuela', simbolo: 'Bs.', codigo: 'VES', lada: '58', formatoWhats: '+58 412 123 4567' },
+        'PR': { nombre: 'Puerto Rico', simbolo: '$', codigo: 'USD', lada: '1', formatoWhats: '+1 787 123 4567' },
+        'ES': { nombre: 'España', simbolo: '€', codigo: 'EUR', lada: '34', formatoWhats: '+34 612 345 678' },
+        'US': { nombre: 'Estados Unidos', simbolo: '$', codigo: 'USD', lada: '1', formatoWhats: '+1 202 555 0123' }
+    };
+
+    function alCambiarPais(paisKey) {
+        paisKey = (paisKey || '').toUpperCase();
+        const data = DATOS_PAISES[paisKey];
+        if (!data) return;
+
+        const inputSimbolo = document.getElementById('inputMonedaSimbolo');
+        const inputCodigo = document.getElementById('inputMonedaCodigo');
+        const inputLada = document.getElementById('inputLada');
+
+        if (inputSimbolo) inputSimbolo.value = data.simbolo;
+        if (inputCodigo) inputCodigo.value = data.codigo;
+        if (inputLada) inputLada.value = data.lada;
+
+        actualizarPreviewRegion();
+    }
+
+    function actualizarPreviewRegion() {
+        const paisKey = (document.getElementById('selectPaisConfig')?.value || 'MX').toUpperCase();
+        const info = DATOS_PAISES[paisKey];
+        const simbolo = document.getElementById('inputMonedaSimbolo')?.value || '$';
+        const codigo = document.getElementById('inputMonedaCodigo')?.value || 'MXN';
+        const lada = document.getElementById('inputLada')?.value || '52';
+
+        const prevPrecio = document.getElementById('prevPrecioEjemplo');
+        if (prevPrecio) {
+            prevPrecio.textContent = `${simbolo} 1,500.00 ${codigo}`;
+        }
+
+        const prevWhats = document.getElementById('prevWhatsEjemplo');
+        if (prevWhats) {
+            if (info && info.lada === lada) {
+                prevWhats.textContent = info.formatoWhats;
+            } else {
+                prevWhats.textContent = `+${lada} ...`;
+            }
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        actualizarPreviewRegion();
+    });
 </script>
 }

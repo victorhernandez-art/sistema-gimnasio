@@ -50,8 +50,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (!sidebar) return;
 
-    // Restore sidebar state from localStorage
-    if (localStorage.getItem('sidebarCollapsed') === 'true') {
+    // Restore sidebar state from localStorage or auto-collapse on compact screens
+    var savedCollapsed = localStorage.getItem('sidebarCollapsed');
+    if (savedCollapsed === 'true') {
+        sidebar.classList.add('collapsed');
+    } else if (savedCollapsed === null && window.innerWidth <= 1180) {
         sidebar.classList.add('collapsed');
     }
 

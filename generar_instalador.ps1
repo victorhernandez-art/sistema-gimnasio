@@ -7,11 +7,11 @@ $root = $PSScriptRoot
 $dist = Join-Path $root "dist"
 $winOut = Join-Path $dist "GymWeb-Windows"
 $bioWinOut = Join-Path $winOut "BioService"
-$zipOut = Join-Path $dist "Instalador_GymWeb_Windows_v2.1.zip"
+$zipOut = Join-Path $dist "Instalador_GymWeb_Windows_v2.5.zip"
 $tempBuild = Join-Path $dist "temp_installer_build"
 
 Write-Host "`n============================================================" -ForegroundColor Cyan
-Write-Host "   GENERANDO INSTALADOR COMPLETO GYMWEB v2.1 (WINDOWS)" -ForegroundColor Cyan
+Write-Host "   GENERANDO INSTALADOR COMPLETO GYMWEB v2.5 (WINDOWS)" -ForegroundColor Cyan
 Write-Host "============================================================`n" -ForegroundColor Cyan
 
 # 1. Limpieza previa
@@ -75,11 +75,42 @@ pause
 "@
 Set-Content -Path (Join-Path $winOut "DESINSTALAR.bat") -Value $desinstalarContent -Encoding ASCII
 
+# Incluir Puente Biométrico DigitalPersona (compilado)
+$dpSource = Join-Path $root "DigitalPersonaBridge\publish"
+if (-not (Test-Path (Join-Path $dpSource "DigitalPersonaBridge.exe"))) {
+    Write-Host "       Compilando puente DigitalPersonaBridge..." -ForegroundColor Gray
+    & dotnet publish (Join-Path $root "DigitalPersonaBridge\DigitalPersonaBridge.csproj") -c Release -o $dpSource --nologo -v quiet
+}
+if (Test-Path $dpSource) {
+    $dpDest = Join-Path $winOut "PuenteBiometrico"
+    Copy-Item -Recurse -Force $dpSource $dpDest
+    Write-Host "       Puente biometrico DigitalPersona incluido en PuenteBiometrico\." -ForegroundColor Green
+}
+
+# Incluir Modulo WhatsApp Gateway (Envio Masivo 100% Automatico sin navegador)
+$waSource = Join-Path $root "WhatsAppGateway"
+if (Test-Path $waSource) {
+    $waDest = Join-Path $winOut "WhatsAppGateway"
+    if (-not (Test-Path $waDest)) { New-Item -ItemType Directory -Path $waDest -Force | Out-Null }
+    Copy-Item -Force (Join-Path $waSource "server.js") $waDest
+    Copy-Item -Force (Join-Path $waSource "package.json") $waDest
+    Copy-Item -Force (Join-Path $waSource "INICIAR-WHATSAPP-GATEWAY.bat") $waDest
+    if (Test-Path (Join-Path $waSource "node_modules")) {
+        Copy-Item -Recurse -Force (Join-Path $waSource "node_modules") (Join-Path $waDest "node_modules")
+    }
+    Copy-Item -Force (Join-Path $waSource "INICIAR-WHATSAPP-GATEWAY.bat") (Join-Path $winOut "INICIAR-WHATSAPP-GATEWAY.bat") -ErrorAction SilentlyContinue
+    Write-Host "       Modulo WhatsApp Gateway incluido en WhatsAppGateway\." -ForegroundColor Green
+}
+
 Copy-Item -Force (Join-Path $root "Publish\Iniciar GymWeb.bat") (Join-Path $winOut "Iniciar GymWeb.bat")
 Copy-Item -Force (Join-Path $root "Publish\AbrirGymWeb.vbs") (Join-Path $winOut "AbrirGymWeb.vbs")
 Copy-Item -Force (Join-Path $root "Publish\Crear Acceso Directo.bat") (Join-Path $winOut "Crear Acceso Directo.bat")
 Copy-Item -Force (Join-Path $root "Publish\ACTUALIZAR.bat") (Join-Path $winOut "ACTUALIZAR.bat") -ErrorAction SilentlyContinue
 Copy-Item -Force (Join-Path $root "Publish\actualizar.ps1") (Join-Path $winOut "actualizar.ps1") -ErrorAction SilentlyContinue
+Copy-Item -Force (Join-Path $root "INICIAR-PUENTE-BIOMETRICO.bat") (Join-Path $winOut "INICIAR-PUENTE-BIOMETRICO.bat") -ErrorAction SilentlyContinue
+Copy-Item -Force (Join-Path $root "PROBAR-LECTOR-USB.bat") (Join-Path $winOut "PROBAR-LECTOR-USB.bat") -ErrorAction SilentlyContinue
+Copy-Item -Force (Join-Path $root "PROBAR-LECTOR-USB.ps1") (Join-Path $winOut "PROBAR-LECTOR-USB.ps1") -ErrorAction SilentlyContinue
+Copy-Item -Force (Join-Path $root "HABILITAR-RED-LAN.bat") (Join-Path $winOut "HABILITAR-RED-LAN.bat") -ErrorAction SilentlyContinue
 if (Test-Path (Join-Path $root "Publish\REPARAR_FECHAS_CLIENTE.bat")) {
     Copy-Item -Force (Join-Path $root "Publish\REPARAR_FECHAS_CLIENTE.bat") (Join-Path $winOut "REPARAR_FECHAS_CLIENTE.bat")
 }
@@ -93,6 +124,12 @@ Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $winOut "ww
 Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $winOut "wwwroot\img\productos\prod_*.*")
 Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $winOut "wwwroot\backups")
 Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $winOut "license.json")
+Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $winOut "gym.db*")
+
+# Copiar configuraciones con Workstation GC si existen
+if (Test-Path (Join-Path $root "Publish\GymWeb.runtimeconfig.json")) {
+    Copy-Item -Force (Join-Path $root "Publish\GymWeb.runtimeconfig.json") (Join-Path $winOut "GymWeb.runtimeconfig.json")
+}
 
 # Crear carpetas vacias necesarias
 New-Item -ItemType Directory -Force -Path (Join-Path $winOut "wwwroot\img\socios") | Out-Null
@@ -100,14 +137,14 @@ New-Item -ItemType Directory -Force -Path (Join-Path $winOut "wwwroot\backups") 
 New-Item -ItemType Directory -Force -Path (Join-Path $winOut "logs") | Out-Null
 
 # 6. Empaquetar en ZIP final
-Write-Host " [6/6] Creando archivo ZIP final: Instalador_GymWeb_Windows_v2.1.zip..." -ForegroundColor Yellow
+Write-Host " [6/6] Creando archivo ZIP final: Instalador_GymWeb_Windows_v2.5.zip..." -ForegroundColor Yellow
 if (Test-Path $zipOut) { Remove-Item -Force $zipOut }
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [System.IO.Compression.ZipFile]::CreateFromDirectory($winOut, $zipOut, [System.IO.Compression.CompressionLevel]::Fastest, $false)
 
-# Copiar también con nombre v2.5 por compatibilidad
-$zipV25 = Join-Path $dist "Instalador_GymWeb_Windows_v2.5.zip"
-Copy-Item -Force $zipOut $zipV25
+# Copiar también con nombre v2.1 por compatibilidad si algún enlace previo aún lo requiere
+$zipV21 = Join-Path $dist "Instalador_GymWeb_Windows_v2.1.zip"
+Copy-Item -Force $zipOut $zipV21
 
 $zipItem = Get-Item $zipOut
 $sizeMb = [math]::Round($zipItem.Length / 1MB, 2)

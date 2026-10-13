@@ -83,9 +83,45 @@ public class PagosController : AuthController
             .OrderByDescending(v => v.FechaCreacion)
             .FirstOrDefaultAsync();
 
-        // Si se seleccionó un plan/membresía, renovarla o asignarla automáticamente en sociomembresia
-        if (idMembresia.HasValue && idMembresia.Value > 0)
+        // Membresía actual activa o reciente del socio
+        var memActual = await _db.Sociomembresia
+            .Include(sm => sm.IdMembresiaNavigation)
+            .Where(sm => sm.IdSocio == idSocio && sm.IdEstado == 1)
+            .OrderByDescending(sm => sm.FechaInicioMembresia ?? sm.FechaCreacion)
+            .FirstOrDefaultAsync();
+
+        bool memActualTieneAdeudo = false;
+        if (memActual != null)
         {
+            decimal precioActual = memActual.Precio ?? 0m;
+            if (precioActual > 0)
+            {
+                var fInicio = (memActual.FechaInicioMembresia ?? memActual.FechaCreacion ?? DateTime.Today).Date;
+                var fMinima = DateOnly.FromDateTime(fInicio.AddDays(-7));
+                var totalPagosMem = await _db.Pagos
+                    .Where(p => p.IdSocio == idSocio && p.IdEstado == 1 &&
+                               ((p.IdMembresia == memActual.IdMembresia) || p.FechaPago >= fMinima))
+                    .SumAsync(p => p.Monto);
+
+                if (totalPagosMem < precioActual)
+                {
+                    memActualTieneAdeudo = true;
+                }
+            }
+        }
+
+        // Si el socio ya tiene una membresía asignada pendiente de cobro:
+        // Este pago salda esa membresía existente sin crear registros duplicados
+        if (memActualTieneAdeudo && memActual != null)
+        {
+            if (!idMembresia.HasValue || idMembresia.Value <= 0)
+            {
+                idMembresia = memActual.IdMembresia;
+            }
+        }
+        else if (idMembresia.HasValue && idMembresia.Value > 0)
+        {
+            // Es una renovación para el siguiente ciclo o asignación por primera vez
             var mem = await _db.Membresia.FindAsync(idMembresia.Value);
             if (mem != null)
             {
@@ -150,7 +186,7 @@ public class PagosController : AuthController
             return NotFound(new { ok = false, msg = "Pago no encontrado." });
 
         var socio = pago.IdSocioNavigation;
-        string nombreSocio = socio != null ? $"{socio.Nombre} {socio.Paterno} {socio.Materno}".Trim() : "Socio no especificado";
+        string nombreSocio = socio != null ? socio.NombreCompleto : "Socio no especificado";
 
         // Obtener última vigencia de membresía si existe
         var memActiva = await _db.Vwsociomembresias
@@ -172,6 +208,7 @@ public class PagosController : AuthController
             fecha = (pago.FechaCreacion ?? pago.FechaPago.ToDateTime(TimeOnly.MinValue)).ToString("dd/MM/yyyy HH:mm"),
             fechaPago = pago.FechaPago.ToString("dd/MM/yyyy"),
             socio = nombreSocio,
+            socioDni = socio?.NumeroDocumento ?? "",
             socioId = pago.IdSocio,
             socioTelefono = socio?.Telefono ?? "",
             telefono = socio?.Telefono ?? "",

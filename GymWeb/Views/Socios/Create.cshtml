@@ -40,17 +40,41 @@
         </div>
 
         <div class="form-grid" style="margin-top:20px;">
-            <div class="form-group">
-                <label class="form-label">Nombre</label>
-                <input asp-for="Nombre" class="form-control" placeholder="Nombre(s)" required />
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label class="form-label">Nombre Completo y Apellidos</label>
+                <input asp-for="Nombre" class="form-control" placeholder="Nombre(s) y Apellidos completos" required autofocus />
+                <input type="hidden" asp-for="Paterno" value="" />
             </div>
             <div class="form-group">
-                <label class="form-label">Apellido Paterno</label>
-                <input asp-for="Paterno" class="form-control" placeholder="Paterno" />
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                    <label class="form-label" style="margin-bottom:0;">Tipo de identificación</label>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="abrirAgregarTipoDoc()" 
+                            style="padding:1px 8px;font-size:11px;border-radius:4px;height:22px;line-height:1;" title="Crear nuevo tipo de identificación">
+                        <i class="fa-solid fa-plus"></i> Agregar
+                    </button>
+                </div>
+                <div id="wrapSelectTipoDoc">
+                    <select id="selTipoDocumento" name="TipoDocumento" class="form-control" onchange="onTipoDocChange(this)">
+                        <option value="S/N" selected>S/N</option>
+                        <option value="DNI">DNI</option>
+                        <option value="INE / IFE">INE / IFE</option>
+                        <option value="Cédula de Identidad">Cédula de Identidad</option>
+                        <option value="Pasaporte">Pasaporte</option>
+                        <option value="RUT / RUN">RUT / RUN</option>
+                        <option value="__OTRO__">+ Agregar otro tipo...</option>
+                    </select>
+                </div>
+                <div id="wrapCustomTipoDoc" style="display:none;margin-top:6px;">
+                    <div style="display:flex;gap:6px;">
+                        <input type="text" id="inpCustomTipoDoc" class="form-control" placeholder="Ej. DUI, CURP..." />
+                        <button type="button" class="btn btn-primary btn-sm" onclick="confirmarTipoDocCustom()" title="Guardar"><i class="fa-solid fa-check"></i></button>
+                        <button type="button" class="btn btn-outline btn-sm" onclick="cancelarTipoDocCustom()" title="Cancelar"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                </div>
             </div>
             <div class="form-group">
-                <label class="form-label">Apellido Materno</label>
-                <input asp-for="Materno" class="form-control" placeholder="Materno" />
+                <label class="form-label">Número de documento</label>
+                <input asp-for="Materno" class="form-control" placeholder="Folio o documento (opcional)" />
             </div>
             <div class="form-group">
                 <label class="form-label">Teléfono</label>
@@ -62,17 +86,43 @@
             </div>
             <div class="form-group">
                 <label class="form-label">Plan / Membresía</label>
-                <select name="IdMembresia" id="selMembresia" class="form-control">
+                <select name="IdMembresia" id="selMembresia" class="form-control" onchange="onPlanNuevoChange()">
                     <option value="">— Sin membresía —</option>
                     @foreach (var m in (IEnumerable<GymWeb.Models.Membresium>)ViewBag.Membresias)
                     {
-                        <option value="@m.IdMembresia">@m.Nombre (@m.Precio?.ToString("C", new System.Globalization.CultureInfo("es-MX")))</option>
+                        <option value="@m.IdMembresia" data-precio="@(m.Precio ?? 0)">@m.Nombre (@GymWeb.Helpers.AppSettings.MonedaSimbolo@m.Precio?.ToString("N2"))</option>
                     }
                 </select>
             </div>
             <div class="form-group">
                 <label class="form-label">Fecha de Inicio de Membresía</label>
                 <input type="date" name="FechaInicioMembresia" id="inpFechaInicio" class="form-control" value="@DateTime.Now.ToString("yyyy-MM-dd")" />
+            </div>
+
+            <!-- Opciones de Cobro Inmediato para Nuevo Socio -->
+            <div class="form-group" style="grid-column:1/-1;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);padding:14px;border-radius:10px;margin-top:6px;display:none;" id="seccionCobroNuevoSocio">
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:8px;">
+                    <input type="checkbox" name="registrarPago" id="chkRegistrarPagoNuevo" value="true" checked onchange="toggleCobroNuevoSocio(this.checked)" style="width:18px;height:18px;accent-color:#00e5ff;" />
+                    <input type="hidden" name="registrarPago" value="false" />
+                    <span style="font-weight:700;color:#00e5ff;font-size:13.5px;"><i class="fa-solid fa-cash-register"></i> Registrar cobro de membresía e ingresar a caja de inmediato</span>
+                </label>
+                <div id="camposCobroNuevoSocio" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;">
+                    <div>
+                        <label class="form-label" style="font-size:12px;">Monto a Cobrar (@GymWeb.Helpers.AppSettings.MonedaSimbolo @GymWeb.Helpers.AppSettings.MonedaCodigo)</label>
+                        <input type="number" name="montoPago" id="inpMontoPagoNuevo" class="form-control" step="0.01" min="0.01" placeholder="0.00" />
+                    </div>
+                    <div>
+                        <label class="form-label" style="font-size:12px;">Método de Pago</label>
+                        <select name="metodoPago" class="form-select">
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Tarjeta">Tarjeta</option>
+                            <option value="Transferencia">Transferencia</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="avisoCobroPendienteNuevo" style="display:none;margin-top:6px;font-size:12px;color:#f87171;background:rgba(239,68,68,0.1);padding:8px 12px;border-radius:6px;border:1px solid rgba(239,68,68,0.2);">
+                    <i class="fa-solid fa-triangle-exclamation"></i> <strong>Atención:</strong> La membresía se activará pero quedará registrada como <strong>adeudo pendiente</strong> en el estado de cuenta del socio.
+                </div>
             </div>
             <div class="form-group" style="grid-column:1/-1;">
                 <label class="form-label">Observaciones</label>
@@ -167,22 +217,133 @@
         reader.readAsDataURL(file);
     });
 
-    // Sincronizar fechas de registro e inicio de membresía
-    const inpRegistro = document.getElementById('inpFechaRegistro');
-    const inpInicio   = document.getElementById('inpFechaInicio');
-    if (inpRegistro && inpInicio) {
-        inpInicio.addEventListener('change', () => {
-            if (!inpRegistro.dataset.manual) {
-                inpRegistro.value = inpInicio.value;
+
+    window.onPlanNuevoChange = function() {
+        const sel = document.getElementById('selMembresia');
+        const sec = document.getElementById('seccionCobroNuevoSocio');
+        const inp = document.getElementById('inpMontoPagoNuevo');
+        if (!sel || !sec) return;
+        if (sel.value) {
+            sec.style.display = 'block';
+            const opt = sel.options[sel.selectedIndex];
+            if (opt && opt.dataset.precio && inp) {
+                inp.value = parseFloat(opt.dataset.precio).toFixed(2);
             }
-        });
-        inpRegistro.addEventListener('change', () => {
-            inpRegistro.dataset.manual = 'true';
-            if (!inpInicio.dataset.manual) {
-                inpInicio.value = inpRegistro.value;
-            }
-        });
+        } else {
+            sec.style.display = 'none';
+            if (inp) inp.value = '';
+        }
+    };
+
+    window.toggleCobroNuevoSocio = function(checked) {
+        const campos = document.getElementById('camposCobroNuevoSocio');
+        const aviso = document.getElementById('avisoCobroPendienteNuevo');
+        if (campos) campos.style.display = checked ? 'grid' : 'none';
+        if (aviso) aviso.style.display = checked ? 'none' : 'block';
+    };
+
+    // Gestión de tipos de identificación personalizados con persistencia local
+    const STORAGE_KEY = 'gym_custom_id_types';
+    function cargarTiposPersonalizados() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return;
+            const guardados = JSON.parse(raw);
+            const sel = document.getElementById('selTipoDocumento');
+            if (!sel || !Array.isArray(guardados)) return;
+            const optOtro = sel.querySelector('option[value="__OTRO__"]');
+            guardados.forEach(tipo => {
+                if (tipo && !Array.from(sel.options).some(o => o.value.toLowerCase() === tipo.toLowerCase())) {
+                    const nueva = document.createElement('option');
+                    nueva.value = tipo;
+                    nueva.textContent = tipo;
+                    sel.insertBefore(nueva, optOtro);
+                }
+            });
+        } catch (e) { console.warn('Error al cargar tipos personalizados:', e); }
     }
+
+    cargarTiposPersonalizados();
+
+    window.onTipoDocChange = function(sel) {
+        if (sel.value === '__OTRO__') {
+            abrirAgregarTipoDoc();
+        }
+    };
+
+    window.abrirAgregarTipoDoc = function() {
+        const wrapSel = document.getElementById('wrapSelectTipoDoc');
+        const wrapCustom = document.getElementById('wrapCustomTipoDoc');
+        const inp = document.getElementById('inpCustomTipoDoc');
+        if (wrapCustom) wrapCustom.style.display = 'block';
+        if (inp) {
+            inp.value = '';
+            inp.focus();
+        }
+    };
+
+    window.cancelarTipoDocCustom = function() {
+        const wrapCustom = document.getElementById('wrapCustomTipoDoc');
+        const sel = document.getElementById('selTipoDocumento');
+        if (wrapCustom) wrapCustom.style.display = 'none';
+        if (sel && sel.value === '__OTRO__') {
+            sel.selectedIndex = 0; // Vuelve a DNI
+        }
+    };
+
+    window.confirmarTipoDocCustom = function() {
+        const inp = document.getElementById('inpCustomTipoDoc');
+        const sel = document.getElementById('selTipoDocumento');
+        const val = inp?.value?.trim();
+        if (!val) {
+            cancelarTipoDocCustom();
+            return;
+        }
+
+        // Agregar al select si no existe
+        const optOtro = sel.querySelector('option[value="__OTRO__"]');
+        let existente = Array.from(sel.options).find(o => o.value.toLowerCase() === val.toLowerCase());
+        if (!existente) {
+            existente = document.createElement('option');
+            existente.value = val;
+            existente.textContent = val;
+            sel.insertBefore(existente, optOtro);
+
+            // Guardar en localStorage
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                const lista = raw ? JSON.parse(raw) : [];
+                if (!lista.some(item => item.toLowerCase() === val.toLowerCase())) {
+                    lista.push(val);
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(lista));
+                }
+            } catch (e) { }
+        }
+
+        sel.value = existente.value;
+        cancelarTipoDocCustom();
+    };
+
+    document.getElementById('inpCustomTipoDoc')?.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            confirmarTipoDocCustom();
+        } else if (e.key === 'Escape') {
+            cancelarTipoDocCustom();
+        }
+    });
+
+    document.querySelector('form')?.addEventListener('submit', function() {
+        const sel = document.getElementById('selMembresia');
+        const chk = document.getElementById('chkRegistrarPagoNuevo');
+        const inp = document.getElementById('inpMontoPagoNuevo');
+        if (sel && sel.value && chk && chk.checked && (!inp.value || parseFloat(inp.value) <= 0)) {
+            const opt = sel.options[sel.selectedIndex];
+            if (opt && opt.dataset.precio) {
+                inp.value = parseFloat(opt.dataset.precio).toFixed(2);
+            }
+        }
+    });
 })();
 </script>
 

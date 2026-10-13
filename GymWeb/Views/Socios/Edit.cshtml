@@ -45,22 +45,50 @@
                 <input type="hidden" name="FotoBase64" id="FotoBase64" />
                 <video id="cameraVideo" style="display:none;" autoplay playsinline></video>
                 <canvas id="cameraCanvas" style="display:none;"></canvas>
-                <p class="text-muted" style="font-size:11px;margin-top:8px;">Clave del socio: <strong style="color:var(--accent);">@Model.IdSocio</strong></p>
+                <p class="text-muted" style="font-size:11px;margin-top:8px;">Clave del socio: <strong style="color:var(--accent);letter-spacing:1px;font-family:'Inter',monospace;">@Model.IdSocio.ToString("D4")</strong></p>
             </div>
         </div>
 
         <div class="form-grid" style="margin-top:20px;">
-            <div class="form-group">
-                <label class="form-label">Nombre</label>
-                <input asp-for="Nombre" class="form-control" required />
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label class="form-label">Nombre Completo y Apellidos</label>
+                <input asp-for="Nombre" value="@Model.NombreCompleto" class="form-control" placeholder="Nombre(s) y Apellidos completos" required />
+                <input type="hidden" asp-for="Paterno" value="" />
             </div>
             <div class="form-group">
-                <label class="form-label">Apellido Paterno</label>
-                <input asp-for="Paterno" class="form-control" />
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                    <label class="form-label" style="margin-bottom:0;">Tipo de identificación</label>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="abrirAgregarTipoDoc()" 
+                            style="padding:1px 8px;font-size:11px;border-radius:4px;height:22px;line-height:1;" title="Crear nuevo tipo de identificación">
+                        <i class="fa-solid fa-plus"></i> Agregar
+                    </button>
+                </div>
+                <div id="wrapSelectTipoDoc">
+                    <select id="selTipoDocumento" name="TipoDocumento" class="form-control" onchange="onTipoDocChange(this)">
+                        <option value="S/N" selected="@(string.IsNullOrWhiteSpace(Model.TipoDocumento) || Model.TipoDocumento == "S/N")">S/N</option>
+                        <option value="DNI" selected="@(Model.TipoDocumento == "DNI")">DNI</option>
+                        <option value="INE / IFE" selected="@(Model.TipoDocumento == "INE / IFE" || Model.TipoDocumento == "INE")">INE / IFE</option>
+                        <option value="Cédula de Identidad" selected="@(Model.TipoDocumento == "Cédula de Identidad" || Model.TipoDocumento == "Cédula")">Cédula de Identidad</option>
+                        <option value="Pasaporte" selected="@(Model.TipoDocumento == "Pasaporte")">Pasaporte</option>
+                        <option value="RUT / RUN" selected="@(Model.TipoDocumento == "RUT / RUN" || Model.TipoDocumento == "RUT")">RUT / RUN</option>
+                        @if (!string.IsNullOrWhiteSpace(Model.TipoDocumento) && !new[] { "S/N", "DNI", "Cédula de Identidad", "Cédula", "Pasaporte", "RUT / RUN", "RUT", "INE / IFE", "INE" }.Contains(Model.TipoDocumento))
+                        {
+                            <option value="@Model.TipoDocumento" selected>@Model.TipoDocumento</option>
+                        }
+                        <option value="__OTRO__">+ Agregar otro tipo...</option>
+                    </select>
+                </div>
+                <div id="wrapCustomTipoDoc" style="display:none;margin-top:6px;">
+                    <div style="display:flex;gap:6px;">
+                        <input type="text" id="inpCustomTipoDoc" class="form-control" placeholder="Ej. DUI, CURP..." />
+                        <button type="button" class="btn btn-primary btn-sm" onclick="confirmarTipoDocCustom()" title="Guardar"><i class="fa-solid fa-check"></i></button>
+                        <button type="button" class="btn btn-outline btn-sm" onclick="cancelarTipoDocCustom()" title="Cancelar"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                </div>
             </div>
             <div class="form-group">
-                <label class="form-label">Apellido Materno</label>
-                <input asp-for="Materno" class="form-control" />
+                <label class="form-label">Número de documento</label>
+                <input asp-for="Materno" value="@Model.NumeroDocumento" class="form-control" placeholder="Folio o documento (opcional)" />
             </div>
             <div class="form-group">
                 <label class="form-label">Teléfono</label>
@@ -70,6 +98,49 @@
                 <label class="form-label">Fecha de Registro</label>
                 <input asp-for="FechaCreacion" type="date" class="form-control" value="@Model.FechaCreacion?.ToString("yyyy-MM-dd")" />
             </div>
+
+            @if (ViewBag.MembresiaActiva != null)
+            {
+                var mAct = (GymWeb.Models.Sociomembresium)ViewBag.MembresiaActiva;
+                <div class="form-group" style="grid-column:1/-1;background:rgba(0,229,255,0.04);border:1px solid rgba(0,229,255,0.25);padding:14px 16px;border-radius:10px;margin-top:4px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+                        <span style="font-weight:700;color:#00e5ff;font-size:13.5px;">
+                            <i class="fa-solid fa-id-card"></i> Membresía Asignada: <strong>@(mAct.IdMembresiaNavigation?.Nombre ?? "Membresía")</strong>
+                        </span>
+                        <a asp-action="Membresia" asp-route-id="@Model.IdSocio" class="btn btn-outline btn-sm" style="font-size:11.5px;padding:3px 10px;">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i> Ver historial de membresías
+                        </a>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:center;">
+                        <div>
+                            <label class="form-label" style="font-size:12px;font-weight:600;color:#e2e8f0;">
+                                <i class="fa-regular fa-calendar-days" style="color:#00e5ff;"></i> Fecha de Inicio de la Membresía
+                            </label>
+                            <input type="date" name="FechaInicioMembresia" class="form-control"
+                                   value="@(mAct.FechaInicioMembresia?.ToString("yyyy-MM-dd") ?? mAct.FechaCreacion?.ToString("yyyy-MM-dd"))"
+                                   style="border-color:rgba(0,229,255,0.4);background:rgba(0,0,0,0.25);" />
+                            <input type="hidden" name="IdSocioMembresia" value="@mAct.IdSocioMembresia" />
+                        </div>
+                        <div style="font-size:11.5px;color:#94a3b8;line-height:1.45;background:rgba(255,255,255,0.02);padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
+                            <i class="fa-solid fa-circle-info" style="color:#38bdf8;"></i> Si por error no seleccionaste la fecha correcta al dar de alta al socio, cámbiala aquí y al guardar se recalculará automáticamente su vigencia.
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="form-group" style="grid-column:1/-1;background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.12);padding:12px 14px;border-radius:10px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                        <span class="text-muted" style="font-size:12px;">
+                            <i class="fa-solid fa-id-card"></i> Este socio no tiene una membresía activa asignada actualmente.
+                        </span>
+                        <a asp-action="Membresia" asp-route-id="@Model.IdSocio" class="btn btn-outline btn-sm" style="font-size:11.5px;padding:3px 10px;">
+                            <i class="fa-solid fa-plus"></i> Asignar membresía
+                        </a>
+                    </div>
+                </div>
+            }
+
             <div class="form-group" style="grid-column:1/-1;">
                 <label class="form-label">Observaciones</label>
                 <textarea asp-for="Observaciones" class="form-control" rows="3"></textarea>
@@ -141,6 +212,94 @@ function eliminarFotoSocio() {
         fotoBox.innerHTML = '<div class="foto-icon"><i class="fa-solid fa-user fa-2x"></i><span>Sin foto</span></div>';
         btnRet.style.display  = 'none';
         btnOpen.style.display = 'inline-flex';
+    });
+
+    // Gestión de tipos de identificación personalizados con persistencia local
+    const STORAGE_KEY = 'gym_custom_id_types';
+    function cargarTiposPersonalizados() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return;
+            const guardados = JSON.parse(raw);
+            const sel = document.getElementById('selTipoDocumento');
+            if (!sel || !Array.isArray(guardados)) return;
+            const optOtro = sel.querySelector('option[value="__OTRO__"]');
+            guardados.forEach(tipo => {
+                if (tipo && !Array.from(sel.options).some(o => o.value.toLowerCase() === tipo.toLowerCase())) {
+                    const nueva = document.createElement('option');
+                    nueva.value = tipo;
+                    nueva.textContent = tipo;
+                    sel.insertBefore(nueva, optOtro);
+                }
+            });
+        } catch (e) { console.warn('Error al cargar tipos personalizados:', e); }
+    }
+
+    cargarTiposPersonalizados();
+
+    window.onTipoDocChange = function(sel) {
+        if (sel.value === '__OTRO__') {
+            abrirAgregarTipoDoc();
+        }
+    };
+
+    window.abrirAgregarTipoDoc = function() {
+        const wrapCustom = document.getElementById('wrapCustomTipoDoc');
+        const inp = document.getElementById('inpCustomTipoDoc');
+        if (wrapCustom) wrapCustom.style.display = 'block';
+        if (inp) {
+            inp.value = '';
+            inp.focus();
+        }
+    };
+
+    window.cancelarTipoDocCustom = function() {
+        const wrapCustom = document.getElementById('wrapCustomTipoDoc');
+        const sel = document.getElementById('selTipoDocumento');
+        if (wrapCustom) wrapCustom.style.display = 'none';
+        if (sel && sel.value === '__OTRO__') {
+            sel.selectedIndex = 0;
+        }
+    };
+
+    window.confirmarTipoDocCustom = function() {
+        const inp = document.getElementById('inpCustomTipoDoc');
+        const sel = document.getElementById('selTipoDocumento');
+        const val = inp?.value?.trim();
+        if (!val) {
+            cancelarTipoDocCustom();
+            return;
+        }
+
+        const optOtro = sel.querySelector('option[value="__OTRO__"]');
+        let existente = Array.from(sel.options).find(o => o.value.toLowerCase() === val.toLowerCase());
+        if (!existente) {
+            existente = document.createElement('option');
+            existente.value = val;
+            existente.textContent = val;
+            sel.insertBefore(existente, optOtro);
+
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                const lista = raw ? JSON.parse(raw) : [];
+                if (!lista.some(item => item.toLowerCase() === val.toLowerCase())) {
+                    lista.push(val);
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(lista));
+                }
+            } catch (e) { }
+        }
+
+        sel.value = existente.value;
+        cancelarTipoDocCustom();
+    };
+
+    document.getElementById('inpCustomTipoDoc')?.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            confirmarTipoDocCustom();
+        } else if (e.key === 'Escape') {
+            cancelarTipoDocCustom();
+        }
     });
 })();
 </script>

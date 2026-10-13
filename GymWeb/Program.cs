@@ -20,7 +20,15 @@ Log.Logger = new LoggerConfiguration()
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog();
-builder.Host.UseWindowsService();
+
+// Habilitar escucha en todas las interfaces de red para acceso local y móvil desde celulares/tablets (IPv4 e IPv6)
+builder.WebHost.UseUrls("http://*:5080");
+
+// Habilitar modo Servicio de Windows solo si realmente se ejecuta bajo el Service Control Manager
+if (Microsoft.Extensions.Hosting.WindowsServices.WindowsServiceHelpers.IsWindowsService())
+{
+    builder.Host.UseWindowsService();
+}
 
 // Detección automática del motor de Base de Datos (MySQL vs SQLite)
 var connStr = builder.Configuration.GetConnectionString("GymDb") ?? "Data Source=gym.db";
@@ -142,10 +150,26 @@ builder.Services.AddSession(options =>
     options.Cookie.IsEssential = true;
 });
 
+// Configuración de Cultura Regional estándar (soporte unificado para decimales y fechas en cualquier equipo)
+var defaultCulture = new System.Globalization.CultureInfo("es-MX");
+defaultCulture.NumberFormat.NumberDecimalSeparator = ".";
+defaultCulture.NumberFormat.CurrencyDecimalSeparator = ".";
+System.Globalization.CultureInfo.DefaultThreadCurrentCulture = defaultCulture;
+System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = defaultCulture;
+
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    var supported = new[] { defaultCulture };
+    options.DefaultRequestCulture = new Microsoft.AspNetCore.Localization.RequestCulture(defaultCulture);
+    options.SupportedCultures = supported;
+    options.SupportedUICultures = supported;
+});
+
 builder.Services.AddHttpClient();
 builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
+app.UseRequestLocalization();
 
 // Load persistent settings from DB & Auto-migration
 try
@@ -224,8 +248,13 @@ try
         try { db.Database.ExecuteSqlRaw("ALTER TABLE salida ADD COLUMN IF NOT EXISTS fechaLiquidacion DATETIME NULL;"); } catch { }
 
         try { db.Database.ExecuteSqlRaw("ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS precio_visita DECIMAL(8,2) DEFAULT 0;"); } catch { }
+        try { db.Database.ExecuteSqlRaw("ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS pais VARCHAR(10) DEFAULT 'AR';"); } catch { }
+        try { db.Database.ExecuteSqlRaw("ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS moneda_simbolo VARCHAR(10) DEFAULT '$';"); } catch { }
+        try { db.Database.ExecuteSqlRaw("ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS moneda_codigo VARCHAR(10) DEFAULT 'ARS';"); } catch { }
+        try { db.Database.ExecuteSqlRaw("ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS lada VARCHAR(10) DEFAULT '54';"); } catch { }
         try { db.Database.ExecuteSqlRaw("ALTER TABLE registro ADD COLUMN IF NOT EXISTS nombre_visita VARCHAR(150) NULL;"); } catch { }
         try { db.Database.ExecuteSqlRaw("ALTER TABLE registro ADD COLUMN IF NOT EXISTS precio_visita DECIMAL(8,2) NULL;"); } catch { }
+        try { db.Database.ExecuteSqlRaw("ALTER TABLE socio ADD COLUMN IF NOT EXISTS tipo_documento VARCHAR(45) DEFAULT 'DNI';"); } catch { }
     }
 
     var cfg = db.Configuracions.FirstOrDefault();
@@ -239,6 +268,14 @@ try
         AppSettings.GymPieTicket = cfg.Mensaje;
     if (cfg?.MensajeVencimiento.HasValue == true)
         AppSettings.DiasAviso = cfg.MensajeVencimiento.Value;
+    if (!string.IsNullOrWhiteSpace(cfg?.Pais))
+        AppSettings.Pais = cfg.Pais;
+    if (!string.IsNullOrWhiteSpace(cfg?.MonedaSimbolo))
+        AppSettings.MonedaSimbolo = cfg.MonedaSimbolo;
+    if (!string.IsNullOrWhiteSpace(cfg?.MonedaCodigo))
+        AppSettings.MonedaCodigo = cfg.MonedaCodigo;
+    if (!string.IsNullOrWhiteSpace(cfg?.Lada))
+        AppSettings.Lada = cfg.Lada;
 
     var webRoot = app.Environment.WebRootPath ?? Path.Combine(AppContext.BaseDirectory, "wwwroot");
     var logoPath = Path.Combine(webRoot, "img", "logo-custom.png");
@@ -361,4 +398,4 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
-app.Run();
+app.Run("http://*:5080");

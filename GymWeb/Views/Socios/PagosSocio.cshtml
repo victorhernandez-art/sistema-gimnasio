@@ -6,7 +6,7 @@
 <div class="page-header">
     <div>
         <h1 class="page-title"><i class="fa-solid fa-dollar-sign"></i> Pagos del Socio</h1>
-        <p class="page-subtitle">@socio?.Nombre @socio?.Paterno @socio?.Materno — Clave #@socio?.IdSocio</p>
+        <p class="page-subtitle">@socio?.NombreCompleto — Clave #@socio?.ClaveFormateada</p>
     </div>
 </div>
 
@@ -34,7 +34,7 @@ else
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px;">
         <div class="card" style="padding:18px 20px;">
             <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Total Pagado</div>
-            <div style="font-size:26px;font-weight:700;color:var(--accent);">$@Model.Sum(p => p.Monto).ToString("N2")</div>
+            <div style="font-size:26px;font-weight:700;color:var(--accent);">@GymWeb.Helpers.AppSettings.MonedaSimbolo@Model.Sum(p => p.Monto).ToString("N2")</div>
         </div>
         <div class="card" style="padding:18px 20px;">
             <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Número de Pagos</div>
@@ -82,7 +82,7 @@ else
                             }
                             <span style="font-size:13px;"><i class="fa-solid @icon" style="margin-right:5px;opacity:0.7;"></i>@p.MetodoPago</span>
                         </td>
-                        <td><span style="font-weight:600;color:var(--accent);">$@p.Monto.ToString("N2")</span></td>
+                        <td><span style="font-weight:600;color:var(--accent);">@GymWeb.Helpers.AppSettings.MonedaSimbolo@p.Monto.ToString("N2")</span></td>
                         <td class="text-muted" style="font-size:12px;">@(p.Notas ?? "—")</td>
                     </tr>
                 }

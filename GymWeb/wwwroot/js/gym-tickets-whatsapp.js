@@ -478,6 +478,7 @@
 
     // Formateador de texto con diseño formal y profesional para WhatsApp
     function generarTextoTicketWhatsApp(data) {
+        const mon    = (data.monedaSimbolo || window.MONEDA_SIMBOLO || window.GYM_CONFIG?.monedaSimbolo || window._gymConfig?.monedaSimbolo || '$').trim();
         const gymNom = (data.gymNombre || 'GIMNASIO').toUpperCase();
         const folio  = data.folio || ('#' + (data.idSalida || data.idPago || '0'));
         const fecha  = data.fecha || new Date().toLocaleString();
@@ -496,7 +497,7 @@
                     const cant = it.cantidad || 1;
                     const nom = it.nombre || 'Producto';
                     const sub = Number(it.subtotal || (cant * it.precioUnitario) || 0).toFixed(2);
-                    itemsTxt += `  - ${cant}x ${nom}: $${sub}\n`;
+                    itemsTxt += `  - ${cant}x ${nom}: ${mon} ${sub}\n`;
                 });
             } else {
                 itemsTxt = `  - Consumo en mostrador\n`;
@@ -507,9 +508,9 @@
 
             cuerpo = `DETALLE DE ARTÍCULOS:
 ${itemsTxt}----------------------------------------
-TOTAL: $${total}
+TOTAL: ${mon} ${total}
 FORMA DE PAGO: ${metodo}
-${data.esCredito && data.saldoPendiente != null ? `SALDO PENDIENTE: $${Number(data.saldoPendiente).toFixed(2)}\n` : ''}`;
+${data.esCredito && data.saldoPendiente != null ? `SALDO PENDIENTE: ${mon} ${Number(data.saldoPendiente).toFixed(2)}\n` : ''}`;
 
         } else if (tipo === 'MEMBRESIA') {
             encabezado = `*COMPROBANTE DE PAGO DE MEMBRESÍA*`;
@@ -519,7 +520,7 @@ ${data.esCredito && data.saldoPendiente != null ? `SALDO PENDIENTE: $${Number(da
             const metodo = data.metodoPago || data.metodo || 'Efectivo';
 
             cuerpo = `CONCEPTO: ${plan}${vigencia}
-TOTAL PAGADO: $${monto}
+TOTAL PAGADO: ${mon} ${monto}
 FORMA DE PAGO: ${metodo}
 ${data.notas ? `NOTAS: ${data.notas}\n` : ''}`;
 
@@ -527,9 +528,9 @@ ${data.notas ? `NOTAS: ${data.notas}\n` : ''}`;
             encabezado = `*COMPROBANTE DE ABONO A CUENTA*`;
             const monto = Number(data.monto || 0).toFixed(2);
             const metodo = data.metodoPago || 'Efectivo';
-            const saldo = data.saldoRestante != null ? `\nSALDO RESTANTE: $${Number(data.saldoRestante).toFixed(2)}` : '';
+            const saldo = data.saldoRestante != null ? `\nSALDO RESTANTE: ${mon} ${Number(data.saldoRestante).toFixed(2)}` : '';
 
-            cuerpo = `MONTO ABONADO: $${monto}
+            cuerpo = `MONTO ABONADO: ${mon} ${monto}
 FORMA DE PAGO: ${metodo}${saldo}
 ${data.notas ? `CONCEPTO: ${data.notas}\n` : ''}`;
         }
@@ -568,6 +569,7 @@ ${pie}${telContacto}`;
         const esCredito = Boolean(data.esCredito);
         const saldoPendiente = Number(data.saldoPendiente || (esCredito ? total : 0));
         const logoUrl = data.gymLogo || '/img/logo-custom.png';
+        const mon = (data.monedaSimbolo || window.MONEDA_SIMBOLO || window.GYM_CONFIG?.monedaSimbolo || window._gymConfig?.monedaSimbolo || '$').trim();
 
         let itemsHtml = '';
         if (data.items && data.items.length > 0) {
@@ -580,9 +582,9 @@ ${pie}${telContacto}`;
                   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:3px;gap:4px;">
                     <div style="flex:1;min-width:0;word-break:break-word;">
                       <div style="font-weight:800;color:#000000;font-size:10px;">${nom}</div>
-                      <div style="font-size:8.5px;color:#333333;font-weight:600;">${cant} x $${pu.toFixed(2)}</div>
+                      <div style="font-size:8.5px;color:#333333;font-weight:600;">${cant} x ${mon} ${pu.toFixed(2)}</div>
                     </div>
-                    <div style="font-weight:800;color:#000000;text-align:right;white-space:nowrap;font-size:10px;">$${sub.toFixed(2)}</div>
+                    <div style="font-weight:800;color:#000000;text-align:right;white-space:nowrap;font-size:10px;">${mon} ${sub.toFixed(2)}</div>
                   </div>`;
             }).join('');
         } else if (data.plan) {
@@ -592,7 +594,7 @@ ${pie}${telContacto}`;
                   <div style="font-weight:800;color:#000000;font-size:10px;">${data.plan}</div>
                   ${data.vigencia ? `<div style="font-size:8.5px;color:#333333;font-weight:600;">Vigencia: Hasta ${data.vigencia}</div>` : ''}
                 </div>
-                <div style="font-weight:800;color:#000000;text-align:right;white-space:nowrap;font-size:10px;">$${total.toFixed(2)}</div>
+                <div style="font-weight:800;color:#000000;text-align:right;white-space:nowrap;font-size:10px;">${mon} ${total.toFixed(2)}</div>
               </div>`;
         } else {
             itemsHtml = `
@@ -600,7 +602,7 @@ ${pie}${telContacto}`;
                 <div style="flex:1;min-width:0;word-break:break-word;">
                   <div style="font-weight:800;color:#000000;font-size:10px;">${data.notas || 'Consumo en mostrador'}</div>
                 </div>
-                <div style="font-weight:800;color:#000000;text-align:right;white-space:nowrap;font-size:10px;">$${total.toFixed(2)}</div>
+                <div style="font-weight:800;color:#000000;text-align:right;white-space:nowrap;font-size:10px;">${mon} ${total.toFixed(2)}</div>
               </div>`;
         }
 
@@ -638,16 +640,16 @@ ${pie}${telContacto}`;
             ${descuento > 0 ? `
               <div style="display:flex;justify-content:space-between;font-size:9.5px;color:#000;margin:1px 0;">
                 <span>Subtotal:</span>
-                <span>$${subtotal.toFixed(2)}</span>
+                <span>${mon} ${subtotal.toFixed(2)}</span>
               </div>
               <div style="display:flex;justify-content:space-between;font-size:9.5px;color:#000;font-weight:700;margin:1px 0;">
                 <span>Descuento:</span>
-                <span>-$${descuento.toFixed(2)}</span>
+                <span>-${mon} ${descuento.toFixed(2)}</span>
               </div>
             ` : ''}
             <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:900;color:#000;margin:3px 0;">
               <span>TOTAL PAGADO:</span>
-              <span>$${total.toFixed(2)}</span>
+              <span>${mon} ${total.toFixed(2)}</span>
             </div>
 
             <div style="display:flex;justify-content:space-between;font-size:9.5px;color:#000;margin-top:2px;">
@@ -658,18 +660,18 @@ ${pie}${telContacto}`;
             ${!esCredito && metodo === 'Efectivo' && pagaCon > 0 ? `
               <div style="display:flex;justify-content:space-between;font-size:9.5px;color:#000;margin:1px 0;">
                 <span>Paga con:</span>
-                <span>$${pagaCon.toFixed(2)}</span>
+                <span>${mon} ${pagaCon.toFixed(2)}</span>
               </div>
               <div style="display:flex;justify-content:space-between;font-size:10px;color:#000;font-weight:800;margin:1px 0;">
                 <span>Cambio:</span>
-                <span>$${cambio.toFixed(2)}</span>
+                <span>${mon} ${cambio.toFixed(2)}</span>
               </div>
             ` : ''}
 
             ${esCredito ? `
               <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#b91c1c;font-weight:900;margin-top:3px;">
                 <span>Saldo pendiente:</span>
-                <span>$${saldoPendiente.toFixed(2)}</span>
+                <span>${mon} ${saldoPendiente.toFixed(2)}</span>
               </div>
             ` : ''}
 
@@ -763,10 +765,58 @@ ${pie}${telContacto}`;
     // Referencia global para ventana única (Singleton) de WhatsApp Web
     window._gymWhatsAppVentanaUnica = null;
 
+    // ── 3.1b FORMATEADOR INTELIGENTE DE TELÉFONO PARA WHATSAPP INTERNACIONAL ──
+    window.formatearTelefonoWhatsApp = function (telefono) {
+        let raw = String(telefono || '').replace(/[^\d]/g, '');
+        if (!raw) return '';
+
+        const cfg = window.GYM_CONFIG || window._gymConfig || {};
+        const ladaConfig = (cfg.lada || '54').toString().replace(/[^\d]/g, '');
+        const paisConfig = (cfg.pais || 'AR').toUpperCase();
+
+        // ── CASO ESPECIAL ARGENTINA (AR o Lada 54) ──
+        // Para WhatsApp en Argentina, el formato internacional exige prefijo 549 seguido de los 10 dígitos (sin el 15 local)
+        if (paisConfig === 'AR' || ladaConfig === '54') {
+            // Ya tiene prefijo completo '549' (ej: 5491112345678 -> 13 dígitos)
+            if (raw.startsWith('549') && raw.length >= 12) {
+                return raw;
+            }
+            // Tiene '54' pero le falta el '9' de celular (ej: 541112345678 -> 12 dígitos)
+            if (raw.startsWith('54') && !raw.startsWith('549') && raw.length >= 11) {
+                return '549' + raw.substring(2);
+            }
+            // Ingresado con 0 inicial (ej: 01112345678 -> 11 dígitos)
+            if (raw.startsWith('0') && raw.length === 11) {
+                return '549' + raw.substring(1);
+            }
+            // Si tiene 12 dígitos y trae el '15' local (ej: 111512345678)
+            if (raw.length === 12 && raw.substring(2, 4) === '15') {
+                return '549' + raw.substring(0, 2) + raw.substring(4);
+            }
+            // Formato estándar argentino: 10 dígitos (código de área + número local)
+            if (raw.length === 10) {
+                return '549' + raw;
+            }
+            // Si no empieza con 54, anteponer 549
+            if (!raw.startsWith('54')) {
+                return '549' + raw;
+            }
+            return raw;
+        }
+
+        // ── RESTO DE PAÍSES (México, Colombia, Chile, Perú, etc.) ──
+        // Si ya incluye la lada configurada al inicio y tiene longitud suficiente, no duplicar
+        if (raw.startsWith(ladaConfig) && raw.length > ladaConfig.length + 5) {
+            return raw;
+        }
+
+        // Anteponer la lada configurada
+        return ladaConfig + raw;
+    };
+
     // ── 3.2 APERTURA DE VENTANA WHATSAPP WEB CENTRADA (VENTANA ÚNICA / SINGLETON) ──
     window.abrirVentanaWhatsAppCentrada = function (telefono, mensajeTexto) {
-        let cleanPhone = String(telefono || '').replace(/[^\d]/g, '');
-        if (cleanPhone.length === 10) cleanPhone = '52' + cleanPhone;
+        const cleanPhone = window.formatearTelefonoWhatsApp(telefono);
 
         const encodedText = encodeURIComponent(mensajeTexto || '');
         const url = `https://web.whatsapp.com/send/?phone=${cleanPhone}&text=${encodedText}`;
@@ -811,7 +861,7 @@ ${pie}${telContacto}`;
         if (!data) return;
 
         let tel = (telManual || data.socioTelefono || data.telefono || '').toString().replace(/\D/g, '');
-        if (!tel || tel.length < 10) {
+        if (!tel || tel.length < 7) {
             window.abrirModalWhatsAppTicket(data);
             return;
         }
@@ -882,8 +932,8 @@ ${pie}${telContacto}`;
         const alertBox = document.getElementById('whatsModalAlert');
 
         let tel = inputTel.value.trim().replace(/[^0-9]/g, '');
-        if (!tel || tel.length < 10) {
-            alertBox.textContent = 'Por favor ingresa un número de WhatsApp válido (10 dígitos).';
+        if (!tel || tel.length < 7) {
+            alertBox.textContent = 'Por favor ingresa un número de WhatsApp válido.';
             alertBox.style.display = 'block';
             inputTel.focus();
             return;
@@ -960,7 +1010,7 @@ ${pie}${telContacto}`;
         const folio = data?.folio || '#000000';
         const socio = data?.socio || data?.socioNombre || 'Cliente';
         const total = Number(data?.total || data?.monto || 0).toFixed(2);
-        const barcodeHtml = window.generarBarcodeSvgDirecto(folio, `${socio} | ${folio}`);
+        const mon = (data?.monedaSimbolo || window.MONEDA_SIMBOLO || window.GYM_CONFIG?.monedaSimbolo || '$').trim();
 
         div.innerHTML = `
             <div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:10px;margin-bottom:10px;">
@@ -971,7 +1021,7 @@ ${pie}${telContacto}`;
             <div style="margin-bottom:10px;font-size:11px;">
                 <div><strong>Socio:</strong> ${socio}</div>
                 <div><strong>Fecha:</strong> ${data?.fecha || new Date().toLocaleString()}</div>
-                <div><strong>Total:</strong> $${total}</div>
+                <div><strong>Total:</strong> ${mon} ${total}</div>
             </div>
             ${barcodeHtml}
             <div style="text-align:center;font-size:10px;margin-top:10px;color:#555;">
@@ -1004,6 +1054,8 @@ ${pie}${telContacto}`;
     // ── 5. CREACIÓN DEL MODAL DOM PARA WHATSAPP TICKET ───────────────────────
     function crearModalWhatsAppSiNoExiste() {
         if (document.getElementById('modalWhatsAppTicket')) return;
+
+        const ladaActual = (window.GYM_CONFIG?.lada || window._gymConfig?.lada || '54');
 
         const modal = document.createElement('div');
         modal.id = 'modalWhatsAppTicket';
@@ -1046,12 +1098,12 @@ ${pie}${telContacto}`;
             <!-- Campo de Teléfono Manual o Auto-cargado -->
             <div style="margin-bottom:14px;">
                 <label style="display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:700;margin-bottom:6px;color:var(--text,#f8fafc);">
-                    <span><i class="fa-solid fa-mobile-screen" style="color:#25D366;"></i> Número de WhatsApp (10 dígitos):</span>
+                    <span><i class="fa-solid fa-mobile-screen" style="color:#25D366;"></i> Número de WhatsApp:</span>
                     <span style="font-size:10.5px;color:#94a3b8;font-weight:normal;">Manual para no socios</span>
                 </label>
                 <div style="display:flex;gap:8px;">
-                    <span style="display:flex;align-items:center;padding:0 12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:8px;font-size:13px;font-weight:700;color:#94a3b8;">+52</span>
-                    <input type="tel" id="whatsModalTelefono" class="form-control" placeholder="Ej: 9611234567" maxlength="15"
+                    <span id="whatsModalLadaBadge" style="display:flex;align-items:center;padding:0 12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:8px;font-size:13px;font-weight:700;color:#00f264;">+${ladaActual}</span>
+                    <input type="tel" id="whatsModalTelefono" class="form-control" placeholder="Ej: 1112345678" maxlength="15"
                            style="flex:1;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.18);border-radius:8px;padding:10px 12px;color:#fff;font-size:14px;font-weight:700;" />
                 </div>
             </div>
@@ -1232,9 +1284,9 @@ ${pie}${telContacto}`;
         const texto = document.getElementById('directoModalTexto').value.trim();
         const alertBox = document.getElementById('directoModalAlert');
 
-        if (!tel || tel.length < 10) {
+        if (!tel || tel.length < 7) {
             alertBox.style.display = 'block';
-            alertBox.textContent = 'Ingresa un número telefónico válido de 10 dígitos.';
+            alertBox.textContent = 'Ingresa un número telefónico válido.';
             return;
         }
         if (!texto) {
@@ -1243,8 +1295,7 @@ ${pie}${telContacto}`;
             return;
         }
 
-        const phoneWithCountry = tel.length === 10 ? ('52' + tel) : tel;
-        const encodedText = encodeURIComponent(texto);
+        const phoneWithCountry = window.formatearTelefonoWhatsApp(tel);
 
         // Envío directo reutilizando la misma ventana única de WhatsApp sin duplicar
         window.abrirVentanaWhatsAppCentrada(phoneWithCountry, texto);
@@ -1253,6 +1304,8 @@ ${pie}${telContacto}`;
 
     function crearModalMensajeDirectoSiNoExiste() {
         if (document.getElementById('modalWhatsAppDirecto')) return;
+
+        const ladaActual = (window.GYM_CONFIG?.lada || window._gymConfig?.lada || '54');
 
         const modal = document.createElement('div');
         modal.id = 'modalWhatsAppDirecto';
@@ -1278,8 +1331,8 @@ ${pie}${telContacto}`;
             <div style="margin-bottom:12px;">
                 <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:4px;color:var(--text,#f8fafc);">Número de WhatsApp:</label>
                 <div style="display:flex;gap:8px;">
-                    <span style="display:flex;align-items:center;padding:0 10px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:8px;font-size:12px;font-weight:700;color:#94a3b8;">+52</span>
-                    <input type="tel" id="directoModalTelefono" class="form-control" placeholder="10 dígitos" maxlength="15"
+                    <span id="directoModalLadaBadge" style="display:flex;align-items:center;padding:0 10px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:8px;font-size:12px;font-weight:700;color:#00f264;">+${ladaActual}</span>
+                    <input type="tel" id="directoModalTelefono" class="form-control" placeholder="Ej: 1112345678" maxlength="15"
                            style="flex:1;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.18);border-radius:8px;padding:8px 10px;color:#fff;font-size:13px;font-weight:700;" />
                 </div>
             </div>
@@ -1323,12 +1376,145 @@ ${pie}${telContacto}`;
     let difusionIndiceActual = 0;
     let difusionEnEjecucion = false;
     let difusionTimer = null;
+    let whatsAppGatewayConectado = false;
+    let whatsAppGatewayPhone = null;
+    let whatsAppGatewayCheckTimer = null;
+
+    async function verificarEstadoWhatsAppGateway() {
+        try {
+            const resp = await fetch('http://localhost:5085/api/status', { method: 'GET', mode: 'cors' });
+            if (!resp.ok) throw new Error('Gateway no disponible');
+            const data = await resp.json();
+            whatsAppGatewayConectado = data.connected === true;
+            whatsAppGatewayPhone = data.phone;
+            actualizarBadgeGatewayUI(data);
+            return data;
+        } catch (_) {
+            whatsAppGatewayConectado = false;
+            whatsAppGatewayPhone = null;
+            actualizarBadgeGatewayUI({ connected: false, offline: true });
+            return { connected: false, offline: true };
+        }
+    }
+
+    function actualizarBadgeGatewayUI(data) {
+        const badgeEl = document.getElementById('difusionBadgeGateway');
+        if (!badgeEl) return;
+
+        if (data && data.connected) {
+            badgeEl.innerHTML = `
+                <div style="background:rgba(37,211,102,0.15);border:1px solid rgba(37,211,102,0.4);color:#25D366;padding:5px 12px;border-radius:20px;font-size:11.5px;font-weight:700;display:inline-flex;align-items:center;gap:6px;">
+                    <i class="fa-solid fa-circle-check"></i> Bot Conectado (+${data.phone})
+                    <button type="button" onclick="desvincularWhatsAppGateway()" style="background:none;border:none;color:#94a3b8;font-size:10px;cursor:pointer;margin-left:4px;text-decoration:underline;" title="Desvincular cuenta">Desvincular</button>
+                </div>
+            `;
+        } else {
+            badgeEl.innerHTML = `
+                <button type="button" onclick="abrirModalVincularWhatsApp()" style="background:linear-gradient(135deg, #25D366, #128C7E);color:#0B1120;font-weight:800;border:none;padding:5px 13px;border-radius:20px;font-size:11.5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 10px rgba(37,211,102,0.35);">
+                    <i class="fa-solid fa-qrcode"></i> Vincular Bot con QR (Envío 1 Clic Desatendido)
+                </button>
+            `;
+        }
+    }
+
+    let vincularQrPollTimer = null;
+
+    window.abrirModalVincularWhatsApp = function () {
+        crearModalVincularWhatsAppSiNoExiste();
+        const modal = document.getElementById('modalVincularWhatsApp');
+        if (modal) modal.style.display = 'flex';
+        refrescarEstadoQRVincular();
+        if (vincularQrPollTimer) clearInterval(vincularQrPollTimer);
+        vincularQrPollTimer = setInterval(refrescarEstadoQRVincular, 2500);
+    };
+
+    window.cerrarModalVincularWhatsApp = function () {
+        if (vincularQrPollTimer) {
+            clearInterval(vincularQrPollTimer);
+            vincularQrPollTimer = null;
+        }
+        const modal = document.getElementById('modalVincularWhatsApp');
+        if (modal) modal.style.display = 'none';
+        verificarEstadoWhatsAppGateway();
+    };
+
+    async function refrescarEstadoQRVincular() {
+        const qrImgEl = document.getElementById('vincularQrImage');
+        const qrStatusEl = document.getElementById('vincularQrStatus');
+        const qrSpinnerEl = document.getElementById('vincularQrSpinner');
+        if (!qrStatusEl) return;
+
+        try {
+            const resp = await fetch('http://localhost:5085/api/status', { method: 'GET', mode: 'cors' });
+            if (!resp.ok) throw new Error('Servicio no responde');
+            const data = await resp.json();
+
+            if (data.connected) {
+                whatsAppGatewayConectado = true;
+                whatsAppGatewayPhone = data.phone;
+                if (qrSpinnerEl) qrSpinnerEl.style.display = 'none';
+                if (qrImgEl) qrImgEl.style.display = 'none';
+                qrStatusEl.innerHTML = `
+                    <div style="background:rgba(37,211,102,0.15);border:1px solid rgba(37,211,102,0.4);color:#25D366;padding:14px;border-radius:12px;font-size:13px;font-weight:700;">
+                        <i class="fa-solid fa-circle-check" style="font-size:24px;display:block;margin-bottom:6px;"></i>
+                        ¡WhatsApp Conectado con Éxito!<br>
+                        <span style="font-size:12px;color:#cbd5e1;font-weight:normal;">Dispositivo: +${data.phone}</span>
+                    </div>
+                `;
+                actualizarBadgeGatewayUI(data);
+                setTimeout(() => {
+                    cerrarModalVincularWhatsApp();
+                }, 1800);
+                return;
+            }
+
+            if (data.qr) {
+                if (qrSpinnerEl) qrSpinnerEl.style.display = 'none';
+                if (qrImgEl) {
+                    qrImgEl.src = data.qr;
+                    qrImgEl.style.display = 'block';
+                }
+                qrStatusEl.innerHTML = `<span style="color:#38bdf8;font-size:11.5px;"><i class="fa-solid fa-sync fa-spin"></i> Código QR activo. Escanéalo desde WhatsApp en tu celular.</span>`;
+            } else {
+                if (qrImgEl) qrImgEl.style.display = 'none';
+                if (qrSpinnerEl) qrSpinnerEl.style.display = 'block';
+                qrStatusEl.innerHTML = `<span style="color:#fbbf24;font-size:12px;"><i class="fa-solid fa-spinner fa-spin"></i> Generando código QR seguro...</span>`;
+            }
+        } catch (err) {
+            if (qrImgEl) qrImgEl.style.display = 'none';
+            if (qrSpinnerEl) qrSpinnerEl.style.display = 'none';
+            qrStatusEl.innerHTML = `
+                <div style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);color:#fca5a5;padding:12px;border-radius:10px;font-size:12px;">
+                    <i class="fa-solid fa-triangle-exclamation"></i> El Gateway de WhatsApp (puerto 5085) no está activo.<br>
+                    <span style="font-size:11px;color:#94a3b8;">Inicia el servicio con "INICIAR-WHATSAPP-GATEWAY.bat".</span>
+                </div>
+            `;
+        }
+    }
+
+    window.desvincularWhatsAppGateway = async function () {
+        if (!confirm('¿Seguro que deseas desvincular esta cuenta de WhatsApp del sistema?')) return;
+        try {
+            const resp = await fetch('http://localhost:5085/api/logout', { method: 'POST', mode: 'cors' });
+            const data = await resp.json();
+            alert('✓ Sesión de WhatsApp desvinculada.');
+            verificarEstadoWhatsAppGateway();
+        } catch (err) {
+            alert('Error al desvincular WhatsApp: ' + err.message);
+        }
+    };
 
     window.abrirModalDifusionMasiva = async function () {
         crearModalDifusionMasivaSiNoExiste();
         const modal = document.getElementById('modalDifusionMasiva');
         modal.style.display = 'flex';
-        await cargarSociosParaDifusion('todos');
+        verificarEstadoWhatsAppGateway();
+        const btnTodos = modal.querySelector('.difusion-btn-filtro');
+        if (btnTodos) {
+            cambiarFiltroDifusion('todos', btnTodos);
+        } else {
+            await cargarSociosParaDifusion('todos');
+        }
     };
 
     window.cerrarModalDifusionMasiva = function () {
@@ -1344,12 +1530,17 @@ ${pie}${telContacto}`;
         btnIniciar.disabled = true;
 
         try {
-            const resp = await fetch(`/Socios/GetSociosParaDifusion?filtro=${encodeURIComponent(filtro)}`);
+            const resp = await fetch(`/Socios/GetSociosParaDifusion?filtro=${encodeURIComponent(filtro || 'todos')}`);
             const data = await resp.json();
 
             if (data.ok) {
                 difusionSocios = data.socios || [];
-                statusEl.innerHTML = `<span style="color:#00f264;font-weight:700;"><i class="fa-solid fa-users"></i> ${difusionSocios.length} socio(s)</span> listos con número de WhatsApp registrado.`;
+                let descFiltro = 'listos con número de WhatsApp registrado.';
+                if (filtro === 'activos') descFiltro = 'activos con número de WhatsApp registrado.';
+                else if (filtro === 'inactivos') descFiltro = 'inactivos / vencidos con WhatsApp registrado.';
+                else if (filtro === 'deudores') descFiltro = 'con saldo deudor pendiente.';
+
+                statusEl.innerHTML = `<span style="color:#00f264;font-weight:700;"><i class="fa-solid fa-users"></i> ${difusionSocios.length} socio(s)</span> ${descFiltro}`;
                 btnIniciar.disabled = difusionSocios.length === 0;
                 actualizarPreviewDifusion();
             } else {
@@ -1391,12 +1582,13 @@ ${pie}${telContacto}`;
 
         const socioEjemplo = difusionSocios.length > 0 ? difusionSocios[0] : { nombre: 'Carlos', nombreCompleto: 'Carlos Mendoza', deuda: 350.00 };
         const gym = window.GYM_CONFIG?.nombre || 'GIMNASIO';
+        const mon = (window.MONEDA_SIMBOLO || window.GYM_CONFIG?.monedaSimbolo || window._gymConfig?.monedaSimbolo || '$').trim();
 
         let formateado = template
             .replace(/{nombre}/g, socioEjemplo.nombre || 'Socio')
             .replace(/{socio}/g, socioEjemplo.nombreCompleto || socioEjemplo.nombre || 'Socio')
             .replace(/{gimnasio}/g, gym)
-            .replace(/{deuda}/g, '$' + Number(socioEjemplo.deuda || 0).toFixed(2));
+            .replace(/{deuda}/g, mon + ' ' + Number(socioEjemplo.deuda || 0).toFixed(2));
 
         // Markdown visual básico para el preview
         const htmlPreview = formateado
@@ -1422,10 +1614,29 @@ ${pie}${telContacto}`;
         document.getElementById('difusionPanelConfig').style.display = 'none';
         document.getElementById('difusionPanelEjecucion').style.display = 'block';
 
+        const infoGatewayEl = document.getElementById('difusionInfoGateway');
+        const infoNavegadorEl = document.getElementById('difusionInfoNavegador');
+        if (infoGatewayEl && infoNavegadorEl) {
+            if (whatsAppGatewayConectado) {
+                infoGatewayEl.style.display = 'block';
+                infoNavegadorEl.style.display = 'none';
+            } else {
+                infoGatewayEl.style.display = 'none';
+                infoNavegadorEl.style.display = 'block';
+            }
+        }
+
         difusionIndiceActual = 0;
         difusionEnEjecucion = true;
         ejecutarEnvioSocioActual();
     };
+
+    function solicitarAutoEnterWhatsApp(delayMs) {
+        delayMs = delayMs || 5000;
+        try {
+            fetch(`http://localhost:8080/whatsapp-press-enter?delay=${delayMs}`, { method: 'GET', mode: 'cors' }).catch(() => {});
+        } catch (_) {}
+    }
 
     window.ejecutarEnvioSocioActual = function () {
         if (!difusionEnEjecucion) return;
@@ -1438,15 +1649,15 @@ ${pie}${telContacto}`;
         const s = difusionSocios[difusionIndiceActual];
         const template = document.getElementById('difusionMensaje').value;
         const gym = window.GYM_CONFIG?.nombre || 'Gimnasio';
+        const mon = (window.MONEDA_SIMBOLO || window.GYM_CONFIG?.monedaSimbolo || window._gymConfig?.monedaSimbolo || '$').trim();
 
         const textoFinal = template
             .replace(/{nombre}/g, s.nombre || 'Socio')
             .replace(/{socio}/g, s.nombreCompleto || s.nombre || 'Socio')
             .replace(/{gimnasio}/g, gym)
-            .replace(/{deuda}/g, '$' + Number(s.deuda || 0).toFixed(2));
+            .replace(/{deuda}/g, mon + ' ' + Number(s.deuda || 0).toFixed(2));
 
-        const tel = s.telefono.replace(/\D/g, '');
-        const phoneWithCountry = tel.length === 10 ? ('52' + tel) : tel;
+        const phoneWithCountry = window.formatearTelefonoWhatsApp(s.telefono);
         const encodedText = encodeURIComponent(textoFinal);
 
         // Actualizar UI de ejecución
@@ -1457,33 +1668,93 @@ ${pie}${telContacto}`;
         document.getElementById('difusionContador').textContent = `Enviando ${difusionIndiceActual + 1} de ${total}`;
         document.getElementById('difusionNombreActual').textContent = `${s.nombreCompleto} (${s.telefono})`;
 
-        // Envío directo reutilizando la misma ventana única de WhatsApp sin duplicar
-        window.abrirVentanaWhatsAppCentrada(phoneWithCountry, textoFinal);
+        const btnSiguiente = document.getElementById('btnDifusionSiguiente');
+        const esUltimo = (difusionIndiceActual + 1) >= total;
+        const nombreSiguiente = difusionSocios[difusionIndiceActual + 1]?.nombre || 'Socio';
 
-        // Verificar si auto-avance está activo
-        const auto = document.getElementById('difusionCheckAuto').checked;
-        const intervaloSegundos = parseInt(document.getElementById('difusionIntervalo').value) || 3;
+        if (difusionTimer) {
+            clearInterval(difusionTimer);
+            difusionTimer = null;
+        }
 
-        if (auto) {
-            let tiempoRestante = intervaloSegundos;
-            const btnSiguiente = document.getElementById('btnDifusionSiguiente');
+        // =====================================================================
+        // MODO 1: BOT EN SEGUNDO PLANO VINCULADO (CERO VENTANAS, 100% AUTOMATICO)
+        // =====================================================================
+        if (whatsAppGatewayConectado) {
             btnSiguiente.disabled = true;
+            btnSiguiente.innerHTML = `<i class="fa-solid fa-bolt"></i> Enviando por Bot en segundo plano...`;
+
+            fetch('http://localhost:5085/api/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: s.telefono, message: textoFinal })
+            }).then(r => r.json()).then(data => {
+                console.log('[WHATSAPP GATEWAY RESPUESTA]', data);
+            }).catch(err => {
+                console.warn('[WHATSAPP GATEWAY ERROR]', err);
+            });
+
+            // Pausa de 4 segundos entre socios (tiempo ideal para no disparar alertas de spam)
+            let tiempoRestante = 4;
+            btnSiguiente.disabled = false;
+            btnSiguiente.innerHTML = esUltimo 
+                ? `<i class="fa-solid fa-check"></i> Finalizando en ${tiempoRestante}s...` 
+                : `<i class="fa-solid fa-forward-step"></i> Siguiente: ${nombreSiguiente} (${tiempoRestante}s...)`;
 
             difusionTimer = setInterval(() => {
                 tiempoRestante--;
-                btnSiguiente.textContent = `Auto-siguiente en ${tiempoRestante}s...`;
                 if (tiempoRestante <= 0) {
                     clearInterval(difusionTimer);
-                    btnSiguiente.disabled = false;
-                    btnSiguiente.innerHTML = '<i class="fa-solid fa-forward-step"></i> Enviar Siguiente Socio';
+                    difusionTimer = null;
                     difusionIndiceActual++;
                     ejecutarEnvioSocioActual();
+                } else {
+                    btnSiguiente.innerHTML = esUltimo 
+                        ? `<i class="fa-solid fa-check"></i> Finalizando en ${tiempoRestante}s...` 
+                        : `<i class="fa-solid fa-forward-step"></i> Siguiente: ${nombreSiguiente} (${tiempoRestante}s...)`;
+                }
+            }, 1000);
+            return;
+        }
+
+        // =====================================================================
+        // MODO 2: NAVEGADOR WHATSAPP WEB CON VENTANA EMERGENTE
+        // =====================================================================
+        window.abrirVentanaWhatsAppCentrada(phoneWithCountry, textoFinal);
+
+        const checkAutoEl = document.getElementById('difusionCheckAuto');
+        const auto = checkAutoEl ? checkAutoEl.checked : true;
+        const intervaloSegundos = parseInt(document.getElementById('difusionIntervalo')?.value) || 7;
+
+        if (auto) {
+            const delayAutoEnter = Math.max(3500, (intervaloSegundos - 2) * 1000);
+            solicitarAutoEnterWhatsApp(delayAutoEnter);
+
+            let tiempoRestante = intervaloSegundos;
+            btnSiguiente.disabled = false;
+            btnSiguiente.innerHTML = esUltimo 
+                ? `<i class="fa-solid fa-bolt"></i> Auto-enviando en ${tiempoRestante}s...` 
+                : `<i class="fa-solid fa-bolt"></i> Auto-enviando (${tiempoRestante}s...)`;
+
+            difusionTimer = setInterval(() => {
+                tiempoRestante--;
+                if (tiempoRestante <= 0) {
+                    clearInterval(difusionTimer);
+                    difusionTimer = null;
+                    difusionIndiceActual++;
+                    ejecutarEnvioSocioActual();
+                } else {
+                    const accionTxt = tiempoRestante <= 2 ? `Siguiente: ${nombreSiguiente}` : `Auto-enviando`;
+                    btnSiguiente.innerHTML = esUltimo 
+                        ? `<i class="fa-solid fa-check"></i> Finalizando en ${tiempoRestante}s...` 
+                        : `<i class="fa-solid fa-forward-step"></i> ${accionTxt} (${tiempoRestante}s...)`;
                 }
             }, 1000);
         } else {
-            const btnSiguiente = document.getElementById('btnDifusionSiguiente');
             btnSiguiente.disabled = false;
-            btnSiguiente.innerHTML = '<i class="fa-solid fa-forward-step"></i> Enviar Siguiente Socio';
+            btnSiguiente.innerHTML = esUltimo 
+                ? '<i class="fa-solid fa-check"></i> Finalizar Difusión' 
+                : `<i class="fa-solid fa-forward-step"></i> Siguiente: ${nombreSiguiente} (${difusionIndiceActual + 2}/${total})`;
         }
     };
 
@@ -1531,7 +1802,7 @@ ${pie}${telContacto}`;
         modal.innerHTML = `
         <div class="pos-modal-card" style="max-width:700px;width:95%;padding:24px;border-radius:18px;background:var(--card-bg, #0f172a);border:1px solid rgba(255,255,255,0.12);box-shadow:0 25px 60px rgba(0,0,0,0.6);text-align:left;max-height:90vh;overflow-y:auto;position:relative;z-index:1000000;">
             <!-- Header -->
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:12px;flex-wrap:wrap;">
                 <div style="display:flex;align-items:center;gap:12px;">
                     <div style="width:44px;height:44px;border-radius:12px;background:#25D366;display:flex;align-items:center;justify-content:center;color:#0B1120;font-size:24px;box-shadow:0 4px 16px rgba(37,211,102,0.4);">
                         <i class="fa-brands fa-whatsapp"></i>
@@ -1541,7 +1812,10 @@ ${pie}${telContacto}`;
                         <div style="font-size:12px;color:var(--muted, #94a3b8);">Envía avisos, promociones y recordatorios a tus socios con 1 solo clic</div>
                     </div>
                 </div>
-                <button type="button" onclick="cerrarModalDifusionMasiva()" style="background:none;border:none;color:var(--muted,#94a3b8);font-size:24px;cursor:pointer;">&times;</button>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div id="difusionBadgeGateway"></div>
+                    <button type="button" onclick="cerrarModalDifusionMasiva()" style="background:none;border:none;color:var(--muted,#94a3b8);font-size:24px;cursor:pointer;">&times;</button>
+                </div>
             </div>
 
             <!-- Panel de Configuración -->
@@ -1552,10 +1826,10 @@ ${pie}${telContacto}`;
                         <i class="fa-solid fa-filter" style="color:#38bdf8;"></i> Audiencia / Filtro de Socios:
                     </label>
                     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                        <button type="button" class="btn btn-sm btn-outline active" onclick="cambiarFiltroDifusion('todos', this)" style="border-radius:20px;font-size:11.5px;">Todos con Celular</button>
-                        <button type="button" class="btn btn-sm btn-outline" onclick="cambiarFiltroDifusion('activos', this)" style="border-radius:20px;font-size:11.5px;color:#00f264;border-color:rgba(0,242,100,0.3);">Solo Activos</button>
-                        <button type="button" class="btn btn-sm btn-outline" onclick="cambiarFiltroDifusion('inactivos', this)" style="border-radius:20px;font-size:11.5px;color:#f87171;border-color:rgba(239,68,68,0.3);">Solo Inactivos</button>
-                        <button type="button" class="btn btn-sm btn-outline" onclick="cambiarFiltroDifusion('deudores', this)" style="border-radius:20px;font-size:11.5px;color:#fbbf24;border-color:rgba(251,191,36,0.3);">Con Deuda</button>
+                        <button type="button" class="btn btn-sm btn-outline difusion-btn-filtro active" data-filtro="todos" onclick="cambiarFiltroDifusion('todos', this)" style="border-radius:20px;font-size:11.5px;background:rgba(255,255,255,0.14);border-color:rgba(255,255,255,0.3);font-weight:700;">Todos con Celular</button>
+                        <button type="button" class="btn btn-sm btn-outline difusion-btn-filtro" data-filtro="activos" onclick="cambiarFiltroDifusion('activos', this)" style="border-radius:20px;font-size:11.5px;color:#00f264;border-color:rgba(0,242,100,0.3);">Solo Activos</button>
+                        <button type="button" class="btn btn-sm btn-outline difusion-btn-filtro" data-filtro="inactivos" onclick="cambiarFiltroDifusion('inactivos', this)" style="border-radius:20px;font-size:11.5px;color:#f87171;border-color:rgba(239,68,68,0.3);">Solo Inactivos</button>
+                        <button type="button" class="btn btn-sm btn-outline difusion-btn-filtro" data-filtro="deudores" onclick="cambiarFiltroDifusion('deudores', this)" style="border-radius:20px;font-size:11.5px;color:#fbbf24;border-color:rgba(251,191,36,0.3);">Con Deuda</button>
                     </div>
                     <div id="difusionStatusSocios" style="margin-top:10px;font-size:12px;color:var(--muted,#94a3b8);"></div>
                 </div>
@@ -1636,21 +1910,45 @@ ${pie}${telContacto}`;
                     </div>
                 </div>
 
-                <div style="background:rgba(37,211,102,0.08);border:1px solid rgba(37,211,102,0.25);border-radius:10px;padding:12px;margin-bottom:18px;font-size:12px;color:#cbd5e1;text-align:left;">
-                    <i class="fa-solid fa-circle-info" style="color:#25D366;"></i> <strong>Envío directo:</strong> Cada mensaje se transfiere automáticamente a WhatsApp sin abrir pestañas en Chrome. Puedes usar el modo automático para avanzar solo o pulsar <em>Enviar Siguiente</em> a tu propio ritmo.
+                <div id="difusionInfoGateway" style="display:none;background:rgba(37,211,102,0.12);border:1px solid rgba(37,211,102,0.35);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:#cbd5e1;text-align:left;line-height:1.45;">
+                    <div style="font-weight:800;color:#25D366;margin-bottom:4px;font-size:12.5px;">
+                        <i class="fa-solid fa-bolt"></i> Envío 100% Automático en Segundo Plano (Bot Activo)
+                    </div>
+                    <div><strong>1.</strong> Los mensajes se transmiten directamente al WhatsApp de cada socio vía internet.</div>
+                    <div><strong>2.</strong> <strong>Cero ventanas emergentes</strong>: No toca tu pantalla, no requiere Enter ni interfiere con tu trabajo.</div>
+                    <div><strong>3.</strong> Puedes seguir usando tu computadora normalmente mientras avanza el envío.</div>
+                </div>
+
+                <div id="difusionInfoNavegador">
+                    <div style="background:rgba(37,211,102,0.12);border:1px solid rgba(37,211,102,0.35);border-radius:10px;padding:12px 14px;margin-bottom:10px;font-size:12px;color:#cbd5e1;text-align:left;line-height:1.45;">
+                        <div style="font-weight:800;color:#25D366;margin-bottom:4px;font-size:12.5px;">
+                            <i class="fa-solid fa-bolt"></i> Envío por Ventana de Navegador
+                        </div>
+                        <div><strong>1.</strong> El sistema abre cada chat con el mensaje ya escrito.</div>
+                        <div><strong>2.</strong> El puente de Windows <strong>presiona Enter automáticamente</strong> para disparar el mensaje sin que toques el teclado.</div>
+                        <div><strong>3.</strong> Espera unos segundos para que WhatsApp cargue el chat y avanza solo de socio en socio.</div>
+                    </div>
+
+                    <div style="background:rgba(251,191,36,0.14);border:1px solid rgba(251,191,36,0.45);border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:11.5px;color:#fef3c7;text-align:left;line-height:1.4;display:flex;align-items:center;gap:10px;">
+                        <i class="fa-solid fa-eye" style="color:#fbbf24;font-size:17px;flex-shrink:0;"></i>
+                        <div>
+                            <strong style="color:#fbbf24;">RECOMENDACIÓN:</strong> Mantén la ventana de WhatsApp Web <strong>visible en tu pantalla</strong> durante el envío para que los mensajes salgan solos sin interrupciones.
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Configuración de intervalo y controles -->
-                <div style="display:flex;gap:12px;justify-content:center;align-items:center;margin-bottom:20px;flex-wrap:wrap;">
-                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text,#f8fafc);cursor:pointer;">
-                        <input type="checkbox" id="difusionCheckAuto" checked style="width:16px;height:16px;accent-color:#25D366;" />
-                        <span>Avanzar automáticamente cada</span>
+                <div style="display:flex;gap:12px;justify-content:center;align-items:center;margin-bottom:18px;flex-wrap:wrap;">
+                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text,#f8fafc);cursor:pointer;" title="Avanza automáticamente después de esperar los segundos seleccionados">
+                        <input type="checkbox" id="difusionCheckAuto" checked style="width:16px;height:16px;accent-color:#25D366;cursor:pointer;" />
+                        <span style="font-weight:600;">Avanzar automáticamente cada</span>
                     </label>
-                    <select id="difusionIntervalo" class="form-control" style="width:80px;display:inline-block;padding:4px 8px;font-size:12px;background:rgba(255,255,255,0.06);color:#fff;border-radius:6px;">
-                        <option value="2">2 seg</option>
-                        <option value="3" selected>3 seg</option>
-                        <option value="4">4 seg</option>
+                    <select id="difusionIntervalo" class="form-control" style="width:95px;display:inline-block;padding:4px 8px;font-size:12px;background:rgba(255,255,255,0.06);color:#fff;border-radius:6px;cursor:pointer;">
                         <option value="6">6 seg</option>
+                        <option value="7" selected>7 seg</option>
+                        <option value="8">8 seg</option>
+                        <option value="10">10 seg</option>
+                        <option value="12">12 seg</option>
                     </select>
                 </div>
 
@@ -1658,7 +1956,7 @@ ${pie}${telContacto}`;
                     <button type="button" onclick="detenerDifusion()" class="btn btn-outline" style="border-color:#ef4444;color:#ef4444;padding:10px 18px;border-radius:9px;font-size:12px;font-weight:700;">
                         <i class="fa-solid fa-stop"></i> Detener
                     </button>
-                    <button type="button" id="btnDifusionSiguiente" onclick="avanzarManualDifusion()" class="btn" style="background:#25D366;color:#0B1120;font-weight:800;padding:10px 22px;border-radius:9px;font-size:13px;border:none;">
+                    <button type="button" id="btnDifusionSiguiente" onclick="avanzarManualDifusion()" class="btn" style="background:#25D366;color:#0B1120;font-weight:800;padding:10px 22px;border-radius:9px;font-size:13px;border:none;box-shadow:0 3px 12px rgba(37,211,102,0.35);">
                         <i class="fa-solid fa-forward-step"></i> Enviar Siguiente Socio
                     </button>
                 </div>
@@ -1666,13 +1964,116 @@ ${pie}${telContacto}`;
         </div>`;
 
         document.body.appendChild(modal);
+
+        // Listener interactivo para pausar o reanudar auto-avance si el usuario toca el checkbox durante el envio
+        const chk = document.getElementById('difusionCheckAuto');
+        if (chk) {
+            chk.addEventListener('change', function () {
+                if (!difusionEnEjecucion) return;
+                const btnSiguiente = document.getElementById('btnDifusionSiguiente');
+                const total = difusionSocios.length;
+                const esUltimo = (difusionIndiceActual + 1) >= total;
+                const nombreSiguiente = difusionSocios[difusionIndiceActual + 1]?.nombre || 'Socio';
+
+                if (!this.checked) {
+                    if (difusionTimer) {
+                        clearInterval(difusionTimer);
+                        difusionTimer = null;
+                    }
+                    if (btnSiguiente) {
+                        btnSiguiente.innerHTML = esUltimo 
+                            ? '<i class="fa-solid fa-check"></i> Finalizar Difusión' 
+                            : `<i class="fa-solid fa-forward-step"></i> Siguiente: ${nombreSiguiente} (${difusionIndiceActual + 2}/${total})`;
+                    }
+                } else {
+                    if (!difusionTimer) {
+                        ejecutarEnvioSocioActual();
+                    }
+                }
+            });
+        }
     }
 
     window.cambiarFiltroDifusion = function (filtro, btn) {
-        document.querySelectorAll('#modalDifusionMasiva .btn-outline').forEach(b => b.classList.remove('active'));
-        if (btn) btn.classList.add('active');
+        document.querySelectorAll('#modalDifusionMasiva .difusion-btn-filtro').forEach(b => {
+            b.classList.remove('active');
+            b.style.background = 'transparent';
+            b.style.fontWeight = '500';
+            b.style.boxShadow = 'none';
+        });
+        if (btn) {
+            btn.classList.add('active');
+            btn.style.fontWeight = '700';
+            if (filtro === 'todos') {
+                btn.style.background = 'rgba(255,255,255,0.15)';
+                btn.style.boxShadow = '0 0 10px rgba(255,255,255,0.1)';
+            } else if (filtro === 'activos') {
+                btn.style.background = 'rgba(0,242,100,0.18)';
+                btn.style.boxShadow = '0 0 12px rgba(0,242,100,0.25)';
+            } else if (filtro === 'inactivos') {
+                btn.style.background = 'rgba(239,68,68,0.18)';
+                btn.style.boxShadow = '0 0 12px rgba(239,68,68,0.25)';
+            } else if (filtro === 'deudores') {
+                btn.style.background = 'rgba(251,191,36,0.18)';
+                btn.style.boxShadow = '0 0 12px rgba(251,191,36,0.25)';
+            }
+        }
         window.cargarSociosParaDifusion(filtro);
     };
+
+    function crearModalVincularWhatsAppSiNoExiste() {
+        if (document.getElementById('modalVincularWhatsApp')) return;
+
+        const modal = document.createElement('div');
+        modal.id = 'modalVincularWhatsApp';
+        configurarModalOverlayBase(modal);
+
+        modal.innerHTML = `
+        <div class="pos-modal-card" style="max-width:440px;width:92%;padding:24px;border-radius:18px;background:var(--card-bg, #0f172a);border:1px solid rgba(255,255,255,0.12);box-shadow:0 25px 60px rgba(0,0,0,0.6);text-align:center;position:relative;z-index:1000001;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                <div style="display:flex;align-items:center;gap:10px;text-align:left;">
+                    <div style="width:40px;height:40px;border-radius:10px;background:#25D366;display:flex;align-items:center;justify-content:center;color:#0B1120;font-size:22px;">
+                        <i class="fa-brands fa-whatsapp"></i>
+                    </div>
+                    <div>
+                        <div style="font-size:16px;font-weight:900;color:var(--text, #f8fafc);">Vincular WhatsApp Bot</div>
+                        <div style="font-size:11.5px;color:var(--muted, #94a3b8);">Envío 100% automático desatendido</div>
+                    </div>
+                </div>
+                <button type="button" onclick="cerrarModalVincularWhatsApp()" style="background:none;border:none;color:var(--muted,#94a3b8);font-size:24px;cursor:pointer;">&times;</button>
+            </div>
+
+            <!-- Instrucciones -->
+            <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:12px;margin-bottom:14px;text-align:left;font-size:12px;color:#cbd5e1;line-height:1.45;">
+                <div style="font-weight:700;color:#38bdf8;margin-bottom:4px;">
+                    <i class="fa-solid fa-mobile-screen-button"></i> Pasos para vincular:
+                </div>
+                <div><strong>1.</strong> Abre WhatsApp en tu celular.</div>
+                <div><strong>2.</strong> Toca <strong>Ajustes</strong> (o Menú ⋮) &gt; <strong>Dispositivos vinculados</strong>.</div>
+                <div><strong>3.</strong> Toca <strong>Vincular un dispositivo</strong> y apunta tu cámara al código QR.</div>
+            </div>
+
+            <!-- Contenedor QR -->
+            <div style="background:#ffffff;border-radius:14px;padding:16px;display:inline-block;margin:6px auto 10px auto;box-shadow:0 8px 24px rgba(0,0,0,0.3);min-width:240px;min-height:240px;position:relative;">
+                <div id="vincularQrSpinner" style="display:none;position:absolute;top:50%;left:50%;transform:translate(-50%, -50%);color:#0f172a;font-size:28px;">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                </div>
+                <img id="vincularQrImage" src="" alt="Código QR WhatsApp" style="width:230px;height:230px;display:none;border-radius:6px;margin:0 auto;" />
+            </div>
+
+            <div id="vincularQrStatus" style="margin-top:4px;min-height:24px;">
+                <span style="color:#fbbf24;font-size:12px;"><i class="fa-solid fa-spinner fa-spin"></i> Cargando QR...</span>
+            </div>
+
+            <div style="margin-top:16px;">
+                <button type="button" onclick="cerrarModalVincularWhatsApp()" class="btn btn-sm" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:#f8fafc;padding:7px 20px;border-radius:8px;font-size:12px;">
+                    Cerrar
+                </button>
+            </div>
+        </div>`;
+
+        document.body.appendChild(modal);
+    }
 
     // ── 8. MODAL DE CONFIRMACIÓN POST-ABONO (IMPRIMIR / WHATSAPP) ─────────────
     window.abrirModalPostAbono = function (idPago, mensajeExito) {

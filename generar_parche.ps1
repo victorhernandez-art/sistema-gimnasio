@@ -57,11 +57,13 @@ try { Remove-Item -Recurse -Force $tempBuild -ErrorAction SilentlyContinue } cat
 
 Write-Host "[5/5] Creando ZIP del parche..."
 if (Test-Path $zipOut) { Remove-Item -Force $zipOut }
-$zipOut2 = Join-Path $dist "Parche_GymWeb_v2.1.zip"
+$zipOut2 = Join-Path $dist "Parche_GymWeb_v2.5.zip"
 if (Test-Path $zipOut2) { Remove-Item -Force $zipOut2 }
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [System.IO.Compression.ZipFile]::CreateFromDirectory($patchOut, $zipOut2, [System.IO.Compression.CompressionLevel]::Optimal, $false)
 Copy-Item -Force $zipOut2 $zipOut
+$zipOutV21 = Join-Path $dist "Parche_GymWeb_v2.1.zip"
+Copy-Item -Force $zipOut2 $zipOutV21
 
 Write-Host "`n============================================================"
 Write-Host " ¡PARCHE GENERADO Y VERIFICADO AL 100%!" -ForegroundColor Green

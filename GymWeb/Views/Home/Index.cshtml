@@ -80,7 +80,7 @@
                 @foreach (var v in ultimas)
                 {
                     <tr>
-                        <td><span class="name-cell">@(v.IdSocioNavigation != null ? $"{v.IdSocioNavigation.Nombre} {v.IdSocioNavigation.Paterno}" : v.NombreVisita)</span></td>
+                        <td><span class="name-cell">@(v.IdSocioNavigation != null ? v.IdSocioNavigation.NombreCompleto : v.NombreVisita)</span></td>
                         <td class="text-muted" style="font-size:12px;">@v.FechaCreacion?.ToString("dd/MM/yy HH:mm")</td>
                     </tr>
                 }
@@ -106,7 +106,7 @@
                 {
                     int dias = m.Vencimiento.HasValue ? (int)Math.Ceiling((m.Vencimiento.Value - DateTime.Now).TotalDays) : 0;
                     <tr>
-                        <td>@m.NombreSocio @m.Paterno</td>
+                        <td>@m.NombreCompleto</td>
                         <td class="text-muted" style="font-size:12px;">@m.NombreMembresia</td>
                         <td><span class="badge badge-warning">@m.Vencimiento?.ToString("dd/MM/yy")</span></td>
                         <td><span style="font-size:12px;color:#fbbf24;font-weight:600;">@dias día@(dias == 1 ? "" : "s")</span></td>

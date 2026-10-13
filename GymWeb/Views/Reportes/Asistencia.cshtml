@@ -62,8 +62,8 @@
                     @foreach (var s in socios)
                     {
                         bool isSel = (s.IdSocio == idSocio);
-                        <option value="@s.IdSocio" data-clave="@s.IdSocio" data-nombre="@s.Nombre @s.Paterno @s.Materno" selected="@(isSel ? "selected" : null)">
-                            #@s.IdSocio — @s.Nombre @s.Paterno @s.Materno
+                        <option value="@s.IdSocio" data-clave="@s.ClaveFormateada" data-nombre="@s.NombreCompleto" selected="@(isSel ? "selected" : null)">
+                            #@s.ClaveFormateada — @s.NombreCompleto
                         </option>
                     }
                 </select>

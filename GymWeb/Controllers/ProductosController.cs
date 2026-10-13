@@ -110,7 +110,8 @@ public class ProductosController : AuthController
 
         ViewBag.SociosLista = sociosDb.Select(s => new {
             s.IdSocio,
-            NombreCompleto = $"{s.Nombre} {s.Paterno} {s.Materno}".Trim(),
+            NombreCompleto = s.NombreCompleto,
+            Dni = s.NumeroDocumento,
             Telefono = s.Telefono ?? "",
             DeudaTotal = deudasMap.TryGetValue(s.IdSocio, out var d) ? d : 0m
         }).ToList();

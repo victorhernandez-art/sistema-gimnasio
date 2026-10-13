@@ -95,6 +95,10 @@ public partial class GymContext : DbContext
                 .HasColumnName("RFC");
             entity.Property(e => e.Telefono).HasMaxLength(45);
             entity.Property(e => e.Logo).HasColumnName("Logo");
+            entity.Property(e => e.Pais).HasMaxLength(10).HasColumnName("pais");
+            entity.Property(e => e.MonedaSimbolo).HasMaxLength(10).HasColumnName("moneda_simbolo");
+            entity.Property(e => e.MonedaCodigo).HasMaxLength(10).HasColumnName("moneda_codigo");
+            entity.Property(e => e.Lada).HasMaxLength(10).HasColumnName("lada");
         });
 
         modelBuilder.Entity<Detallesalidum>(entity =>
@@ -340,16 +344,25 @@ public partial class GymContext : DbContext
 
         modelBuilder.Entity<Socio>(entity =>
         {
+            entity.Ignore(e => e.Dni);
+            entity.Ignore(e => e.ClaveFormateada);
+            entity.Ignore(e => e.NombreCompleto);
+            entity.Ignore(e => e.EsSocioFormatoAnterior);
+            entity.Ignore(e => e.NumeroDocumento);
+
             entity.HasKey(e => e.IdSocio).HasName("PRIMARY");
 
             entity.ToTable("socio");
+
+            entity.Property(e => e.TipoDocumento).HasMaxLength(45).HasColumnName("tipo_documento").HasDefaultValue("S/N");
 
             entity.HasIndex(e => e.IdEstado, "fk_Socio_Estado1");
 
             entity.HasIndex(e => e.IdUsuarioCreo, "fk_Socio_Usuario1");
 
             entity.Property(e => e.IdSocio)
-                .HasColumnName("idSocio");
+                .HasColumnName("idSocio")
+                .ValueGeneratedNever();
             entity.Property(e => e.FechaCreacion)
                 .HasColumnType("datetime")
                 .HasColumnName("fechaCreacion");

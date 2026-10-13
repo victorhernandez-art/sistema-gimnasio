@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace GymWeb.Models;
@@ -26,4 +26,12 @@ public partial class Configuracion
     public string? Mensaje { get; set; }
 
     public decimal PrecioVisita { get; set; }
+
+    public string? Pais { get; set; } = "MX";
+
+    public string? MonedaSimbolo { get; set; } = "$";
+
+    public string? MonedaCodigo { get; set; } = "MXN";
+
+    public string? Lada { get; set; } = "52";
 }

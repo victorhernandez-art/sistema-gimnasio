@@ -20,11 +20,15 @@ public static class DbInitializer
             );
         ");
 
-        // 2b. Asegurar columnas en la tabla configuracion (Logo, Domicilio, Telefono, Mensaje)
+        // 2b. Asegurar columnas en la tabla configuracion (Logo, Domicilio, Telefono, Mensaje, Pais, Moneda, Lada)
         try { db.Database.ExecuteSqlRaw("ALTER TABLE configuracion ADD COLUMN Logo BLOB NULL;"); } catch { }
         try { db.Database.ExecuteSqlRaw("ALTER TABLE configuracion ADD COLUMN Domicilio TEXT NULL;"); } catch { }
         try { db.Database.ExecuteSqlRaw("ALTER TABLE configuracion ADD COLUMN Telefono TEXT NULL;"); } catch { }
         try { db.Database.ExecuteSqlRaw("ALTER TABLE configuracion ADD COLUMN Mensaje TEXT NULL;"); } catch { }
+        try { db.Database.ExecuteSqlRaw("ALTER TABLE configuracion ADD COLUMN pais TEXT NULL DEFAULT 'MX';"); } catch { }
+        try { db.Database.ExecuteSqlRaw("ALTER TABLE configuracion ADD COLUMN moneda_simbolo TEXT NULL DEFAULT '$';"); } catch { }
+        try { db.Database.ExecuteSqlRaw("ALTER TABLE configuracion ADD COLUMN moneda_codigo TEXT NULL DEFAULT 'MXN';"); } catch { }
+        try { db.Database.ExecuteSqlRaw("ALTER TABLE configuracion ADD COLUMN lada TEXT NULL DEFAULT '52';"); } catch { }
 
         // 2c. Asegurar columnas de salida (metodoPago, folio, descuento, montoRecibido, cambio, referencia, notas)
         string[] alterSalida = new[]
@@ -46,8 +50,9 @@ public static class DbInitializer
             try { db.Database.ExecuteSqlRaw(sql); } catch { }
         }
 
-        // 2d. Asegurar columna imagen_url en producto
+        // 2d. Asegurar columna imagen_url en producto y tipo_documento en socio
         try { db.Database.ExecuteSqlRaw("ALTER TABLE producto ADD COLUMN imagen_url TEXT NULL;"); } catch { }
+        try { db.Database.ExecuteSqlRaw("ALTER TABLE socio ADD COLUMN tipo_documento TEXT NULL DEFAULT 'S/N';"); } catch { }
 
         // 2e. Normalizar fechas en SQLite para tablas que fueron migradas desde MySQL con hora (yyyy-MM-dd HH:mm:ss -> yyyy-MM-dd)
         try
@@ -63,16 +68,10 @@ public static class DbInitializer
         }
         catch { }
 
-        // 3. Configurar secuencia para que los socios comiencen en la clave 1001 (si la tabla está vacía)
+        // 3. Reunificar y migrar claves de socios existentes (ej. clientes con claves 1001, 1002...) a formato 0001 (1, 2, 3...)
         try
         {
-            var totalSocios = db.Socios.Count();
-            if (totalSocios == 0)
-            {
-                db.Database.ExecuteSqlRaw(@"
-                    INSERT OR REPLACE INTO sqlite_sequence (name, seq) VALUES ('socio', 1000);
-                ");
-            }
+            MigrarClavesSociosConsecutivos(db);
         }
         catch { }
 
@@ -250,6 +249,10 @@ public static class DbInitializer
                 Logo = null,
                 MensajeVencimiento = 5,
                 PrecioVisita = 50.00m,
+                Pais = "MX",
+                MonedaSimbolo = "$",
+                MonedaCodigo = "MXN",
+                Lada = "52",
                 FechaModificacion = DateTime.Now
             });
             db.SaveChanges();
@@ -300,4 +303,108 @@ public static class DbInitializer
             db.SaveChanges();
         }
     }
+
+    /// <summary>
+    /// Unifica y reasigna correlativamente las claves de socios antiguos que se habían dado de alta
+    /// con claves 1001, 1002, etc., pasando a 0001 (1), 0002 (2), etc.
+    /// Preserva la integridad referencial en todas las tablas hijas (pagos, membresías, asistencias, salidas, huellas).
+    /// </summary>
+    private static void MigrarClavesSociosConsecutivos(GymContext db)
+    {
+        // Detectar si existen socios con idSocio >= 1000
+        var sociosAltos = db.Socios.Where(s => s.IdSocio >= 1000).OrderBy(s => s.IdSocio).ToList();
+        if (!sociosAltos.Any())
+        {
+            // No hay socios con clave >= 1000. Ajustar secuencia si corresponde.
+            AjustarSecuenciaSocio(db);
+            return;
+        }
+
+        // Obtener los IDs < 1000 que ya están ocupados
+        var idsOcupados = new HashSet<int>(db.Socios.Where(s => s.IdSocio < 1000).Select(s => s.IdSocio));
+
+        // Determinar nuevo ID correlativo desde 1 para cada socio alto
+        int siguienteId = 1;
+        var mapeo = new List<(int ViejoId, int NuevoId)>();
+        foreach (var socio in sociosAltos)
+        {
+            while (idsOcupados.Contains(siguienteId))
+            {
+                siguienteId++;
+            }
+            mapeo.Add((socio.IdSocio, siguienteId));
+            idsOcupados.Add(siguienteId);
+        }
+
+        if (!mapeo.Any()) return;
+
+        bool isSqlite = db.Database.IsSqlite();
+
+        try
+        {
+            if (isSqlite)
+            {
+                db.Database.ExecuteSqlRaw("PRAGMA foreign_keys = OFF;");
+            }
+            else
+            {
+                try { db.Database.ExecuteSqlRaw("SET FOREIGN_KEY_CHECKS = 0;"); } catch { }
+            }
+
+            using var tx = db.Database.BeginTransaction();
+
+            foreach (var (viejoId, nuevoId) in mapeo)
+            {
+                // 1. Actualizar registros dependientes en tablas secundarias
+                db.Database.ExecuteSqlRaw("UPDATE sociomembresia SET idSocio = {0} WHERE idSocio = {1};", nuevoId, viejoId);
+                db.Database.ExecuteSqlRaw("UPDATE pago SET idSocio = {0} WHERE idSocio = {1};", nuevoId, viejoId);
+                db.Database.ExecuteSqlRaw("UPDATE registro SET idSocio = {0} WHERE idSocio = {1};", nuevoId, viejoId);
+                db.Database.ExecuteSqlRaw("UPDATE salida SET idSocio = {0} WHERE idSocio = {1};", nuevoId, viejoId);
+                db.Database.ExecuteSqlRaw("UPDATE socio_huella SET idSocio = {0} WHERE idSocio = {1};", nuevoId, viejoId);
+                try { db.Database.ExecuteSqlRaw("UPDATE visita SET idSocio = {0} WHERE idSocio = {1};", nuevoId, viejoId); } catch { }
+
+                // 2. Actualizar registro en la tabla socio
+                db.Database.ExecuteSqlRaw("UPDATE socio SET idSocio = {0} WHERE idSocio = {1};", nuevoId, viejoId);
+            }
+
+            tx.Commit();
+        }
+        finally
+        {
+            if (isSqlite)
+            {
+                try { db.Database.ExecuteSqlRaw("PRAGMA foreign_keys = ON;"); } catch { }
+            }
+            else
+            {
+                try { db.Database.ExecuteSqlRaw("SET FOREIGN_KEY_CHECKS = 1;"); } catch { }
+            }
+        }
+
+        // Ajustar secuencia/autoincrement al nuevo máximo correlativo
+        AjustarSecuenciaSocio(db);
+    }
+
+    private static void AjustarSecuenciaSocio(GymContext db)
+    {
+        try
+        {
+            if (db.Database.IsSqlite())
+            {
+                db.Database.ExecuteSqlRaw("DELETE FROM sqlite_sequence WHERE name = 'socio';");
+                var maxId = db.Socios.Max(s => (int?)s.IdSocio) ?? 0;
+                if (maxId > 0)
+                {
+                    db.Database.ExecuteSqlRaw("INSERT INTO sqlite_sequence (name, seq) VALUES ('socio', {0});", maxId);
+                }
+            }
+            else
+            {
+                var maxId = db.Socios.Max(s => (int?)s.IdSocio) ?? 0;
+                db.Database.ExecuteSqlInterpolated($"ALTER TABLE socio AUTO_INCREMENT = {maxId + 1};");
+            }
+        }
+        catch { }
+    }
 }
+

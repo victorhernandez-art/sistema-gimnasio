@@ -104,7 +104,8 @@ public class BiometricoController : AuthController
         return Json(new
         {
             idSocio      = socio.IdSocio,
-            nombre       = $"{socio.Nombre} {socio.Paterno} {socio.Materno}".Trim(),
+            nombre       = socio.NombreCompleto,
+            dni          = socio.NumeroDocumento,
             configurado  = huella != null,
             tieneTemplate = huella?.Template != null && huella.Template.Length > 0,
             pin          = huella?.Pin ?? socio.IdSocio,   // sugerencia: usar ID del socio

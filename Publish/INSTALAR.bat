@@ -172,7 +172,7 @@ if errorlevel 1 (
 echo  [6/6] Creando acceso directo en el Escritorio...
 set SHORTCUT=%USERPROFILE%\Desktop\Gimnasio.lnk
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('!SHORTCUT!'); $gymExe = Join-Path '%~dp0' 'Gym.exe'; if (Test-Path $gymExe) { $s.TargetPath = $gymExe; $s.Arguments = ''; } else { $s.TargetPath = 'wscript.exe'; $s.Arguments = '\"%~dp0AbrirGymWeb.vbs\"'; } $s.WorkingDirectory = '%~dp0'; $ico = Join-Path '%~dp0' 'app.ico'; if (-not (Test-Path $ico)) { $ico = Join-Path '%~dp0' 'wwwroot\favicon.ico'; } $s.IconLocation = $ico + ',0'; $s.Description = 'Sistema de Control y Gestion para Gimnasio'; $s.Save()"
+  "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('!SHORTCUT!'); $gymExe = Join-Path '%~dp0' 'Gym.exe'; if (Test-Path $gymExe) { $s.TargetPath = $gymExe; $s.Arguments = ''; } else { $s.TargetPath = 'wscript.exe'; $s.Arguments = '\"%~dp0AbrirGymWeb.vbs\"'; } $s.WorkingDirectory = '%~dp0'; $s.WindowStyle = 3; $ico = Join-Path '%~dp0' 'app.ico'; if (-not (Test-Path $ico)) { $ico = Join-Path '%~dp0' 'wwwroot\favicon.ico'; } $s.IconLocation = $ico + ',0'; $s.Description = 'Sistema de Control y Gestion para Gimnasio'; $s.Save()"
 
 if exist "%USERPROFILE%\Desktop\Gimnasio.lnk" (
     echo         Acceso directo "Gimnasio" creado con exito en el Escritorio.

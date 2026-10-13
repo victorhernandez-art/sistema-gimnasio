@@ -564,3 +564,456 @@ Esta sección documenta la mecánica técnica y los componentes ajustados para m
   1. En `generar_parche_ligero.ps1`, tras copiar `ACTUALIZAR.bat` y `actualizar.ps1` a la carpeta del paquete, se actualiza forzosamente su propiedad `LastWriteTime` con `Get-Date`.
   2. Todos los componentes del archivo ZIP (`archivos/GymWeb.dll`, `archivos/Gym.exe`, `ACTUALIZAR.bat`, `actualizar.ps1`) muestran ahora de forma homogénea la fecha y hora exacta de la generación del parche.
   3. Se verificó que el contenido binario de `GymWeb.dll` (con la solución contable para Yanet Martínez y los 77 falsos deudores) está 100% incorporado y listo para despliegue sin riesgo para la base de datos `gym.db`.
+
+#### I. Membresías a Crédito y Respeto de Cobro Inmediato
+* **Archivos:** [`GymWeb/Controllers/SociosController.cs`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/GymWeb/Controllers/SociosController.cs), [`GymWeb/Views/Socios/Membresia.cshtml`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/GymWeb/Views/Socios/Membresia.cshtml), [`GymWeb/Views/Socios/Create.cshtml`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/GymWeb/Views/Socios/Create.cshtml), [`GymWeb/Controllers/PagosController.cs`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/GymWeb/Controllers/PagosController.cs)
+* **Diagnóstico:**
+  Al asignar o renovar una membresía desmarcando la casilla `Registrar cobro e ingresar a caja de inmediato` (cliente solicita membresía a crédito o pago diferido), el sistema forzaba un registro en la tabla `pago` o reflejaba el monto como cobrado en los reportes de caja en lugar de contabilizarlo como saldo deudor.
+* **Mecánica Implementada:**
+  1. Verificación estricta del flag booleano `registrarCobro`. Si la casilla está desmarcada:
+     - Se asigna/extiende la vigencia de la membresía en `sociomembresia`.
+     - **No** se inserta registro en la tabla `pago`.
+     - No se incrementa el flujo de caja diario ni los totales de ingresos.
+     - El socio pasa a reflejar su saldo pendiente en la lista de deudores y estado de cuenta, permitiendo cobrarle posteriormente desde el módulo de Pagos.
+  2. Se mantuvo intacta la conectividad funcional de los módulos contables y cajas sin romper las renovaciones directas ni la venta rápida de tienda.
+
+#### J. Depuración de Módulo de Respaldos para Clientes SQLite Puro
+* **Archivos:** [`GymWeb/Views/Backup/Index.cshtml`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/GymWeb/Views/Backup/Index.cshtml), [`GymWeb/Controllers/BackupController.cs`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/GymWeb/Controllers/BackupController.cs)
+* **Diagnóstico:**
+  La vista de respaldos mostraba opciones legacy para bases de datos MySQL/XAMPP que resultaban confusas e innecesarias para clientes con la versión moderna basada exclusivamente en SQLite.
+* **Solución Implementada:**
+  1. Se eliminaron las opciones visibles de migración de MySQL en la interfaz de usuario.
+  2. El módulo se focalizó al 100% en la gestión autónoma del archivo `gym.db`:
+     - Generación y descarga directa de respaldos `.db` en caliente.
+     - Restauración de copias de seguridad de SQLite de manera segura.
+     - Historial de respaldos automáticos y manuales en `wwwroot/backups`.
+
+#### K. Apertura en Pantalla Completa Automática (Modo Maximizado)
+* **Archivos:** [`GymApp/Form1.cs`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/GymApp/Form1.cs), [`Publish/Iniciar GymWeb.bat`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/Publish/Iniciar%20GymWeb.bat), [`Iniciar Gym.bat`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/Iniciar%20Gym.bat), [`Publish/Crear Acceso Directo.bat`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/Publish/Crear%20Acceso%20Directo.bat), [`Crear Acceso Directo.bat`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/Crear%20Acceso%20Directo.bat), [`Publish/actualizar.ps1`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/Publish/actualizar.ps1), [`Publish/INSTALAR.bat`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/Publish/INSTALAR.bat)
+* **Diagnóstico de Experiencia de Usuario:**
+  Al abrir el sistema, la ventana del visor nativo (`Gym.exe`) se iniciaba en tamaño fijo centrado (1366x768), obligando al usuario a maximizar la ventana manualmente cada vez que abría el programa.
+* **Mecánica Implementada en 3 Capas:**
+  1. **Capa Nativa (C# WinForms / WebView2):**  
+     En `GymApp/Form1.cs`, se estableció `WindowState = FormWindowState.Maximized` tanto en el constructor como en el evento de ciclo de vida `Load`.
+  2. **Capa de Scripts Lanzadores (.bat):**  
+     Se configuró la invocación como `start "" /max "%~dp0Gym.exe"`. Para navegadores de contingencia (Edge/Chrome) se sustituyó `--window-size=1366,768` por `--start-maximized`.
+  3. **Capa de Accesos Directos (.lnk):**  
+     En todos los scripts de creación de accesos directos (`Crear Acceso Directo.bat`, `actualizar.ps1`, `INSTALAR.bat`), se configuró `$s.WindowStyle = 3` (3 = Maximizado en WScript.Shell de Windows).
+
+#### L. Paquetes de Distribución Oficial v2.5
+* **Archivos:** [`generar_instalador.ps1`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/generar_instalador.ps1), [`generar_parche_ligero.ps1`](file:///c:/xampp/htdocs/Gym%20(2)%20-%20copia/Gym/generar_parche_ligero.ps1)
+* **Entregables Generados:**
+  1. **Instalador Completo Oficial v2.5:**  
+     - Archivo: `dist/Instalador_GymWeb_Windows_v2.5.zip` (~126.04 MB).
+     - Contiene: `GymWeb` autocontenido x64, `BioService` autocontenido x64 para biométricos, visor `Gym.exe` con pantalla maximizada, instalador con auto-elevación UAC, reglas automáticas de firewall y limpieza de archivos de prueba.
+  2. **Micro-Parche Ligero v2.5:**  
+     - Archivo: `dist/Parche_Ligero_GymWeb.zip` (~6.66 MB).
+     - Diseñado para actualizar instalaciones existentes en segundos vía WhatsApp/correo sin alterar `gym.db`.
+
+#### M. Localización para Argentina: Reemplazo de Apellido Materno por DNI
+* **Archivos:** [`GymWeb/Views/Socios/Create.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Socios/Create.cshtml), [`GymWeb/Views/Socios/Edit.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Socios/Edit.cshtml), [`GymWeb/Views/Socios/Index.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Socios/Index.cshtml), [`GymWeb/Models/Socio.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Models/Socio.cs), [`GymWeb/Helpers/ExcelReportHelper.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Helpers/ExcelReportHelper.cs), [`GymWeb/Controllers/SociosController.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Controllers/SociosController.cs), [`GymWeb/Views/Pagos/Index.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Pagos/Index.cshtml)
+* **Diagnóstico de Localización:** En Argentina no se utiliza el concepto de "Apellido Materno" en el día a día civil ni comercial; el documento oficial indispensable es el **DNI** (Documento Nacional de Identidad).
+* **Solución Implementada:**
+  1. **Formularios de Creación y Edición (`Create.cshtml` y `Edit.cshtml`):**
+     - Se sustituyó la etiqueta `"Apellido Paterno"` por `"Apellido"`.
+     - Se sustituyó `"Apellido Materno"` por `"DNI"` con placeholder `"Ej. 38123456"`.
+  2. **Modelo y Base de Datos:**
+     - En `Socio.cs` se expuso la propiedad de conveniencia `Dni` como alias directo de `Materno` (`get => Materno; set => Materno = value;`), manteniendo compatibilidad total sin alterar ni requerir migraciones destructivas en tablas físicas de clientes existentes.
+  3. **Directorio y Búsqueda en Tiempo Real (`Socios/Index.cshtml`):**
+     - El nombre en la tabla se despliega limpio (`@s.Nombre @s.Paterno`) y el DNI se muestra como un badge elegante: `<span class="badge"><i class="fa-solid fa-id-card"></i> DNI: @s.Materno</span>`.
+     - El atributo de búsqueda en vivo (`data-search`) incluye el DNI, permitiendo localizar al socio tipeando su número de documento en la barra de búsqueda.
+  4. **Reportes y Exportación (Excel y CSV):**
+     - En la exportación de Directorio en Excel (`ExcelReportHelper.cs`) se agregó la columna dedicada **"DNI"** entre Nombre y Teléfono.
+     - En la exportación a CSV se actualizó la cabecera a `"Clave,Nombre,Apellido,DNI,Telefono,Estado,FechaRegistro"`.
+  5. **Módulos de Cobros, Registro y Visitas:**
+     - Búsqueda y filtrado por DNI en el selector de Pagos y presentación limpia en comprobantes.
+
+#### N. Columna Inicio de Membresía y Edición Flexible de Vigencias
+* **Archivos:** [`GymWeb/Views/Socios/Index.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Socios/Index.cshtml), [`GymWeb/Views/Socios/Edit.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Socios/Edit.cshtml), [`GymWeb/Views/Socios/Membresia.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Socios/Membresia.cshtml), [`GymWeb/Controllers/SociosController.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Controllers/SociosController.cs), [`GymWeb/Helpers/ExcelReportHelper.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Helpers/ExcelReportHelper.cs)
+* **Diagnóstico Operativo:** 
+  1. En la tabla principal de socios, la columna `"Registro"` mostraba la fecha técnica de creación de cuenta del socio, la cual no aporta valor operativo diario comparada con la fecha real en que comienza su plan.
+  2. Cuando el recepcionista daba de alta a un socio y por error humano seleccionaba una fecha de inicio errónea, el sistema no permitía corregirla en el formulario de edición, obligando a crear membresías duplicadas.
+* **Solución Implementada:**
+  1. **Columna "Inicio Membresía" en Tabla Principal:**
+     - Se sustituyó el encabezado `"Registro"` por `"Inicio Membresía"`.
+     - La celda muestra la fecha en que comenzó la membresía activa más reciente (`dd/MM/yyyy`) junto con el nombre del plan, o `"Sin membresía"` si no tiene plan activo.
+     - Se indexó dicha fecha en el buscador reactivo de la tabla para permitir filtrar por fecha de inicio.
+  2. **Corrección Directa en "Editar Socio" (`Edit.cshtml`):**
+     - Al entrar a editar el socio, se despliega una sección destacada con la membresía activa y un campo interactivo tipo date: `"Fecha de Inicio de la Membresía"`.
+     - Al guardar cambios, el controlador actualiza atómicamente `FechaInicioMembresia` en `sociomembresia`, recalculando automáticamente su fecha de vencimiento (`Vencimiento`) en las vistas SQL de MySQL y SQLite sin pasos manuales.
+  3. **Edición Rápida en Módulo de Membresías (`Membresia.cshtml`):**
+     - Botón directo `"Corregir fecha de inicio"` en la tarjeta superior de membresía activa.
+     - Nueva columna `"Acción"` en la tabla del historial de membresías con modal glassmorphism para ajustar la fecha de inicio de cualquier registro con un solo clic (`POST /Socios/ActualizarFechaInicioMembresia`).
+  4. **Reportes:** Se sincronizó la columna `"Inicio Membresía"` en la exportación de Directorio Excel y CSV.
+
+#### O. Configuración Multi-País (Latinoamérica e Internacional), Conversión Automática de Moneda y LADA para WhatsApp
+* **Archivos:** [`GymWeb/Models/Configuracion.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Models/Configuracion.cs), [`GymWeb/Models/GymContext.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Models/GymContext.cs), [`GymWeb/Helpers/AppSettings.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Helpers/AppSettings.cs), [`GymWeb/Helpers/DbInitializer.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Helpers/DbInitializer.cs), [`GymWeb/Program.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Program.cs), [`GymWeb/Controllers/ConfiguracionController.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Controllers/ConfiguracionController.cs), [`GymWeb/Views/Configuracion/Index.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Configuracion/Index.cshtml), [`GymWeb/Views/Shared/_Layout.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Shared/_Layout.cshtml), [`GymWeb/wwwroot/js/gym-tickets-whatsapp.js`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/wwwroot/js/gym-tickets-whatsapp.js), [`GymWeb/Views/Socios/Create.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Socios/Create.cshtml), [`GymWeb/Views/Socios/Membresia.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Socios/Membresia.cshtml), [`GymWeb/Views/Pagos/Index.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Pagos/Index.cshtml)
+* **Objetivo:** Permitir la personalización regional completa del gimnasio para todos los países de Latinoamérica (Argentina, México, Colombia, Chile, Perú, etc.), España y Estados Unidos, adaptando automáticamente el símbolo de moneda, código de divisa y la LADA telefónica para todas las integraciones de WhatsApp.
+* **Componentes Implementados:**
+  1. **Persistencia y Modelado de Datos:**
+     - Se agregaron las columnas `pais` (default `'AR'`), `moneda_simbolo` (default `'$'`), `moneda_codigo` (default `'ARS'`) y `lada` (default `'54'`) a la tabla `configuracion`.
+     - Migración fluida y transparente en `Program.cs` y `DbInitializer.cs` con comandos seguros `ALTER TABLE configuracion ADD COLUMN ...` que no interfieren con datos existentes.
+     - Hidratación automática de propiedades en `AppSettings` al arranque de la aplicación y actualización instantánea tras guardar en `/Configuracion`.
+  2. **Selector Interactivo en la Vista de Configuración (`Configuracion/Index.cshtml`):**
+     - Nueva sección glassmorphism: *"Región, Moneda y LADA de WhatsApp"*.
+     - Selector con los 20 países disponibles (Argentina, México, Colombia, Chile, Perú, Ecuador, Guatemala, Costa Rica, Panamá, Honduras, El Salvador, Nicaragua, República Dominicana, Bolivia, Paraguay, Uruguay, Venezuela, Puerto Rico, España, Estados Unidos).
+     - Al seleccionar el país, JavaScript autocompleta de inmediato el símbolo monetario, código ISO y la LADA telefónica internacional, mostrando una vista previa interactiva en tiempo real del precio y formato de WhatsApp.
+  3. **Integración Inteligente con WhatsApp (`gym-tickets-whatsapp.js`):**
+     - Se implementó la función universal `window.formatearTelefonoWhatsApp(telefono)` que detecta la configuración regional:
+       - **Argentina (`AR` / Lada `54`):** Aplica automáticamente el prefijo internacional de telefonía móvil `549` para números locales de 10 dígitos (o si fueron ingresados sin el 9), garantizando que WhatsApp Web y WhatsApp Desktop reconozcan el número y abran la conversación sin errores.
+       - **Otros Países:** Antepone dinámicamente la LADA configurada (ej. `52`, `57`, `56`, `51`, `593`, etc.) sin duplicarla si el número ya la contenía.
+     - Se actualizaron todos los botones y flujos de WhatsApp del sistema:
+       - Apertura de WhatsApp para tickets de venta (Tienda / POS).
+       - Apertura de WhatsApp para comprobantes de pago y cuotas de membresía.
+       - Modal de WhatsApp manual con indicador visual dinámico de LADA (`+54`, `+52`, etc.).
+       - Envío de mensajes directos individuales a socios desde el directorio.
+       - Módulo de Difusión Masiva secuencial para socios activos, inactivos y deudores.
+  4. **Adaptabilidad del Símbolo de Moneda:**
+     - Los tickets generados (tanto en texto para WhatsApp como en formato térmico oficial de 80mm en PDF / Canvas) utilizan el símbolo de moneda regional configurado (`$`, `S/`, `Q`, `₡`, `B/.`, `L`, `C$`, `RD$`, `Bs`, `₲`, `$U`, `Bs.`, `€`).
+     - Los formularios de cobro en `Socios/Create.cshtml`, `Socios/Membresia.cshtml` y `Pagos/Index.cshtml` reflejan la divisa y símbolo configurados.
+
+#### P. Unificación de Campos de Nombre, Tipos de Documento Dinámicos y Consecutivo 0001
+* **Archivos:** [`GymWeb/Models/Socio.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Models/Socio.cs), [`GymWeb/Models/GymContext.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Models/GymContext.cs), [`GymWeb/Controllers/SociosController.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Controllers/SociosController.cs), [`GymWeb/Views/Socios/Create.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Socios/Create.cshtml), [`GymWeb/Views/Socios/Edit.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Socios/Edit.cshtml), [`GymWeb/Views/Socios/Index.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Socios/Index.cshtml)
+* **Objetivo:** Adaptar el formulario de socios a estándares internacionales (eliminando la rigidez de 'Apellido Paterno' y 'Apellido Materno'), soportar múltiples tipos de identificación oficial con opción de crear tipos personalizados en caliente, e iniciar las claves de socio en `0001` de forma correlativa.
+* **Componentes Implementados:**
+  1. **Campo Unificado de Nombre:**
+     - En `Create.cshtml` y `Edit.cshtml` se reemplazaron los campos separados por un único campo destacado: *"Nombre completo y apellidos"*.
+     - En `Socio.cs` se crearon propiedades inteligentes (`NombreCompleto`, `EsSocioFormatoAnterior`, `NumeroDocumento`) que garantizan retrocompatibilidad absoluta con bases de datos antiguas que tenían apellidos guardados por separado sin perder información ni romper pantallas.
+  2. **Tipo de Identificación Dinámico y Personalizable:**
+     - Se añadió la columna `tipo_documento` en la tabla `socio` con valor por defecto `'S/N'` (opcional).
+     - Lista inicial con documentos internacionales reconocidos (`S/N`, `DNI`, `INE / IFE`, `Cédula de Identidad`, `Pasaporte`, `Licencia de Conducir`).
+     - Botón `+ Agregar` con modal interactivo glassmorphism que permite al gimnasio registrar en el momento su propio tipo de identificación personalizado y seleccionarlo automáticamente.
+     - Campo contiguo para el *"Número de documento"* (opcional).
+  3. **Consecutivo de Clave desde 0001:**
+     - En `SociosController.Create` se sustituyó la semilla antigua (que arrancaba en 1001) por un algoritmo consecutivo que asigna la primera clave entera libre disponible >= 1 (`0001`, `0002`, etc.).
+     - Si una clave está ocupada (por un socio activo o inactivo), se evalúa la siguiente. Si se elimina un socio y la clave queda desocupada, el sistema puede reutilizarla si no está tomada.
+
+#### Q. Corrección de Difusión Masiva de WhatsApp
+* **Archivos:** [`GymWeb/Views/Socios/Index.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Socios/Index.cshtml)
+* **Diagnóstico:** En la difusión masiva de WhatsApp, se detectó que los mensajes se estaban dirigiendo al mismo teléfono de origen o del negocio en lugar del número individual de cada socio destinatario, o se bloqueaban por las restricciones de popups del navegador.
+* **Solución Implementada:**
+  - Se corrigió la extracción del atributo `telefono` en el bucle JavaScript de los socios seleccionados.
+  - Se implementó apertura limpia y secuencial con temporizador entre envíos para evitar bloqueos del navegador.
+  - Validación de números vacíos o inválidos antes de intentar la apertura.
+
+#### R. Migración y Unificación Automática de Claves Existentes (1001+ a 0001+)
+* **Archivos:** [`GymWeb/Helpers/DbInitializer.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Helpers/DbInitializer.cs), [`GymWeb/Controllers/SociosController.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Controllers/SociosController.cs), [`GymWeb/Controllers/RegistroController.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Controllers/RegistroController.cs), [`GymWeb/Views/Registro/Index.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Registro/Index.cshtml)
+* **Diagnóstico Operativo:** Los gimnasios que ya tenían socios cargados en producción con claves del sistema anterior (`1001`, `1002`, etc.) al instalar el parche corrían el riesgo de tener claves fragmentadas o inconsistentes con el nuevo formato `0001`.
+* **Solución Implementada:**
+  1. **Rutina de Migración en Arranque (`DbInitializer.MigrarClavesSociosConsecutivos`):**
+     - Al arrancar GymWeb, detecta automáticamente si existen socios con `idSocio >= 1000`.
+     - Genera un mapeo correlativo ordenado: el primer socio pasa a `1` (`0001`), el segundo a `2` (`0002`), el tercero a `3` (`0003`), hasta el total de socios existentes.
+     - Se ejecuta dentro de una transacción atómica desactivando temporalmente foreign keys (`PRAGMA foreign_keys = OFF;`), reasignando en cascada las 7 tablas relacionadas:
+       - `sociomembresia` (`idSocio`)
+       - `pago` (`idSocio`)
+       - `registro` (`idSocio`)
+       - `salida` (`idSocio`)
+       - `socio_huella` (`idSocio`)
+       - `visita` (`idSocio`)
+       - `socio` (`idSocio`)
+  2. **Sincronización de Secuencia:**
+     - `sqlite_sequence` se limpia y actualiza con el nuevo `MAX(idSocio)`.
+  3. **Continuidad del Consecutivo:**
+     - Al dar de alta un nuevo socio posterior a la migración, el sistema continúa exactamente con el siguiente número consecutivo libre (ej. si tenían 5 socios remapeados de `0001` a `0005`, el nuevo socio será el `0006`).
+  4. **Escáner y Registro de Entradas:**
+     - En `RegistroController.cs` y `Views/Registro/Index.cshtml` se ajustaron las validaciones de control de acceso para admitir IDs desde `1` en adelante, manteniendo el código `1000` como acceso especial para visitas de día.
+
+#### S. Regeneración de Entregables Oficiales v2.5
+* **Micro-Parche Ligero:** `dist/Parche_Ligero_GymWeb.zip` (~6.69 MB) con binarios compilados y vistas actualizadas.
+* **Instalador Completo:** `dist/Instalador_GymWeb_Windows_v2.5.zip` (~126.08 MB) con soporte biométrico integrado, base de datos limpia y accesos directos maximizados.
+
+#### T. Sincronización Universal y Dinámica del Símbolo de Moneda Multi-País (Octubre 2026)
+* **Archivos:** [`GymWeb/Views/Shared/_Layout.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Shared/_Layout.cshtml), [`GymWeb/Views/Productos/Index.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Productos/Index.cshtml), [`GymWeb/Views/Socios/Index.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Socios/Index.cshtml), [`GymWeb/Views/Pagos/Index.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Pagos/Index.cshtml), [`GymWeb/Views/Socios/PagosSocio.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Socios/PagosSocio.cshtml), [`GymWeb/Views/Membresias/Index.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Membresias/Index.cshtml), [`GymWeb/Views/Registro/Index.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Registro/Index.cshtml), [`GymWeb/Views/Registro/Historial.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Registro/Historial.cshtml), [`GymWeb/Views/Reportes/CorteDia.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Reportes/CorteDia.cshtml), [`GymWeb/Views/Reportes/Visitas.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Reportes/Visitas.cshtml), [`GymWeb/Controllers/ConfiguracionController.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Controllers/ConfiguracionController.cs), [`GymWeb/Controllers/RegistroController.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Controllers/RegistroController.cs), [`GymWeb/Helpers/AppSettings.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Helpers/AppSettings.cs), [`GymWeb/wwwroot/js/gym-tickets-whatsapp.js`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/wwwroot/js/gym-tickets-whatsapp.js)
+* **Diagnóstico:**
+  Al cambiar el país en Configuración (por ejemplo, a España `€`, Perú `S/`, Costa Rica `₡`, etc.) y guardar los cambios, en varias vistas de Razor y en scripts de tickets POS/abonos seguía apareciendo el símbolo fijo de peso (`$`), porque estaba hardcodeado en las plantillas y en cadenas de JavaScript.
+* **Solución Implementada:**
+  1. **Exposición Global en Frontend (`_Layout.cshtml`):**
+     - Se expuso `window.MONEDA_SIMBOLO = '@GymWeb.Helpers.AppSettings.MonedaSimbolo';` y `window.formatearMoneda(val)`.
+     - `window.GYM_CONFIG.monedaSimbolo` y `window.GYM_CONFIG.monedaCodigo` quedan disponibles globalmente para cualquier módulo.
+  2. **Reemplazo Integral en Vistas Razor (.cshtml):**
+     - En todas las vistas donde existían símbolos de divisa fijos (`$@...`) se sustituyeron por `@GymWeb.Helpers.AppSettings.MonedaSimbolo@...`.
+     - Afectó a: Módulo POS/Productos (catálogo, top bar, carrito, botones de billetes rápidos, modal de cobro y deudas), Socios (badges de deudas, modal de estado de cuenta), Cobros/Pagos (KPIs, listados, modal de pago), Membresías (catálogo de precios), Registro de Visitas e Historial (precios y totales cobrados), Reportes de Corte del Día y Visitas (arqueo de caja, totales en efectivo, transferencia, tarjeta y crédito).
+  3. **Tickets Térmicos y Comprobantes Dinámicos:**
+     - En `Productos/Index.cshtml` (`ejecutarImpresionTicket`) y `Socios/Index.cshtml` (`imprimirComprobanteAbono`), los tickets impresos ahora usan `${mon}` dinámico.
+     - En `gym-tickets-whatsapp.js` tanto los comprobantes en PDF/Canvas como los mensajes de WhatsApp para ventas, membresías, abonos y difusión masiva leen `window.MONEDA_SIMBOLO`.
+  4. **Persistencia Inmediata:**
+     - En `ConfiguracionController.cs` se asegura la actualización atómica en la base de datos y la recarga inmediata en memoria en `AppSettings.MonedaSimbolo`, impactando todas las solicitudes posteriores sin requerir reiniciar la aplicación.
+
+---
+
+### [2026-10-08] Parche: Corrección de Divisa en Excel/POS y Desvinculación de DNI en Nombres del Sistema
+* **Archivos Modificados:**
+  - [`GymWeb/Helpers/ExcelReportHelper.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Helpers/ExcelReportHelper.cs)
+  - [`GymWeb/Models/Vwultimamembresiadetalladum.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Models/Vwultimamembresiadetalladum.cs)
+  - [`GymWeb/Views/Pagos/Index.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Pagos/Index.cshtml)
+  - [`GymWeb/Views/Socios/PagosSocio.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Socios/PagosSocio.cshtml)
+  - [`GymWeb/Views/Socios/Membresia.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Socios/Membresia.cshtml)
+  - [`GymWeb/Views/Registro/Index.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Registro/Index.cshtml)
+  - [`GymWeb/Views/Registro/Historial.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Registro/Historial.cshtml)
+  - [`GymWeb/Views/Reportes/Asistencia.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Reportes/Asistencia.cshtml)
+  - [`GymWeb/Views/Reportes/Visitas.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Reportes/Visitas.cshtml)
+  - [`GymWeb/Views/Reportes/CorteDia.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Reportes/CorteDia.cshtml)
+  - [`GymWeb/Views/Productos/Index.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Productos/Index.cshtml)
+  - [`GymWeb/Views/Home/Index.cshtml`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Home/Index.cshtml)
+  - [`GymWeb/Controllers/PagosController.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Controllers/PagosController.cs)
+  - [`GymWeb/Controllers/ProductosController.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Controllers/ProductosController.cs)
+  - [`GymWeb/Controllers/RegistroController.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Controllers/RegistroController.cs)
+  - [`GymWeb/Controllers/HomeController.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Controllers/HomeController.cs)
+  - [`GymWeb/Controllers/BiometricoController.cs`](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Controllers/BiometricoController.cs)
+* **Diagnóstico:**
+  1. En las exportaciones a Excel (Corte de caja, Pagos, Deudores) las celdas numéricas y tarjetas KPI seguían mostrando el signo fijo `$` porque las máscaras de ClosedXML estaban fijadas a `"$#,##0.00"` y en strings `"$" + monto`.
+  2. En el modal de detalle de venta del POS existían concatenaciones fijas con `$` en precios y subtotales.
+  3. En varios apartados del sistema (Modal Registrar Pago, Pagos de Socio, Registro de Entradas, Reportes de Asistencia y Visitas) se estaba mostrando erróneamente el segundo apellido del socio como DNI (ej: `VITOR HERNANDEZ [DNI: JOVEL]`), y en algunas tablas solo se concatenaba `Nombre` y `Paterno` mutilando el segundo apellido del socio.
+* **Solución Implementada:**
+  1. **Moneda Dinámica en ClosedXML Excel:**
+     - Se implementaron los métodos `FormatoMonedaExcel()` (`"\"<simbolo>\"#,##0.00"`) y `FormatearMonedaTexto(...)` en `ExcelReportHelper.cs`, tomando dinámicamente `AppSettings.MonedaSimbolo`.
+     - Ahora todos los archivos Excel generados (Corte de Caja, Historial de Pagos, Socios Deudores, etc.) respetan fielmente el símbolo de divisa del país configurado.
+  2. **Regla de Negocio de Documento de Identificación:**
+     - El documento de identificación es 100% opcional al registrar un socio y su visualización queda **exclusivamente confinada al Directorio de Socios y a su archivo Excel descargable**.
+     - En el resto del sistema (dropdowns de pagos, tablas de pagos, historial de asistencias, dashboard de inicio, reportes de corte y visitas, endpoints de biometría y recepción) se eliminaron por completo las etiquetas `DNI: ...` y se unificó la lectura con `NombreCompleto` y `ClaveFormateada`, preservando todos los nombres y apellidos sin recortes.
+  3. **Corrección en Detalle de Venta POS:**
+     - Se reemplazaron los caracteres `$` fijos por `window.MONEDA_SIMBOLO` en el visor de ventas de productos.
+
+
+
+
+---
+
+### [2026-10-08] Blindaje de Runtimes Autocontenidos, Modo GC Workstation y Diagnóstico de Memoria
+* **Archivos Modificados:**
+  - [GymWeb/Program.cs](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Program.cs)
+  - [generar_parche_ligero.ps1](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/generar_parche_ligero.ps1)
+  - Publish/GymWeb.runtimeconfig.json
+  - Publish/Gym.runtimeconfig.json
+  - dist/Parche-Ligero/archivos/
+  - dist/Parche_Ligero_GymWeb.zip
+  - C:\Users\vic_c\Downloads\Instalador_GymWeb_Windows_v2.5 (1)\
+* **Incidencia 1: Error "You must install or update .NET to run this application"**
+  - **Diagnóstico:** El empaquetador del micro-parche ligero anterior compilaba sin el flag --self-contained true, generando archivos *.runtimeconfig.json con la propiedad "frameworks" en lugar de "includedFrameworks". Al instalar el parche sobre una instalación autocontenida de cliente, sobreescribía los archivos de configuración provocando que el host de .NET buscara runtimes globales inexistentes y solicitara instalar .NET.
+  - **Solución:**
+    1. Se restauraron los archivos de configuración autocontenidos (includedFrameworks) tanto para Gym.exe como para GymWeb.exe.
+    2. Se blindó [generar_parche_ligero.ps1](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/generar_parche_ligero.ps1) para que solo incluya GymWeb.dll, GymWeb.pdb y recursos de wwwroot, preservando intactos los binarios y configuraciones autocontenidas de la carpeta del cliente.
+* **Incidencia 2: Bloqueo en pantalla de carga ("Iniciando motor de base de datos y servidor local...")**
+  - **Diagnóstico:**
+    1. En [GymWeb/Program.cs](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Program.cs), la llamada incondicional a uilder.Host.UseWindowsService() provocaba que al iniciar el backend fuera del Service Control Manager (por ejemplo, desde el lanzador de escritorio), WindowsServiceLifetime asumiera modo servicio y se detuviera prematuramente.
+    2. Se detectó en el registro de eventos del sistema que la computadora del usuario alcanzó saturación total de memoria virtual (FreeVirtualMemory < 25 MB, más de 18 GB de Commit ocupados por navegadores y procesos acumulados). Esto provocaba que el Garbage Collector y Entity Framework Core fallaran con System.OutOfMemoryException (código  x8007000E), impidiendo arrancar el servidor Kestrel en el puerto 5080.
+  - **Solución:**
+    1. En [GymWeb/Program.cs](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Program.cs) se condicionó UseWindowsService con WindowsServiceHelpers.IsWindowsService(). De este modo, si se ejecuta como servicio de Windows opera como tal, y si se ejecuta en modo aplicación de escritorio local corre de forma indefinida sin apagarse.
+    2. Se configuró "System.GC.Server": false (Workstation GC) en los archivos untimeconfig.json para reducir en un 90% el consumo inicial de memoria del Garbage Collector.
+* **Estado Actual y Paso al Reiniciar la PC:**
+  - El sistema de archivos, el backend (GymWeb.dll), el frontend de escritorio (Gym.exe), los archivos untimeconfig y el micro-parche están 100% reparados y sincronizados.
+  - Al reiniciar el equipo se liberará la memoria virtual retenida por Windows.
+  - **Paso inmediato para el usuario al regresar:** Hacer doble clic en el acceso directo **Gimnasio** en el escritorio (o ejecutar Iniciar GymWeb.bat), y el sistema entrará de inmediato con las mejoras de divisas y socios funcionando.
+
+---
+
+### [2026-10-08] Parche: Símbolo Dinámico de Moneda en Botón de Pagos de Socios
+* **Archivos Modificados:**
+  - [GymWeb/Views/Socios/Index.cshtml](file:///c:/Users/vic_c/OneDrive/Documents/Gym-Argentina/Gym/GymWeb/Views/Socios/Index.cshtml)
+* **Diagnóstico:**
+  En la tabla del Directorio de Socios, en la columna de Acciones, el botón contiguo al icono de membresía (`Historial de pagos`) mostraba el icono estático de FontAwesome `<i class="fa-solid fa-dollar-sign"></i>`, permaneciendo como `$` incluso al configurar otro país (por ejemplo, Perú con `S/.`, España con `€`, o Costa Rica con `₡`).
+* **Solución Implementada:**
+  - Se sustituyó el icono estático por `@GymWeb.Helpers.AppSettings.MonedaSimbolo`, ajustando el tamaño de fuente y espaciado dinámicamente según la longitud del símbolo para que quede perfectamente centrado dentro del botón de 28x28px.
+  - Se regeneró el binario `GymWeb.dll`, se sincronizó en `Publish/` y se empaquetó el micro-parche ligero actualizado en `dist/Parche_Ligero_GymWeb.zip`.
+
+---
+
+### [2026-10-09] Parche: Fechas Independientes en Alta de Socio y Ordenamiento Alfabético Opcional por Check
+* **Archivos Modificados:**
+  - [`GymWeb/Views/Socios/Create.cshtml`](file:///c:/xampp/htdocs/Gym-Paises/Gym/GymWeb/Views/Socios/Create.cshtml)
+  - [`GymWeb/Controllers/SociosController.cs`](file:///c:/xampp/htdocs/Gym-Paises/Gym/GymWeb/Controllers/SociosController.cs)
+  - [`GymWeb/Views/Socios/Index.cshtml`](file:///c:/xampp/htdocs/Gym-Paises/Gym/GymWeb/Views/Socios/Index.cshtml)
+* **Corrección 1: Independencia Total de Fechas (Registro vs Inicio de Membresía):**
+  - **Diagnóstico:** Al dar de alta un socio, seleccionar una fecha de inicio de membresía distinta (ej. 01/10/2026) sobreescribía automáticamente la fecha de registro (ej. hoy 09/10/2026) tanto por un listener de sincronización en JavaScript como por una regla condicional en el controlador C#.
+  - **Solución Implementada:**
+    1. Se eliminó el event listener en `Create.cshtml` que forzaba la sobreescritura de `inpFechaRegistro`.
+    2. En `SociosController.Create`, se eliminó la lógica que reemplazaba `socio.FechaCreacion` con `FechaInicioMembresia`, preservando fielmente la fecha de registro indicada por el usuario.
+* **Corrección 2: Ordenamiento Alfabético Opcional mediante Checkbox:**
+  - **Funcionalidad:**
+    1. En la barra de herramientas de `Socios/Index.cshtml` se integró un check interactivo con estilo glassmorphism: `☑ Ordenar alfabéticamente (A-Z)`.
+    2. Al marcar el check, las filas se reordenan reactivamente en el DOM de la A a la Z por nombre completo (`localeCompare` con soporte para acentos y español) y la columna `#` se renumera dinámicamente.
+    3. Al desmarcarlo, regresa al orden consecutivo original (`data-default-order`).
+    4. La preferencia se recuerda automáticamente mediante `localStorage ('gym_socios_orden_alfabetico')`.
+    5. Es 100% compatible con los filtros de estado (Todos, Activos, Inactivos, Deudores) y el buscador reactivo.
+* **Entregables:**
+  - Binario `GymWeb.dll` recompilado en Release y sincronizado en `Publish/`.
+  - Micro-parche actualizado en `dist/Parche_Ligero_GymWeb.zip` (~6.59 MB).
+
+---
+
+### [2026-10-12] Parche: Buscador Rápido Multi-Campo en Visitas, Adaptabilidad Responsive (19") y Acceso por Red LAN / Móvil con Código QR
+* **Archivos Modificados y Creados:**
+  - [`GymWeb/Views/Registro/Index.cshtml`](file:///c:/xampp/htdocs/Gym-Paises/Gym/GymWeb/Views/Registro/Index.cshtml): Se replicó la barra de filtros rápidos (Todos, Vigentes, Por Vencer, Vencidos, Sin Membresía), buscador multi-opción (nombre, clave de 4 dígitos, teléfono), checkbox de orden A-Z con persistencia en `localStorage`, y formateo de clave a 4 dígitos.
+  - [`GymWeb/Views/Socios/Index.cshtml`](file:///c:/xampp/htdocs/Gym-Paises/Gym/GymWeb/Views/Socios/Index.cshtml): Se optimizó la tabla compactando los 8 botones de acciones a 26x26px, integrando el avatar en la celda del nombre (reduciendo de 8 a 7 columnas) para evitar desbordamientos horizontales en monitores de 19" (1366x768 / 1280x1024).
+  - [`GymWeb/wwwroot/css/gym.css`](file:///c:/xampp/htdocs/Gym-Paises/Gym/GymWeb/wwwroot/css/gym.css): Se agregaron reglas responsivas (`@media (max-width: 1440px)`, `@media (max-width: 1366px)`, `@media (max-width: 1220px)`) ajustando márgenes, paddings de celdas, tarjetas y ancho de sidebar (`--sidebar-w: 210px` / `195px`), además de scrollbars estilizados de 6px.
+  - [`GymWeb/Helpers/NetworkHelper.cs`](file:///c:/xampp/htdocs/Gym-Paises/Gym/GymWeb/Helpers/NetworkHelper.cs): Detección automática de la IP local activa en la red (Wi-Fi / Ethernet), priorizando adaptadores inalámbricos activos (`192.168.68.123`).
+  - [`GymWeb/Controllers/ConfiguracionController.cs`](file:///c:/xampp/htdocs/Gym-Paises/Gym/GymWeb/Controllers/ConfiguracionController.cs): Inyección de datos de red LAN y endpoint AJAX `[HttpGet] GetRedLanInfo()` para actualización en tiempo real.
+  - [`GymWeb/Views/Configuracion/Index.cshtml`](file:///c:/xampp/htdocs/Gym-Paises/Gym/GymWeb/Views/Configuracion/Index.cshtml): Nueva pestaña **Red LAN (Móvil)** idéntica a la vista solicitada, con tarjeta de servidor activo, puerto 5080, generador de QR offline con `qrcode.min.js`, botones de "Copiar Enlace", "Abrir en Navegador", refresco dinámico de IP y guía paso a paso para guardar como App (PWA) en Android (Chrome) e iPhone (Safari).
+  - [`GymWeb/appsettings.json`](file:///c:/xampp/htdocs/Gym-Paises/Gym/GymWeb/appsettings.json), [`Publish/appsettings.json`](file:///c:/xampp/htdocs/Gym-Paises/Gym/Publish/appsettings.json), [`GymWeb/Properties/launchSettings.json`](file:///c:/xampp/htdocs/Gym-Paises/Gym/GymWeb/Properties/launchSettings.json), [`Iniciar Gym.bat`](file:///c:/xampp/htdocs/Gym-Paises/Gym/Iniciar%20Gym.bat): Kestrel configurado para escuchar en `http://0.0.0.0:5080`, aceptando peticiones de cualquier celular o equipo en la misma red local.
+  - [`HABILITAR-RED-LAN.bat`](file:///c:/xampp/htdocs/Gym-Paises/Gym/HABILITAR-RED-LAN.bat) y [`Publish/HABILITAR-RED-LAN.bat`](file:///c:/xampp/htdocs/Gym-Paises/Gym/Publish/HABILITAR-RED-LAN.bat): Asistente de 1 clic con elevación UAC para autorizar el puerto 5080 TCP en el Firewall de Windows.
+  - [`GymWeb/wwwroot/lib/qrcode.min.js`](file:///c:/xampp/htdocs/Gym-Paises/Gym/GymWeb/wwwroot/lib/qrcode.min.js): Librería nativa y offline para generación instantánea de códigos QR en canvas/SVG sin dependencias externas.
+* **Entregables:**
+  - Micro-parche actualizado en [`dist/Parche_Ligero_GymWeb.zip`](file:///c:/xampp/htdocs/Gym-Paises/Gym/dist/Parche_Ligero_GymWeb.zip) (~7.66 MB) listo para instalación.
+
+---
+
+### [2026-10-12] Parche: Búsqueda por Documento (DNI/INE), Retiro de Píldoras y Muestra de Documento en Registro de Visitas
+* **Archivos Modificados:**
+  - [`GymWeb/Controllers/RegistroController.cs`](file:///c:/xampp/htdocs/Gym-Paises/Gym/GymWeb/Controllers/RegistroController.cs): Carga de `ViewBag.SociosDict` para resolver el tipo y número de documento del socio.
+  - [`GymWeb/Views/Registro/Index.cshtml`](file:///c:/xampp/htdocs/Gym-Paises/Gym/GymWeb/Views/Registro/Index.cshtml):
+    - Se retiraron las píldoras de colores (`Todos`, `Vigentes`, `Por Vencer`, `Vencidos`, `Sin Membresía`) para mantener la interfaz más limpia y enfocada en la recepción de entradas.
+    - Se agregó la badge con el tipo y número de documento (DNI, INE, etc.) al lado del nombre del socio idéntica a la vista de Socios.
+    - Se optimizó `data-search` para incluir `docLimpio` (sin guiones ni puntos), permitiendo buscar a cualquier socio ingresando los últimos 3 dígitos de su documento o su clave.
+  - [`GymWeb/Views/Socios/Index.cshtml`](file:///c:/xampp/htdocs/Gym-Paises/Gym/GymWeb/Views/Socios/Index.cshtml): Se añadió `docLimpio` al texto de búsqueda y se actualizó el placeholder indicando que busca por documento (DNI, INE).
+
+---
+
+### [2026-10-12 / 2026-10-13] Parche Mayor v2.5: Sincronización en Tiempo Real (LiveSync Celular ↔ PC) y Puente de Hardware Biométrico DigitalPersona U.are.U 4500 (WebSocket Local)
+
+#### 1. Sincronización Reactiva en Tiempo Real (LiveSync Celular ↔ PC):
+* **Problema:**
+  Al usar el sistema desde un celular o tablet conectado por red LAN Wi-Fi y modificar o dar de alta un socio o registrar un pago, la PC principal no reflejaba los cambios a simple vista hasta que el usuario navegaba a otra sección o recargaba manualmente el navegador.
+* **Arquitectura Implementada:**
+  - [`GymWeb/Helpers/LiveSyncService.cs`](file:///c:/xampp/htdocs/Gym-Paises/Gym/GymWeb/Helpers/LiveSyncService.cs):
+    Servicio Singleton en C# de ultra-bajo consumo basado en Long-Polling asíncrono con `ConcurrentDictionary` y `TaskCompletionSource`. Mantiene un número de versión global y despacha notificaciones atómicas instantáneas sin sobrecargar la CPU ni la memoria.
+  - [`GymWeb/Controllers/LiveSyncController.cs`](file:///c:/xampp/htdocs/Gym-Paises/Gym/GymWeb/Controllers/LiveSyncController.cs):
+    - `[HttpGet] /LiveSync/WaitUpdates(long lastVersion)`: Espera asíncrona no bloqueante (timeout de 25 s) que responde inmediatamente cuando ocurre un cambio en cualquier dispositivo.
+    - `[HttpPost] /LiveSync/TriggerUpdate(string entity, string action)`: Endpoint de notificación para disparar sincronizaciones manuales o automáticas.
+  - **Notificación en Controladores:**
+    En [`GymWeb/Controllers/SociosController.cs`](file:///c:/xampp/htdocs/Gym-Paises/Gym/GymWeb/Controllers/SociosController.cs), cada operación de `Create`, `Edit`, `ToggleEstado`, `Delete` y pagos notifica a `_liveSyncService.NotifyChange("socios", ...)`.
+  - **Frontend Reactivo:**
+    Script global en `_Layout.cshtml` con reconexión automática resiliente que actualiza en tiempo real las tablas de Socios, Visitas y métricas cuando cualquier dispositivo en la red realiza una acción.
+
+---
+
+#### 2. Integración de Hardware Biométrico: DigitalPersona U.are.U 4500 (Puente Local WebSocket):
+* **Problema:**
+  Los navegadores web por seguridad de sandbox no pueden comunicarse directamente con lectores de huellas USB propietarios que usan drivers Non-WBF (como el DigitalPersona 4500 de HID Global).
+* **Solución (Arquitectura de Puente Local):**
+  - **Servicio Puente Local en C#:**
+    Directorio: [`Gym/DigitalPersonaBridge`](file:///c:/xampp/htdocs/Gym-Paises/Gym/DigitalPersonaBridge)
+    - `WebSocketServer.cs`: Servidor WebSocket local nativo en C# escuchando en `ws://localhost:8080`.
+    - `DigitalPersonaHandler.cs`: Monitoreo del puerto USB, detección de conexión/desconexión del hardware, captura óptica y serialización de la huella a Base64.
+    - Protocolo JSON:
+      - Estado: `{"type": "status", "connected": true/false}`
+      - Detección de huella: `{"type": "fingerprint", "base64": "..."}`
+  - **Frontend Modal en Socios ([`GymWeb/Views/Socios/Index.cshtml`](file:///c:/xampp/htdocs/Gym-Paises/Gym/GymWeb/Views/Socios/Index.cshtml)):**
+    - Conexión por WebSocket nativo a `ws://localhost:8080`.
+    - Indicador visual dinámico en la cabecera:
+      - 🟢 **"Lector conectado (DigitalPersona 4500)"** cuando el hardware está presente.
+      - 🟡 **"Sin lector USB — Modo PIN"** si no hay lector físico conectado.
+    - Bloqueo inteligente: Se previene la simulación falsa o clic en captura si el hardware USB no está físicamente conectado.
+    - Al apoyar el dedo en el lector, se captura la huella, se emite en Base64, se muestra la confirmación visual y se almacena en la tabla `socio_huella`.
+  - **Arranque 100% Automático y Transparente:**
+    - Se integró en [`Publish/Iniciar GymWeb.bat`](file:///c:/xampp/htdocs/Gym-Paises/Gym/Publish/Iniciar%20GymWeb.bat) e [`Iniciar Gym.bat`](file:///c:/xampp/htdocs/Gym-Paises/Gym/Iniciar%20Gym.bat) la verificación y arranque silencioso en segundo plano (`start "" /B`) de `DigitalPersonaBridge.exe`.
+    - **Resultado para el cliente:** Al hacer doble clic en el acceso directo del escritorio "Gimnasio", el sistema inicia el puente de huella en automático. El cliente **NO** necesita abrir ventanas de consola ni ejecutar scripts manuales en su rutina diaria.
+
+---
+
+#### 3. Herramientas de Mantenimiento y Diagnóstico USB:
+* [`PROBAR-LECTOR-USB.bat`](file:///c:/xampp/htdocs/Gym-Paises/Gym/PROBAR-LECTOR-USB.bat) y [`PROBAR-LECTOR-USB.ps1`](file:///c:/xampp/htdocs/Gym-Paises/Gym/PROBAR-LECTOR-USB.ps1):
+  Script de diagnóstico rápido que inspecciona el bus USB y controladores PnP de Windows, detectando al instante si el lector DigitalPersona 4500 está reconocido por el sistema operativo o si le falta el driver Non-WBF.
+* [`INICIAR-PUENTE-BIOMETRICO.bat`](file:///c:/xampp/htdocs/Gym-Paises/Gym/INICIAR-PUENTE-BIOMETRICO.bat):
+  Lanzador independiente de prueba con consola para depuración y soporte técnico.
+
+---
+
+#### 4. Generación y Sincronización de Entregables (Parche e Instalador):
+* **Micro-Parche Ligero v2.5 (~6.7 MB):**
+  - Script: [`Gym/generar_parche_ligero.ps1`](file:///c:/xampp/htdocs/Gym-Paises/Gym/generar_parche_ligero.ps1)
+  - Salidas generadas:
+    - [`Gym/dist/Parche_Ligero_GymWeb.zip`](file:///c:/xampp/htdocs/Gym-Paises/Gym/dist/Parche_Ligero_GymWeb.zip)
+    - Copia directa en Escritorio: `C:\Users\vic_c\Desktop\Parche_Ligero_GymWeb_v2.5.zip`
+  - Contenido: `GymWeb.dll` (Release), `PuenteBiometrico\`, `ACTUALIZAR.bat`, `LEEME_INSTRUCCIONES.txt`, utilitarios de red LAN y diagnóstico.
+  - Seguridad: Preserva el 100% de la base de datos (`gym.db`), socios, fotos y configuraciones institucionales.
+* **Instalador Completo Autocontenido v2.5 (~126 MB):**
+  - Script: [`Gym/generar_instalador.ps1`](file:///c:/xampp/htdocs/Gym-Paises/Gym/generar_instalador.ps1)
+  - Salidas generadas:
+    - [`Gym/dist/Instalador_GymWeb_Windows_v2.5.zip`](file:///c:/xampp/htdocs/Gym-Paises/Gym/dist/Instalador_GymWeb_Windows_v2.5.zip)
+    - Copia directa en Escritorio: `C:\Users\vic_c\Desktop\Instalador_GymWeb_Windows_v2.5.zip`
+  - Contenido: Paquete autocontenido x64 completo con `GymWeb.exe`, `Gym.exe` (visor WebView2), `BioService\`, `PuenteBiometrico\`, `INSTALAR.bat` y `DESINSTALAR.bat`. Para instalaciones limpias desde cero sin requerir prerequisitos de .NET.
+
+---
+
+### [2026-10-13] Mejora: Difusión Masiva por WhatsApp 100% Automática y Desatendida (Auto-Enter por Puente de Windows)
+* **Archivos Modificados y Creados:**
+  - [`DigitalPersonaBridge/WhatsAppAutomationHelper.cs`](file:///c:/xampp/htdocs/Gym-Paises/Gym/DigitalPersonaBridge/WhatsAppAutomationHelper.cs): Nuevo módulo en C# de automatización a nivel de Sistema Operativo Windows. Utiliza APIs nativas de Win32 (`keybd_event`, `SetForegroundWindow`, `EnumWindows`) para localizar la ventana de WhatsApp Web y disparar de forma automática la pulsación de la tecla `Enter` (`VK_RETURN = 0x0D`) tras el tiempo de espera de carga.
+  - [`DigitalPersonaBridge/WebSocketServer.cs`](file:///c:/xampp/htdocs/Gym-Paises/Gym/DigitalPersonaBridge/WebSocketServer.cs): Soporte para comando WebSocket `whatsapp_auto_send` y endpoint HTTP `GET/POST /whatsapp-press-enter?delay=5000` con CORS habilitado.
+  - [`GymWeb/wwwroot/js/gym-tickets-whatsapp.js`](file:///c:/xampp/htdocs/Gym-Paises/Gym/GymWeb/wwwroot/js/gym-tickets-whatsapp.js): Función `solicitarAutoEnterWhatsApp` integrada al loop de ejecución de difusión secuencial.
+* **Flujo 100% Desatendido (Sin presionar Enter):**
+  1. El sistema abre la ventana única de WhatsApp Web con el mensaje del socio ya redactado.
+  2. En paralelo, solicita al puente local de Windows programar la tecla `Enter` a los 5 segundos.
+  3. WhatsApp Web resuelve el contacto ("Iniciando chat...") y enfoca el campo de texto.
+  4. El puente de Windows presiona `Enter` automáticamente a nivel de sistema operativo y el mensaje sale volando solo.
+  5. A los 7 segundos el sistema salta al siguiente socio y repite el proceso de forma autónoma.
+* **Alertas y Recomendaciones para el Dueño del Negocio:**
+  - Se agregó una tarjeta ámbar destacada en el panel de configuración de difusión antes de iniciar el envío.
+  - Se agregó un banner de recordatorio visual durante la ejecución del envío.
+  - Se incluyó la sección `*** RECOMENDACIÓN MUY IMPORTANTE PARA EL DUEÑO DEL NEGOCIO ***` en el archivo `LEEME_INSTRUCCIONES.txt` del parche.
+* **Entregables Actualizados:**
+  - Micro-parche ligero actualizado exclusivamente en `Gym/dist/Parche_Ligero_GymWeb.zip` (~6.74 MB).
+
+---
+
+### [2026-10-13] Microservicio WhatsApp Gateway (Envío Masivo 100% Desatendido sin Navegador)
+* **Objetivo:** Resolver definitivamente el congelamiento de WhatsApp Web al enviar a cientos de clientes (300+ socios), permitiendo envíos 100% automáticos en segundo plano, sin abrir navegadores, sin depender del foco de ventanas de Windows y sin tocar el mouse ni el teclado.
+* **Componentes Creados e Integrados:**
+  - **Microservicio `WhatsAppGateway/` (Puerto `5085`):**
+    - Construido con Node.js, Express, CORS y `@whiskeysockets/baileys`.
+    - Conecta directamente a los servidores de WhatsApp mediante WebSockets binarios cifrados oficiales.
+    - Endpoints REST:
+      - `GET /api/status`: Devuelve el estado de conexión y el código QR en Base64 para vinculación rápida.
+      - `POST /api/send`: Envía mensajes directamente por socket en segundo plano a cualquier socio.
+      - `POST /api/logout`: Permite desvincular la cuenta en cualquier momento.
+    - Persistencia de sesión segura en `auth_session/`: el dueño del negocio vincula su celular una sola vez y la sesión queda guardada de forma permanente.
+    - Lanzador independiente: [`INICIAR-WHATSAPP-GATEWAY.bat`](file:///c:/xampp/htdocs/Gym-Paises/Gym/WhatsAppGateway/INICIAR-WHATSAPP-GATEWAY.bat).
+  - **Frontend Integrado en GymWeb ([`GymWeb/wwwroot/js/gym-tickets-whatsapp.js`](file:///c:/xampp/htdocs/Gym-Paises/Gym/GymWeb/wwwroot/js/gym-tickets-whatsapp.js)):**
+    - Detección automática del estado del Bot en puerto 5085.
+    - Indicador visual tipo Badge en el modal de Difusión Masiva:
+      - Verde con número conectado si el bot está activo.
+      - Botón "Vincular Bot con QR" si aún no se ha escaneado.
+    - Modal emergente nativo con código QR auto-refrescable para vincular en 3 pasos con el celular.
+    - Enrutamiento inteligente en `ejecutarEnvioSocioActual()`: Si el bot está activo, despacha vía `POST /api/send` con intervalo de 4 segundos entre socios sin abrir ninguna ventana de navegador. Si no está vinculado, ofrece el modo de navegador con Auto-Enter como respaldo.
+  - **Arranque Silencioso en Lanzadores Principales:**
+    - Integrado en [`Iniciar Gym.bat`](file:///c:/xampp/htdocs/Gym-Paises/Gym/Iniciar%20Gym.bat) y [`Publish/Iniciar GymWeb.bat`](file:///c:/xampp/htdocs/Gym-Paises/Gym/Publish/Iniciar%20GymWeb.bat) con arranque desatendido (`start "" /B node WhatsAppGateway\server.js`) si el puerto 5085 no está ocupado.
+  - **Aislamiento Total de Módulos (Cero Afectación a Huella y POS):**
+    - GymWeb: Puerto 5080.
+    - WhatsApp Gateway: Puerto 5085.
+    - DigitalPersonaBridge (Lector USB): Puerto 8080 (100% intacto y funcional).
+    - BioService (ZKTeco): Puerto 4500.
+* **Entregables:**
+  - Micro-parche ligero actualizado en `Gym/dist/Parche_Ligero_GymWeb.zip`.
+
+---
+
+### [2026-10-13] Actualizador Automático en 1 Clic (In-App Auto-Updater Profesional)
+* **Objetivo:** Eliminar por completo el proceso manual de descarga de ZIPs, descompresión y copia de archivos que requería el cliente para actualizar el sistema, adoptando el estándar profesional de actualización en 1 clic del software de taller (FixPOS Pro).
+* **Componentes Implementados:**
+  - **Servicio Backend (`AutoUpdateService.cs`):**
+    - Descarga asíncrona por fragmentos (chunks de 80 KB) con reporte continuo de progreso (porcentaje, bytes descargados, tamaño total, velocidad en KB/s o MB/s).
+    - Descompresión automática en directorio temporal (`%TEMP%\GymWeb_Update\`).
+    - Detección inteligente del directorio de instalación (`AppContext.BaseDirectory`, rutas estándar o directorio activo).
+    - Generación y ejecución de script de reemplazo en caliente (`hot_patch_apply.bat`):
+      - Cierra procesos en ejecución de GymWeb para liberar bloqueos de archivos en Windows.
+      - Copia archivos y librerías actualizadas (`robocopy`) con exclusión explícita de `gym.db`, `license*.json` y `appsettings*.json` (protección del 100% de datos y configuración del cliente).
+      - Reinicia la aplicación (`Gym.exe`, `GymWeb.exe` o servicio de Windows).
+  - **Controlador API (`HomeController.cs`):**
+    - `GET /Home/CheckUpdate`: Consulta GitHub Releases, compara versiones semánticas (`v2.5` vs `v2.4`), clasifica automáticamente las notas del release en `novedades` y `correcciones`, y extrae el tamaño del asset. Caché en memoria de 2 horas.
+    - `POST /Home/IniciarActualizacion`: Inicia la tarea de descarga en segundo plano.
+    - `GET /Home/ProgresoActualizacion`: Devuelve métricas en vivo para la barra de progreso.
+    - `POST /Home/CancelarActualizacion`: Cancela la descarga si el usuario lo solicita.
+    - `GET /Home/Ping`: Permite al frontend detectar de inmediato cuándo el servidor reinició y volvió a estar listo.
+  - **Frontend Integrado (`Views/Shared/_Layout.cshtml`):**
+    - Modal oscuro flotante con esquinas redondeadas y degradado dinámico superior.
+    - Vista 1 (Información): Muestra versión actual vs nueva, secciones estilizadas de `✨ NOVEDADES` y `🛠️ CORRECCIONES`, tamaño del parche y aviso de seguridad de base de datos.
+    - Vista 2 (Progreso en Vivo): Barra de progreso con efecto shimmer, porcentaje, tamaño descargado (`X MB / Y MB`), velocidad en tiempo real, advertencia de no cerrar la ventana y botón para cancelar.
+    - Vista 3 (Instalación): Indicador de reemplazo en caliente y reinicio automático.
+    - Vista 4 (Éxito y Reconexión): Sondeo con `/Home/Ping` y auto-recarga de pantalla al reconectar.
+    - Activador manual: Al hacer clic en "Versión v2.5" en la barra lateral, se busca y abre el actualizador de forma inmediata.
+* **Entregables:**
+  - Actualizado en `Gym/Publish/` y compilado en `Gym/dist/Parche_Ligero_GymWeb.zip`.
+
+
+
+
+

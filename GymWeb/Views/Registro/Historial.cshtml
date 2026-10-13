@@ -54,7 +54,7 @@
                             <td colspan="3" style="text-align:right;font-size:13px;color:var(--text-muted);">
                                 Subtotal @diaActual?.ToString("dd/MM/yyyy")
                             </td>
-                            <td style="text-align:right;color:var(--accent);">$@totalDia.ToString("N2")</td>
+                            <td style="text-align:right;color:var(--accent);">@GymWeb.Helpers.AppSettings.MonedaSimbolo@totalDia.ToString("N2")</td>
                         </tr>
                     }
                     totalDia = 0;
@@ -87,7 +87,7 @@
                                 <img src="/Socios/GetFoto/@r.IdSocio" class="socio-avatar"
                                      onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';" />
                                 <span class="socio-avatar-icon" style="display:none;"><i class="fa-solid fa-user"></i></span>
-                                <span class="name-cell">@s.Nombre @s.Paterno @s.Materno</span>
+                                <span class="name-cell">@s.NombreCompleto</span>
                             </div>
                         }
                         else if (esSocio)
@@ -102,7 +102,7 @@
                     <td style="text-align:right;font-size:13px;">
                         @if (r.PrecioVisita > 0)
                         {
-                            <span style="color:#4ade80;">$@r.PrecioVisita.ToString("N2")</span>
+                            <span style="color:#4ade80;">@GymWeb.Helpers.AppSettings.MonedaSimbolo@r.PrecioVisita.ToString("N2")</span>
                         }
                         else
                         {
@@ -118,7 +118,7 @@
                     <td colspan="3" style="text-align:right;font-size:13px;color:var(--text-muted);">
                         Subtotal @diaActual?.ToString("dd/MM/yyyy")
                     </td>
-                    <td style="text-align:right;color:var(--accent);">$@totalDia.ToString("N2")</td>
+                    <td style="text-align:right;color:var(--accent);">@GymWeb.Helpers.AppSettings.MonedaSimbolo@totalDia.ToString("N2")</td>
                 </tr>
             }
             </tbody>
@@ -133,7 +133,7 @@
         @if (totalGeneral > 0)
         {
             <span style="background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.3);border-radius:var(--radius);padding:6px 16px;font-weight:700;color:#4ade80;font-size:15px;">
-                <i class="fa-solid fa-coins"></i> Total cobrado: $@totalGeneral.ToString("N2")
+                <i class="fa-solid fa-coins"></i> Total cobrado: @GymWeb.Helpers.AppSettings.MonedaSimbolo@totalGeneral.ToString("N2")
             </span>
         }
     </div>

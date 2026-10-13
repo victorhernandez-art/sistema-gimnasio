@@ -166,7 +166,9 @@
                 <i class="fa-solid fa-right-from-bracket"></i>
                 <span>Cerrar Sesión</span>
             </a>
-            <div class="sidebar-version"><span>Versión @GymWeb.Helpers.AppSettings.CurrentVersion</span></div>
+            <div class="sidebar-version" style="cursor:pointer;" onclick="window.gymForzarVerificarActualizacion && window.gymForzarVerificarActualizacion(true)" title="Buscar actualizaciones de GymWeb">
+                <span>Versión @GymWeb.Helpers.AppSettings.CurrentVersion</span> <i class="fa-solid fa-arrows-rotate" style="font-size:10px;margin-left:4px;opacity:0.6;"></i>
+            </div>
         </div>
     </nav>
 
@@ -359,84 +361,170 @@ else
     </div>
 </div>
 
-@* ── Modal de Actualización Disponible (GitHub Releases API) ── *@
-@if (Context.Session.GetString("UsuarioRol") == "superadmin" && GymWeb.Helpers.LicenseService.GetStatus().Valid)
+@* ── Modal de Actualización Automática In-App (Auto-Updater en 1 Clic) ── *@
+@if ((Context.Session.GetString("UsuarioRol") == "superadmin" || Context.Session.GetString("UsuarioRol") == "admin") && GymWeb.Helpers.LicenseService.GetStatus().Valid)
 {
 <!-- Backdrop del modal -->
-<div id="updateBackdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);backdrop-filter:blur(4px);z-index:99990;"></div>
+<div id="updateBackdrop" style="display:none;position:fixed;inset:0;background:rgba(5,10,20,0.78);backdrop-filter:blur(6px);z-index:99990;"></div>
 
 <!-- Modal de Actualización -->
-<div id="updateModal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.92);z-index:99999;width:min(520px,94vw);background:linear-gradient(160deg,#0d1526 0%,#111827 100%);border:1px solid rgba(0,242,255,0.3);border-radius:20px;box-shadow:0 24px 64px rgba(0,0,0,0.8),0 0 0 1px rgba(0,242,255,0.06);overflow:hidden;opacity:0;transition:opacity 0.3s ease, transform 0.3s cubic-bezier(0.34,1.56,0.64,1);">
-    <div style="height:4px;background:linear-gradient(90deg,#00f2ff,#0284c7,#6366f1);"></div>
-    <div style="padding:20px 22px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:14px;border-bottom:1px solid rgba(255,255,255,0.06);">
+<div id="updateModal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.92);z-index:99999;width:min(540px,94vw);background:linear-gradient(165deg,#0a101f 0%,#0f172a 100%);border:1px solid rgba(0,242,255,0.25);border-radius:22px;box-shadow:0 28px 70px rgba(0,0,0,0.85), 0 0 40px rgba(0,242,255,0.08);overflow:hidden;opacity:0;transition:opacity 0.28s ease, transform 0.28s cubic-bezier(0.34,1.56,0.64,1);color:#ffffff;font-family:inherit;">
+    
+    <!-- Barra superior con degradado dinámico -->
+    <div style="height:4px;background:linear-gradient(90deg,#00f2ff,#3b82f6,#8b5cf6,#00f2ff);background-size:200% 100%;animation:gymUpdateShimmer 3s linear infinite;"></div>
+
+    <!-- Header del Modal -->
+    <div style="padding:18px 22px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:14px;border-bottom:1px solid rgba(255,255,255,0.07);">
         <div style="display:flex;align-items:center;gap:14px;">
-            <div style="width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,rgba(0,242,255,0.15),rgba(0,242,255,0.05));border:1px solid rgba(0,242,255,0.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                <i class="fa-solid fa-rocket" style="color:#00f2ff;font-size:20px;"></i>
+            <div id="upHeaderIconBox" style="width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,rgba(0,242,255,0.18),rgba(59,130,246,0.12));border:1px solid rgba(0,242,255,0.35);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 14px rgba(0,242,255,0.2);">
+                <i id="upHeaderIcon" class="fa-solid fa-rocket" style="color:#00f2ff;font-size:21px;"></i>
             </div>
             <div>
-                <div style="font-size:15px;font-weight:700;color:#ffffff;letter-spacing:0.2px;">Actualización disponible</div>
-                <div style="font-size:12px;color:#64748b;margin-top:2px;">
-                    Versión actual: <span id="upCurrent" style="color:#94a3b8;font-weight:600;"></span>
-                    &nbsp;<i class="fa-solid fa-arrow-right" style="font-size:10px;color:#00f2ff;"></i>&nbsp;
-                    Nueva versión: <span id="upLatest" style="color:#00f2ff;font-weight:700;"></span>
+                <div id="upHeaderTitle" style="font-size:16px;font-weight:700;color:#ffffff;letter-spacing:0.2px;">Nueva Actualización Disponible</div>
+                <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap;">
+                    <span style="font-size:11.5px;padding:2px 8px;border-radius:6px;background:rgba(0,242,255,0.15);border:1px solid rgba(0,242,255,0.35);color:#00f2ff;font-weight:700;" id="upLatestBadge">v2.5</span>
+                    <span style="font-size:11.5px;color:#64748b;">actual: <span id="upCurrent" style="color:#94a3b8;font-weight:600;">v2.4</span></span>
+                    <span id="upSizeBadge" style="font-size:11px;padding:2px 7px;border-radius:6px;background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.3);color:#c4b5fd;">Tamaño: ~2.4 MB</span>
                 </div>
             </div>
         </div>
-        <button onclick="gymDismissUpdate('later')" style="background:none;border:none;color:#475569;cursor:pointer;font-size:22px;line-height:1;padding:2px;flex-shrink:0;" title="Cerrar">&times;</button>
+        <button id="upCloseBtn" onclick="gymDismissUpdate('later')" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:22px;line-height:1;padding:4px;flex-shrink:0;transition:color 0.15s;" title="Cerrar">&times;</button>
     </div>
-    <div style="padding:18px 22px;max-height:52vh;overflow-y:auto;">
-        <div id="upNotesSection" style="display:none;margin-bottom:18px;">
-            <div style="font-size:11px;font-weight:700;color:#00f2ff;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:8px;">
-                <i class="fa-solid fa-list-check" style="margin-right:5px;"></i>¿Qué incluye esta actualización?
+
+    <!-- ═══ VISTA 1: INFORMACIÓN Y NOTAS DE VERSIÓN ═══ -->
+    <div id="upViewInfo" style="padding:18px 22px;">
+        <div style="max-height:48vh;overflow-y:auto;padding-right:4px;">
+            <!-- Novedades -->
+            <div id="upNovedadesSection" style="margin-bottom:14px;">
+                <div style="font-size:11px;font-weight:700;color:#00f2ff;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+                    <i class="fa-solid fa-sparkles"></i> NOVEDADES
+                </div>
+                <div id="upNovedadesList" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:12px 14px;font-size:12.5px;color:#cbd5e1;line-height:1.6;display:flex;flex-direction:column;gap:7px;">
+                </div>
             </div>
-            <div id="upNotes" style="font-size:12.5px;color:#cbd5e1;line-height:1.7;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:12px 14px;white-space:pre-wrap;"></div>
+
+            <!-- Correcciones -->
+            <div id="upCorreccionesSection" style="margin-bottom:14px;display:none;">
+                <div style="font-size:11px;font-weight:700;color:#38bdf8;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+                    <i class="fa-solid fa-wrench"></i> CORRECCIONES Y MEJORAS
+                </div>
+                <div id="upCorreccionesList" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:12px 14px;font-size:12.5px;color:#cbd5e1;line-height:1.6;display:flex;flex-direction:column;gap:7px;">
+                </div>
+            </div>
+
+            <!-- Aviso de Seguridad / Protección de Datos -->
+            <div style="display:flex;align-items:center;gap:10px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.22);border-radius:10px;padding:10px 14px;">
+                <i class="fa-solid fa-shield-check" style="color:#10b981;font-size:16px;flex-shrink:0;"></i>
+                <span style="font-size:12px;color:#6ee7b7;line-height:1.4;">
+                    Tus socios, cobros, base de datos y configuración <strong>se mantienen 100% seguros</strong>. El actualizador solo renueva el código y optimizaciones.
+                </span>
+            </div>
         </div>
-        <div>
-            <div style="font-size:11px;font-weight:700;color:#f59e0b;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:10px;">
-                <i class="fa-solid fa-screwdriver-wrench" style="margin-right:5px;"></i>Cómo instalar el parche
-            </div>
-            <div style="display:flex;flex-direction:column;gap:9px;">
-                <div style="display:flex;align-items:flex-start;gap:10px;">
-                    <div style="width:22px;height:22px;border-radius:50%;background:rgba(0,242,255,0.15);border:1px solid rgba(0,242,255,0.35);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#00f2ff;flex-shrink:0;margin-top:1px;">1</div>
-                    <div style="font-size:12.5px;color:#cbd5e1;line-height:1.5;">Haz clic en <strong style="color:#ffffff;">"Descargar parche"</strong> y guarda el archivo <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px;font-size:11.5px;">Parche_Ligero_GymWeb.zip</code></div>
-                </div>
-                <div style="display:flex;align-items:flex-start;gap:10px;">
-                    <div style="width:22px;height:22px;border-radius:50%;background:rgba(0,242,255,0.15);border:1px solid rgba(0,242,255,0.35);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#00f2ff;flex-shrink:0;margin-top:1px;">2</div>
-                    <div style="font-size:12.5px;color:#cbd5e1;line-height:1.5;"><strong style="color:#ffffff;">Descomprime</strong> el ZIP. Obtendrás una carpeta llamada <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px;font-size:11.5px;">Parche-Ligero</code></div>
-                </div>
-                <div style="display:flex;align-items:flex-start;gap:10px;">
-                    <div style="width:22px;height:22px;border-radius:50%;background:rgba(0,242,255,0.15);border:1px solid rgba(0,242,255,0.35);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#00f2ff;flex-shrink:0;margin-top:1px;">3</div>
-                    <div style="font-size:12.5px;color:#cbd5e1;line-height:1.5;"><strong style="color:#ffffff;">Copia todos los archivos</strong> de la carpeta descomprimida dentro de la carpeta donde instalaste GymWeb (generalmente <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px;font-size:11.5px;">C:\GymWeb\</code>)</div>
-                </div>
-                <div style="display:flex;align-items:flex-start;gap:10px;">
-                    <div style="width:22px;height:22px;border-radius:50%;background:rgba(245,158,11,0.2);border:1px solid rgba(245,158,11,0.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#f59e0b;flex-shrink:0;margin-top:1px;">4</div>
-                    <div style="font-size:12.5px;color:#cbd5e1;line-height:1.5;">Haz <strong style="color:#ffffff;">clic derecho</strong> en <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px;font-size:11.5px;">ACTUALIZAR.bat</code> → <strong style="color:#f59e0b;">"Ejecutar como administrador"</strong>. El sistema se reinicia automáticamente.</div>
-                </div>
-                <div style="display:flex;align-items:center;gap:8px;background:rgba(16,185,129,0.07);border:1px solid rgba(16,185,129,0.2);border-radius:8px;padding:8px 12px;margin-top:2px;">
-                    <i class="fa-solid fa-shield-check" style="color:#10b981;font-size:13px;flex-shrink:0;"></i>
-                    <span style="font-size:11.5px;color:#6ee7b7;">Tus socios, cobros y configuración <strong>no se borran</strong>. El parche solo actualiza el código.</span>
-                </div>
-            </div>
+
+        <!-- Botones de Acción de Vista 1 -->
+        <div style="margin-top:18px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid rgba(255,255,255,0.07);padding-top:16px;">
+            <button onclick="gymDismissUpdate('later')" style="padding:9px 18px;border-radius:10px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);color:#94a3b8;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.15s;">
+                <i class="fa-regular fa-clock" style="margin-right:5px;"></i> Más tarde (Omitir)
+            </button>
+            <button id="upBtnActualizarAhora" onclick="gymIniciarActualizacion()" style="display:inline-flex;align-items:center;gap:8px;padding:9px 22px;border-radius:10px;border:none;background:linear-gradient(135deg,#00f2ff,#0284c7);color:#031326;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 18px rgba(0,242,255,0.35);transition:all 0.15s;">
+                <i class="fa-solid fa-bolt"></i> Actualizar Ahora
+            </button>
         </div>
     </div>
-    <div style="padding:16px 22px 20px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid rgba(255,255,255,0.06);">
-        <button onclick="gymDismissUpdate('later')" style="padding:9px 20px;border-radius:10px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);color:#94a3b8;font-size:13px;font-weight:600;cursor:pointer;">
-            <i class="fa-regular fa-clock"></i>&nbsp; Más tarde
-        </button>
-        <a id="upDownloadBtn" href="/Home/DescargarParche" download="Parche_Ligero_GymWeb.zip" style="display:inline-flex;align-items:center;gap:8px;padding:9px 22px;border-radius:10px;background:linear-gradient(135deg,#00f2ff,#0284c7);color:#000000;font-size:13px;font-weight:700;text-decoration:none;box-shadow:0 4px 16px rgba(0,242,255,0.35);">
-            <i class="fa-solid fa-download"></i> Descargar parche
-        </a>
+
+    <!-- ═══ VISTA 2: DESCARGA CON BARRA DE PROGRESO EN VIVO ═══ -->
+    <div id="upViewProgress" style="display:none;padding:24px 22px;">
+        <div style="text-align:center;margin-bottom:18px;">
+            <div style="font-size:15px;font-weight:700;color:#ffffff;margin-bottom:4px;" id="upProgressTitle">
+                Descargando actualización...
+            </div>
+            <div style="font-size:12.5px;color:#94a3b8;" id="upProgressSubtitle">
+                Por favor espera mientras descargamos los nuevos archivos del sistema.
+            </div>
+        </div>
+
+        <!-- Pista de la Barra de Progreso -->
+        <div style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);border-radius:12px;height:14px;overflow:hidden;position:relative;margin-bottom:12px;">
+            <div id="upProgressBar" style="height:100%;width:0%;border-radius:12px;background:linear-gradient(90deg,#00f2ff,#0284c7,#6366f1);transition:width 0.3s ease;position:relative;overflow:hidden;">
+                <div style="position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.3),transparent);animation:gymUpdateBarShine 1.5s infinite;"></div>
+            </div>
+        </div>
+
+        <!-- Métricas: Porcentaje, Bytes y Velocidad -->
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;margin-bottom:18px;">
+            <div>
+                <span id="upPercentText" style="font-weight:700;color:#00f2ff;">0%</span>
+                <span style="color:#64748b;margin:0 4px;">·</span>
+                <span id="upBytesText" style="color:#cbd5e1;">0 KB / 0 KB</span>
+            </div>
+            <div>
+                <span id="upSpeedText" style="color:#a78bfa;font-weight:600;font-family:monospace;">0 KB/s</span>
+            </div>
+        </div>
+
+        <!-- Alerta Amarilla de Advertencia -->
+        <div style="display:flex;align-items:center;gap:10px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);border-radius:10px;padding:10px 14px;margin-bottom:18px;">
+            <i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b;font-size:15px;flex-shrink:0;"></i>
+            <span style="font-size:12px;color:#fde68a;">
+                Si cierras la aplicación o el navegador la descarga se interrumpirá.
+            </span>
+        </div>
+
+        <!-- Botón de Cancelar -->
+        <div style="display:flex;justify-content:center;">
+            <button id="upBtnCancelar" onclick="gymCancelarActualizacion()" style="padding:8px 20px;border-radius:10px;border:1px solid rgba(239,68,68,0.3);background:rgba(239,68,68,0.08);color:#fca5a5;font-size:12.5px;font-weight:600;cursor:pointer;transition:all 0.15s;">
+                <i class="fa-solid fa-xmark" style="margin-right:5px;"></i> Cancelar descarga
+            </button>
+        </div>
+    </div>
+
+    <!-- ═══ VISTA 3: APLICANDO Y REINICIANDO SISTEMA ═══ -->
+    <div id="upViewInstalling" style="display:none;padding:32px 22px;text-align:center;">
+        <div style="width:58px;height:58px;margin:0 auto 16px;border-radius:50%;background:rgba(0,242,255,0.12);border:2px solid #00f2ff;display:flex;align-items:center;justify-content:center;box-shadow:0 0 24px rgba(0,242,255,0.35);">
+            <i class="fa-solid fa-arrows-rotate fa-spin" style="color:#00f2ff;font-size:26px;"></i>
+        </div>
+        <div style="font-size:16px;font-weight:700;color:#ffffff;margin-bottom:6px;">
+            Aplicando actualización en caliente...
+        </div>
+        <div style="font-size:13px;color:#94a3b8;line-height:1.5;max-width:380px;margin:0 auto 16px;">
+            Descomprimiendo archivos y aplicando reemplazo. GymWeb se reiniciará automáticamente.
+        </div>
+        <div style="display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:20px;background:rgba(0,242,255,0.08);border:1px solid rgba(0,242,255,0.25);font-size:12px;color:#38bdf8;">
+            <i class="fa-solid fa-circle-notch fa-spin"></i>
+            <span id="upInstallStatusText">Reconectando con el sistema...</span>
+        </div>
+    </div>
+
+    <!-- ═══ VISTA 4: ÉXITO Y RECARGA ═══ -->
+    <div id="upViewSuccess" style="display:none;padding:34px 22px;text-align:center;">
+        <div style="width:60px;height:60px;margin:0 auto 16px;border-radius:50%;background:rgba(16,185,129,0.15);border:2px solid #10b981;display:flex;align-items:center;justify-content:center;box-shadow:0 0 28px rgba(16,185,129,0.4);">
+            <i class="fa-solid fa-check" style="color:#10b981;font-size:30px;"></i>
+        </div>
+        <div style="font-size:17px;font-weight:700;color:#ffffff;margin-bottom:6px;">
+            ¡Actualización completada al 100%!
+        </div>
+        <div style="font-size:13px;color:#94a3b8;margin-bottom:6px;">
+            El sistema se ha actualizado con éxito a la versión <strong id="upSuccessVersion" style="color:#10b981;"></strong>.
+        </div>
+        <div style="font-size:12px;color:#64748b;">
+            Recargando pantalla...
+        </div>
     </div>
 </div>
 
 <style>
 @@keyframes gymFadeInBackdrop { from{opacity:0} to{opacity:1} }
+@@keyframes gymUpdateShimmer { 0%{background-position:0% 0%} 100%{background-position:200% 0%} }
+@@keyframes gymUpdateBarShine { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
 </style>
 
 <script>
 (function(){
     const SESSION_KEY = 'gym_update_checked';
     const DISMISS_KEY = 'gym_update_dismissed';
+    let pollInterval = null;
+    let pingInterval = null;
+    let newVersionTag = '';
 
     // Limpiar dismiss huérfano (sin fecha) o expirado (24h)
     const exp = localStorage.getItem('gym_update_dismissed_exp');
@@ -445,28 +533,83 @@ else
         localStorage.removeItem('gym_update_dismissed_exp');
     }
 
-    if (sessionStorage.getItem(SESSION_KEY) === 'shown') return;
+    async function verificarActualizaciones(manual = false) {
+        if (!manual && sessionStorage.getItem(SESSION_KEY) === 'shown') return;
 
-    setTimeout(async function(){
+        if (manual && window.mostrarToastNotificacion) {
+            window.mostrarToastNotificacion('🔍 Buscando actualizaciones en GitHub...', 'info');
+        }
+
         try {
-            const res  = await fetch('/Home/CheckUpdate');
-            if (!res.ok) return;
+            const res = await fetch('/Home/CheckUpdate');
+            if (!res.ok) {
+                if (manual && window.mostrarToastNotificacion) window.mostrarToastNotificacion('⚠️ No se pudo conectar con el servidor de actualizaciones.', 'warning');
+                return;
+            }
             const data = await res.json();
-            if (!data.hasUpdate) return;
-
-            const dismissed = localStorage.getItem(DISMISS_KEY);
-            if (dismissed === data.latest) return;
-
-            document.getElementById('upCurrent').textContent = data.current;
-            document.getElementById('upLatest').textContent  = data.latest;
-            document.getElementById('upDownloadBtn').href    = '/Home/DescargarParche';
-
-            const notes = (data.releaseNotes || '').trim();
-            if (notes) {
-                document.getElementById('upNotes').textContent         = notes;
-                document.getElementById('upNotesSection').style.display = 'block';
+            if (!data.hasUpdate) {
+                if (manual && window.mostrarToastNotificacion) {
+                    window.mostrarToastNotificacion('✓ Tu sistema está actualizado a la versión más reciente (' + (data.current || 'actual') + ').', 'success');
+                }
+                return;
             }
 
+            newVersionTag = data.latest;
+            const dismissed = localStorage.getItem(DISMISS_KEY);
+            if (!manual && dismissed === data.latest) return;
+
+            // Llenar información en modal
+            document.getElementById('upCurrent').textContent     = data.current || '';
+            document.getElementById('upLatestBadge').textContent = data.latest || '';
+            if (document.getElementById('upSuccessVersion')) {
+                document.getElementById('upSuccessVersion').textContent = data.latest || '';
+            }
+
+            if (data.assetSizeFormatted) {
+                document.getElementById('upSizeBadge').textContent = 'Tamaño: ' + data.assetSizeFormatted;
+            }
+
+            // Renderizar novedades
+            const novList = document.getElementById('upNovedadesList');
+            novList.innerHTML = '';
+            const novedades = (data.novedades && data.novedades.length) ? data.novedades : (data.releaseNotes ? [data.releaseNotes] : ['Mejoras de rendimiento y estabilidad del sistema.']);
+            novedades.forEach(function(item){
+                const row = document.createElement('div');
+                row.style.display = 'flex';
+                row.style.alignItems = 'flex-start';
+                row.style.gap = '8px';
+                row.innerHTML = '<i class="fa-solid fa-circle-check" style="color:#00f2ff;font-size:11px;margin-top:4px;flex-shrink:0;"></i><span>' + escapeHtml(item) + '</span>';
+                novList.appendChild(row);
+            });
+
+            // Renderizar correcciones
+            const corrSec = document.getElementById('upCorreccionesSection');
+            const corrList = document.getElementById('upCorreccionesList');
+            if (data.correcciones && data.correcciones.length) {
+                corrList.innerHTML = '';
+                data.correcciones.forEach(function(item){
+                    const row = document.createElement('div');
+                    row.style.display = 'flex';
+                    row.style.alignItems = 'flex-start';
+                    row.style.gap = '8px';
+                    row.innerHTML = '<i class="fa-solid fa-wrench" style="color:#38bdf8;font-size:11px;margin-top:4px;flex-shrink:0;"></i><span>' + escapeHtml(item) + '</span>';
+                    corrList.appendChild(row);
+                });
+                corrSec.style.display = 'block';
+            } else {
+                corrSec.style.display = 'none';
+            }
+
+            // Asegurar que la vista de info esté visible y las otras ocultas
+            document.getElementById('upViewInfo').style.display       = 'block';
+            document.getElementById('upViewProgress').style.display   = 'none';
+            document.getElementById('upViewInstalling').style.display = 'none';
+            document.getElementById('upViewSuccess').style.display    = 'none';
+            document.getElementById('upCloseBtn').style.display        = 'block';
+            const btn = document.getElementById('upBtnActualizarAhora');
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-bolt"></i> Actualizar Ahora'; }
+
+            // Mostrar modal suavemente
             const backdrop = document.getElementById('updateBackdrop');
             const modal    = document.getElementById('updateModal');
             backdrop.style.display = 'block';
@@ -481,35 +624,191 @@ else
 
             localStorage.setItem(DISMISS_KEY + '_seen', data.latest);
             sessionStorage.setItem(SESSION_KEY, 'shown');
-        } catch(e) {}
-    }, 3000);
+        } catch(e) {
+            if (manual && window.mostrarToastNotificacion) window.mostrarToastNotificacion('⚠️ Error al buscar actualizaciones.', 'warning');
+        }
+    }
 
+    window.gymForzarVerificarActualizacion = function(manual = true) {
+        verificarActualizaciones(manual);
+    };
+
+    // Auto-ejecución silenciosa a los 2.8 segundos
+    setTimeout(function(){
+        verificarActualizaciones(false);
+    }, 2800);
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Cerrar u omitir actualización
     window.gymDismissUpdate = function(reason) {
+        if (pollInterval) clearInterval(pollInterval);
         const backdrop = document.getElementById('updateBackdrop');
         const modal    = document.getElementById('updateModal');
         if (modal) {
             modal.style.opacity   = '0';
             modal.style.transform = 'translate(-50%,-50%) scale(0.92)';
-            setTimeout(function(){ modal.style.display = 'none'; backdrop.style.display = 'none'; }, 280);
+            setTimeout(function(){ modal.style.display = 'none'; backdrop.style.display = 'none'; }, 260);
         }
-        if (reason === 'later') {
-            const latest = document.getElementById('upLatest')?.textContent;
-            if (latest) {
-                const expiry = new Date();
-                expiry.setHours(expiry.getHours() + 24);
-                localStorage.setItem(DISMISS_KEY, latest);
-                localStorage.setItem('gym_update_dismissed_exp', expiry.toISOString());
-            }
+        if (reason === 'later' && newVersionTag) {
+            const expiry = new Date();
+            expiry.setHours(expiry.getHours() + 24);
+            localStorage.setItem(DISMISS_KEY, newVersionTag);
+            localStorage.setItem('gym_update_dismissed_exp', expiry.toISOString());
         }
     };
+
+    // Iniciar Actualización en 1 Clic
+    window.gymIniciarActualizacion = async function() {
+        const btn = document.getElementById('upBtnActualizarAhora');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Conectando...';
+        }
+
+        try {
+            const res = await fetch('/Home/IniciarActualizacion', { method: 'POST' });
+            const data = await res.json();
+            if (!data.ok) {
+                alert(data.msg || 'No se pudo iniciar la actualización.');
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-bolt"></i> Actualizar Ahora'; }
+                return;
+            }
+
+            // Cambiar vista a Progreso
+            document.getElementById('upViewInfo').style.display     = 'none';
+            document.getElementById('upViewProgress').style.display = 'block';
+            document.getElementById('upCloseBtn').style.display      = 'none';
+
+            // Comenzar sondeo de progreso cada 350ms
+            pollInterval = setInterval(verificarProgreso, 350);
+        } catch(err) {
+            alert('Error de conexión al iniciar actualización: ' + err.message);
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-bolt"></i> Actualizar Ahora'; }
+        }
+    };
+
+    async function verificarProgreso() {
+        try {
+            const res = await fetch('/Home/ProgresoActualizacion');
+            if (!res.ok) return;
+            const p = await res.json();
+
+            const bar     = document.getElementById('upProgressBar');
+            const pctText = document.getElementById('upPercentText');
+            const bytText = document.getElementById('upBytesText');
+            const spdText = document.getElementById('upSpeedText');
+
+            if (p.percent !== undefined) {
+                bar.style.width   = p.percent + '%';
+                pctText.textContent = p.percent + '%';
+            }
+            if (p.downloadedFormatted && p.totalFormatted) {
+                bytText.textContent = p.downloadedFormatted + ' / ' + p.totalFormatted;
+            }
+            if (p.speedText) {
+                spdText.textContent = p.speedText;
+            }
+
+            if (p.status === 'extracting' || p.status === 'installing') {
+                document.getElementById('upViewProgress').style.display   = 'none';
+                document.getElementById('upViewInstalling').style.display = 'block';
+                if (p.message) {
+                    document.getElementById('upInstallStatusText').textContent = p.message;
+                }
+            }
+            else if (p.status === 'ready') {
+                clearInterval(pollInterval);
+                document.getElementById('upViewProgress').style.display   = 'none';
+                document.getElementById('upViewInstalling').style.display = 'none';
+                document.getElementById('upViewSuccess').style.display    = 'block';
+
+                // Iniciar ping hasta que el servidor reinicie y responda
+                iniciarPingReconexion();
+            }
+            else if (p.status === 'error') {
+                clearInterval(pollInterval);
+                alert('Ocurrió un error durante la actualización: ' + (p.error || p.message));
+                document.getElementById('upViewProgress').style.display = 'none';
+                document.getElementById('upViewInfo').style.display     = 'block';
+                document.getElementById('upCloseBtn').style.display      = 'block';
+                const btn = document.getElementById('upBtnActualizarAhora');
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-bolt"></i> Actualizar Ahora'; }
+            }
+            else if (p.status === 'cancelled') {
+                clearInterval(pollInterval);
+                document.getElementById('upViewProgress').style.display = 'none';
+                document.getElementById('upViewInfo').style.display     = 'block';
+                document.getElementById('upCloseBtn').style.display      = 'block';
+                const btn = document.getElementById('upBtnActualizarAhora');
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-bolt"></i> Actualizar Ahora'; }
+            }
+        } catch(e) {}
+    }
+
+    // Cancelar la descarga
+    window.gymCancelarActualizacion = async function() {
+        try {
+            await fetch('/Home/CancelarActualizacion', { method: 'POST' });
+        } catch(e) {}
+    };
+
+    // Ping para reconectar cuando el servidor se reinicia
+    function iniciarPingReconexion() {
+        let intentos = 0;
+        pingInterval = setInterval(async function(){
+            intentos++;
+            try {
+                const res = await fetch('/Home/Ping?t=' + Date.now(), { cache: 'no-store' });
+                if (res.ok) {
+                    clearInterval(pingInterval);
+                    // Servidor activo: recargar pantalla tras 1 segundo
+                    setTimeout(function(){
+                        window.location.reload();
+                    }, 1000);
+                }
+            } catch(e) {
+                // El servidor se está reiniciando, reintentará en el siguiente ciclo
+            }
+            if (intentos > 40) {
+                // Timeout preventivo después de 60 segundos
+                clearInterval(pingInterval);
+                window.location.reload();
+            }
+        }, 1500);
+    }
 })();
 </script>
 }
 }
+}
+    <script>
+        window.GYM_CONFIG = {
+            nombre: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(GymWeb.Helpers.AppSettings.GymNombre)),
+            domicilio: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(GymWeb.Helpers.AppSettings.GymDomicilio)),
+            telefono: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(GymWeb.Helpers.AppSettings.GymTelefono)),
+            pais: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(GymWeb.Helpers.AppSettings.Pais)),
+            monedaSimbolo: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(GymWeb.Helpers.AppSettings.MonedaSimbolo)),
+            monedaCodigo: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(GymWeb.Helpers.AppSettings.MonedaCodigo)),
+            lada: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(GymWeb.Helpers.AppSettings.Lada))
+        };
+        window._gymConfig = window.GYM_CONFIG;
+        window.MONEDA_SIMBOLO = window.GYM_CONFIG.monedaSimbolo || '$';
+        window.formatearMoneda = function(val) {
+            const s = window.MONEDA_SIMBOLO;
+            const n = Number(val || 0);
+            return `${s}${n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+        };
+    </script>
     <script src="~/lib/JsBarcode.all.min.js" asp-append-version="true"></script>
     <script src="~/lib/html2canvas.min.js" asp-append-version="true"></script>
     <script src="~/lib/jspdf.umd.min.js" asp-append-version="true"></script>
     <script src="~/js/gym-tickets-whatsapp.js" asp-append-version="true"></script>
+    <script src="~/js/live-sync.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

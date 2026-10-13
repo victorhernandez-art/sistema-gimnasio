@@ -2,6 +2,7 @@
 @using GymWeb.Helpers
 @{
     var deudas = ViewBag.Deudas as Dictionary<int, SocioDeudorItemDto> ?? new Dictionary<int, SocioDeudorItemDto>();
+    var ultimasMembresias = ViewBag.UltimasMembresias as Dictionary<int, GymWeb.Models.Sociomembresium> ?? new Dictionary<int, GymWeb.Models.Sociomembresium>();
     int totalDeudores = ViewBag.TotalDeudoresCount ?? 0;
     decimal totalMontoCobrar = ViewBag.TotalMontoPorCobrar ?? 0m;
 }
@@ -22,6 +23,7 @@
 <div class="card">
     <div class="card-header" style="flex-wrap:wrap;gap:12px;">
         <div class="card-title"><i class="fa-solid fa-users"></i> Directorio y Control de Socios</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
             <button type="button" onclick="abrirModalDifusionMasiva()" class="btn btn-sm" style="background:#25D366;color:#0B1120;font-weight:800;border:none;box-shadow:0 2px 8px rgba(37,211,102,0.3);" title="Enviar mensaje o promoción masiva a los socios por WhatsApp">
                 <i class="fa-brands fa-whatsapp"></i> Difusión WhatsApp
             </button>
@@ -49,16 +51,22 @@
             <i class="fa-solid fa-user-slash"></i> Inactivos (@Model.Count(s => s.IdEstado != 1))
         </button>
         <button type="button" class="btn btn-sm filtro-btn" data-filtro="deudores" onclick="filtrarSocios('deudores', this)" style="border-radius:20px;font-size:12px;background:rgba(251,146,60,0.1);border:1px solid rgba(251,146,60,0.4);color:#fb923c;font-weight:700;">
-            <i class="fa-solid fa-circle-exclamation"></i> Con Saldo Deudor (@totalDeudores) &nbsp;·&nbsp; $@totalMontoCobrar.ToString("N2")
+            <i class="fa-solid fa-circle-exclamation"></i> Con Saldo Deudor (@totalDeudores) &nbsp;·&nbsp; @GymWeb.Helpers.AppSettings.MonedaSimbolo@totalMontoCobrar.ToString("N2")
         </button>
     </div>
 
-    <div class="toolbar">
-        <div class="toolbar-left">
+    <div class="toolbar" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+        <div class="toolbar-left" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
             <div class="search-box">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input id="tableSearch" type="text" placeholder="Buscar socio por nombre, clave o teléfono..." onkeyup="ejecutarBusquedaYFiltro()" />
+                <input id="tableSearch" type="text" placeholder="Buscar socio por nombre, clave o documento (DNI, INE)..." onkeyup="ejecutarBusquedaYFiltro()" />
             </div>
+            <label class="orden-alfa-pill" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none;font-size:12.5px;color:var(--text-secondary);background:rgba(255,255,255,0.03);padding:6px 14px;border-radius:20px;border:1px solid var(--border);transition:all 0.2s ease;" title="Activar para ordenar todos los socios alfabéticamente de la A a la Z">
+                <input type="checkbox" id="chkOrdenAlfabetico" onchange="toggleOrdenAlfabetico(this.checked)" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer;margin:0;" />
+                <span style="display:inline-flex;align-items:center;gap:6px;font-weight:600;">
+                    <i class="fa-solid fa-arrow-down-a-z" style="color:var(--accent);"></i> Ordenar alfabéticamente (A-Z)
+                </span>
+            </label>
         </div>
         <div class="toolbar-right">
             <span id="labelContadorSocios" class="text-muted" style="font-size:13px;">Mostrando @Model.Count() socios</span>
@@ -67,16 +75,16 @@
 
 <style>
 .socio-action-btn {
-    width: 28px !important;
-    height: 28px !important;
-    min-width: 28px !important;
-    max-width: 28px !important;
+    width: 26px !important;
+    height: 26px !important;
+    min-width: 26px !important;
+    max-width: 26px !important;
     padding: 0 !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
     border-radius: 6px !important;
-    font-size: 11px !important;
+    font-size: 10.5px !important;
     flex-shrink: 0 !important;
     line-height: 1 !important;
     margin: 0 !important;
@@ -84,12 +92,12 @@
     transition: transform 0.15s ease, background 0.15s ease;
 }
 .socio-action-btn:hover {
-    transform: scale(1.12);
+    transform: scale(1.15);
 }
 .socio-actions-container {
     display: inline-flex !important;
     flex-direction: row !important;
-    gap: 3px !important;
+    gap: 2.5px !important;
     align-items: center !important;
     justify-content: center !important;
     flex-wrap: nowrap !important;
@@ -107,14 +115,13 @@
         <table class="gym-table" id="tablaSocios">
             <thead>
                 <tr>
-                    <th>#</th>
-                    <th></th>
-                    <th>Nombre / Estado de Cuenta</th>
-                    <th>Clave</th>
-                    <th>Teléfono</th>
-                    <th>Estado</th>
-                    <th>Registro</th>
-                    <th style="text-align:center;width:1%;white-space:nowrap;min-width:270px;">Acciones</th>
+                    <th style="width:36px;text-align:center;">#</th>
+                    <th>Socio / Estado de Cuenta</th>
+                    <th style="width:75px;">Clave</th>
+                    <th style="width:110px;">Teléfono</th>
+                    <th style="width:85px;">Estado</th>
+                    <th style="width:135px;">Inicio Membresía</th>
+                    <th style="text-align:center;width:1%;white-space:nowrap;">Acciones</th>
                 </tr>
             </thead>
             <tbody>
@@ -123,80 +130,109 @@
             {
                 num++;
                 var infoDeuda = deudas.TryGetValue(s.IdSocio, out var dItem) ? dItem : null;
+                var memRec = ultimasMembresias.TryGetValue(s.IdSocio, out var mItem) ? mItem : null;
                 decimal deudaTotal = infoDeuda?.DeudaTotal ?? 0m;
                 bool esDeudor = deudaTotal > 0;
                 string estadoTexto = s.IdEstado == 1 ? "activo" : "inactivo";
-                string textoBusqueda = $"{s.Nombre} {s.Paterno} {s.Materno} {s.IdSocio} {s.Telefono}".ToLower();
+                string fIniTexto = memRec?.FechaInicioMembresia?.ToString("dd/MM/yyyy") ?? "";
+                string claveFormateada = s.IdSocio.ToString("D4");
+                string tipoDoc = !string.IsNullOrWhiteSpace(s.TipoDocumento) ? s.TipoDocumento : "S/N";
+                string numDoc = s.NumeroDocumento;
+                string docLimpio = !string.IsNullOrWhiteSpace(numDoc) ? numDoc.Replace("-", "").Replace(" ", "").Replace(".", "") : "";
+                string textoBusqueda = $"{s.NombreCompleto} {tipoDoc} {numDoc} {docLimpio} {s.IdSocio} {claveFormateada} {s.Telefono} {fIniTexto}".ToLower();
 
-                <tr class="socio-row" data-estado="@estadoTexto" data-deudor="@(esDeudor ? "true" : "false")" data-search="@textoBusqueda">
-                    <td class="text-muted">@num</td>
-                    <td style="padding:8px 6px;">
-                        @if (s.Foto != null && s.Foto.Length > 0)
-                        {
-                            <img src="/Socios/GetFoto/@s.IdSocio" class="socio-avatar" />
-                        }
-                        else
-                        {
-                            <span class="socio-avatar-icon"><i class="fa-solid fa-user"></i></span>
-                        }
-                    </td>
+                <tr class="socio-row" data-estado="@estadoTexto" data-deudor="@(esDeudor ? "true" : "false")" data-search="@textoBusqueda" data-nombre="@s.NombreCompleto" data-default-order="@num">
+                    <td class="text-muted col-num" style="text-align:center;width:36px;font-size:12px;">@num</td>
                     <td>
-                        <div class="name-cell" style="font-weight:600;display:inline-block;">@s.Nombre @s.Paterno @s.Materno</div>
-                        @if (s.SocioHuella != null && s.SocioHuella.Template != null)
-                        {
-                            <span class="badge" style="font-size:10px;padding:2px 7px;margin-left:6px;background:rgba(0,242,100,0.12);color:#00f264;border:1px solid rgba(0,242,100,0.3);font-family:'Inter',monospace;" title="Huella y PIN activos">
-                                <i class="fa-solid fa-fingerprint"></i> PIN @s.SocioHuella.Pin
-                            </span>
-                        }
+                        <div style="display:flex;align-items:flex-start;gap:10px;">
+                            @if (s.Foto != null && s.Foto.Length > 0)
+                            {
+                                <img src="/Socios/GetFoto/@s.IdSocio" class="socio-avatar" style="flex-shrink:0;margin-top:2px;" />
+                            }
+                            else
+                            {
+                                <span class="socio-avatar-icon" style="flex-shrink:0;margin-top:2px;"><i class="fa-solid fa-user"></i></span>
+                            }
+                            <div style="min-width:0;flex:1;">
+                                <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;">
+                                    <span class="name-cell" style="font-weight:600;">@s.NombreCompleto</span>
+                                    @if (!string.IsNullOrWhiteSpace(numDoc))
+                                    {
+                                        <span class="badge" style="font-size:10px;padding:2px 6px;background:rgba(255,255,255,0.06);color:#94a3b8;border:1px solid rgba(255,255,255,0.12);" title="@tipoDoc">
+                                            <i class="fa-solid fa-id-card"></i> @(tipoDoc == "S/N" ? "Doc" : tipoDoc): @numDoc
+                                        </span>
+                                    }
+                                    @if (s.SocioHuella != null && s.SocioHuella.Template != null)
+                                    {
+                                        <span class="badge" style="font-size:10px;padding:2px 6px;background:rgba(0,242,100,0.12);color:#00f264;border:1px solid rgba(0,242,100,0.3);font-family:'Inter',monospace;" title="Huella y PIN activos">
+                                            <i class="fa-solid fa-fingerprint"></i> PIN @s.SocioHuella.Pin
+                                        </span>
+                                    }
+                                </div>
 
-                        @if (esDeudor)
-                        {
-                            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-top:3px;">
-                                <span class="badge" style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.35);font-size:11px;font-weight:700;cursor:pointer;" onclick="abrirModalEstadoCuenta(@s.IdSocio, '@s.Nombre @s.Paterno')" title="Click para ver desglose y cobrar abono">
-                                    <i class="fa-solid fa-circle-exclamation"></i> Debe: $@deudaTotal.ToString("N2")
-                                </span>
-                                @if (infoDeuda!.DeudaProductos > 0)
+                                @if (esDeudor)
                                 {
-                                    <span class="badge" style="background:rgba(251,146,60,0.12);color:#fb923c;font-size:10px;" title="A crédito en tienda">
-                                        <i class="fa-solid fa-bag-shopping"></i> A crédito: $@infoDeuda.DeudaProductos.ToString("N2")
-                                    </span>
-                                }
-                                @if (infoDeuda!.DeudaMembresias > 0)
-                                {
-                                    <span class="badge" style="background:rgba(56,189,248,0.12);color:#38bdf8;font-size:10px;" title="Membresía adeudada">
-                                        <i class="fa-solid fa-id-card"></i> Membresía: $@infoDeuda.DeudaMembresias.ToString("N2")
-                                    </span>
+                                    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-top:3px;">
+                                        <span class="badge" style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.35);font-size:10px;font-weight:700;cursor:pointer;" onclick="abrirModalEstadoCuenta(@s.IdSocio, '@s.NombreCompleto')" title="Click para ver desglose y cobrar abono">
+                                            <i class="fa-solid fa-circle-exclamation"></i> Debe: @GymWeb.Helpers.AppSettings.MonedaSimbolo@deudaTotal.ToString("N2")
+                                        </span>
+                                        @if (infoDeuda!.DeudaProductos > 0)
+                                        {
+                                            <span class="badge" style="background:rgba(251,146,60,0.12);color:#fb923c;font-size:9.5px;" title="A crédito en tienda">
+                                                <i class="fa-solid fa-bag-shopping"></i> Fiado: @GymWeb.Helpers.AppSettings.MonedaSimbolo@infoDeuda.DeudaProductos.ToString("N2")
+                                            </span>
+                                        }
+                                        @if (infoDeuda!.DeudaMembresias > 0)
+                                        {
+                                            <span class="badge" style="background:rgba(56,189,248,0.12);color:#38bdf8;font-size:9.5px;" title="Membresía adeudada">
+                                                <i class="fa-solid fa-id-card"></i> Memb.: @GymWeb.Helpers.AppSettings.MonedaSimbolo@infoDeuda.DeudaMembresias.ToString("N2")
+                                            </span>
+                                        }
+                                    </div>
                                 }
                             </div>
-                        }
+                        </div>
                     </td>
-                    <td><span class="badge badge-info" style="font-family:'Inter',monospace;letter-spacing:1px;">@s.IdSocio</span></td>
-                    <td>@(string.IsNullOrWhiteSpace(s.Telefono) ? "—" : s.Telefono)</td>
+                    <td><span class="badge badge-info" style="font-family:'Inter',monospace;letter-spacing:0.5px;font-size:11px;" title="Clave consecutiva">@claveFormateada</span></td>
+                    <td style="font-size:12.5px;">@(string.IsNullOrWhiteSpace(s.Telefono) ? "—" : s.Telefono)</td>
                     <td>
                         @if (s.IdEstado == 1)
-                        { <span class="badge badge-success"><i class="fa-solid fa-circle"></i> Activo</span> }
+                        { <span class="badge badge-success" style="font-size:10.5px;"><i class="fa-solid fa-circle" style="font-size:7px;"></i> Activo</span> }
                         else
-                        { <span class="badge badge-danger"><i class="fa-solid fa-circle"></i> Inactivo</span> }
+                        { <span class="badge badge-danger" style="font-size:10.5px;"><i class="fa-solid fa-circle" style="font-size:7px;"></i> Inactivo</span> }
                     </td>
-                    <td class="text-muted" style="font-size:12px;">@s.FechaCreacion?.ToString("dd/MM/yyyy")</td>
-                    <td style="white-space:nowrap;width:1%;min-width:270px;text-align:center;padding:4px 6px;">
+                    <td style="font-size:12px;">
+                        @if (memRec != null && memRec.FechaInicioMembresia.HasValue)
+                        {
+                            <div style="font-weight:600;color:var(--text-primary);display:flex;align-items:center;gap:5px;">
+                                <i class="fa-regular fa-calendar-check" style="color:var(--accent);font-size:11px;"></i>
+                                <span>@memRec.FechaInicioMembresia.Value.ToString("dd/MM/yyyy")</span>
+                            </div>
+                            <div class="text-muted" style="font-size:11px;margin-top:2px;">@(memRec.IdMembresiaNavigation?.Nombre ?? "Membresía")</div>
+                        }
+                        else
+                        {
+                            <span class="text-muted" style="font-size:11px;font-style:italic;">Sin membresía</span>
+                        }
+                    </td>
+                    <td style="white-space:nowrap;width:1%;text-align:center;padding:4px 4px;">
                         <div class="socio-actions-container">
                             <a asp-action="Membresia" asp-route-id="@s.IdSocio" class="btn btn-outline btn-sm socio-action-btn" title="Membresía / Renovar">
                                 <i class="fa-solid fa-id-card"></i>
                             </a>
                             <a asp-action="PagosSocio" asp-route-id="@s.IdSocio" class="btn btn-outline btn-sm socio-action-btn" title="Historial de pagos">
-                                <i class="fa-solid fa-dollar-sign"></i>
+                                <span style="font-weight:800;font-family:'Inter',system-ui,-apple-system,sans-serif;line-height:1;display:inline-block;@(GymWeb.Helpers.AppSettings.MonedaSimbolo.Length > 2 ? "font-size:9px;letter-spacing:-0.5px;" : (GymWeb.Helpers.AppSettings.MonedaSimbolo.Length == 2 ? "font-size:10.5px;" : "font-size:12px;"))">@GymWeb.Helpers.AppSettings.MonedaSimbolo</span>
                             </a>
                             <!-- Botón Asistencias -->
                             <button type="button" class="btn btn-outline btn-sm socio-action-btn"
-                                    onclick="abrirModalAsistencias(@s.IdSocio, '@s.Nombre @s.Paterno')"
+                                    onclick="abrirModalAsistencias(@s.IdSocio, '@s.NombreCompleto')"
                                     title="Historial de Asistencias (Semana / Mes / Fechas)"
                                     style="border-color:rgba(56,189,248,0.4);background:rgba(56,189,248,0.08);color:#38bdf8;">
                                 <i class="fa-solid fa-calendar-check"></i>
                             </button>
                             <!-- Botón Estado de Cuenta / A Crédito -->
                             <button type="button" class="btn btn-outline btn-sm socio-action-btn"
-                                    onclick="abrirModalEstadoCuenta(@s.IdSocio, '@s.Nombre @s.Paterno')"
+                                    onclick="abrirModalEstadoCuenta(@s.IdSocio, '@s.NombreCompleto')"
                                     title="Estado de Cuenta y Cobro a Crédito"
                                     style="@(esDeudor ? "border-color:rgba(239,68,68,0.6);background:rgba(239,68,68,0.15);color:#f87171;" : "border-color:rgba(251,191,36,0.4);background:rgba(251,191,36,0.08);color:#fbbf24;")">
                                 <i class="fa-solid fa-receipt"></i>
@@ -212,8 +248,8 @@
                             @if (!string.IsNullOrWhiteSpace(s.Telefono))
                             {
                                 <button type="button" class="btn btn-outline btn-sm socio-action-btn"
-                                        onclick="enviarMensajeDirectoSocio('@s.Telefono', '@s.Nombre @s.Paterno', @s.IdSocio)"
-                                        title="Enviar WhatsApp a @s.Nombre"
+                                        onclick="enviarMensajeDirectoSocio('@s.Telefono', '@s.NombreCompleto', @s.IdSocio)"
+                                        title="Enviar WhatsApp a @s.NombreCompleto"
                                         style="border-color:rgba(37,211,102,0.45);background:rgba(37,211,102,0.08);color:#25D366;">
                                     <i class="fa-brands fa-whatsapp"></i>
                                 </button>
@@ -292,6 +328,14 @@
             </button>
         </div>
 
+        <!-- Nota de Hardware Requerido Estandarizado -->
+        <div id="bioHardwareRequeridoNota" style="margin:10px 24px 0;padding:10px 14px;border-radius:10px;background:rgba(56,189,248,0.06);border:1px solid rgba(56,189,248,0.22);font-size:12px;color:#cbd5e1;line-height:1.5;display:flex;align-items:flex-start;gap:10px;">
+            <i class="fa-solid fa-microchip" style="color:#38bdf8;font-size:15px;margin-top:2px;flex-shrink:0;"></i>
+            <div>
+                <strong style="color:#38bdf8;">Hardware requerido:</strong> Para usar el escaneo de huella, adquiere el lector biométrico modelo DigitalPersona U.are.U 4500 (HID) e instala el controlador Non-WBF en tu PC.
+            </div>
+        </div>
+
         <!-- Config existente -->
         <div id="bioRegExistente" style="display:none;margin:14px 24px 0;background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.25);border-radius:10px;padding:10px 14px;font-size:12px;color:#4ade80;">
             <i class="fa-solid fa-circle-check"></i> <strong>Huella registrada</strong>
@@ -329,7 +373,7 @@
                     <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px;">
                         PIN en el dispositivo
                     </label>
-                    <input id="bioPin" type="number" min="1" max="999999" placeholder="Ej. 1001"
+                    <input id="bioPin" type="number" min="1" max="999999" placeholder="Ej. 0001"
                            style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:#1e2533;color:var(--text-primary);font-size:13px;box-sizing:border-box;" />
                     <div id="bioPinHint" style="font-size:11px;color:var(--accent);margin-top:5px;">
                         <i class="fa-solid fa-circle-info"></i> Se usa la clave del socio como PIN — es única y no necesitas recordar otro número.
@@ -355,6 +399,129 @@
     const modal     = document.getElementById('bioRegModal');
     let   idSocioActivo = null;
     let   templateCapturado = null;
+    let   bioWs = null;
+
+    // ── Conexión con Puente Local WebSocket DigitalPersona (ws://localhost:8080) ──
+    function conectarWebSocketBiometrico() {
+        const dot  = document.getElementById('bioHwDot');
+        const text = document.getElementById('bioHwText');
+        const btnCaptura = document.getElementById('btnCaptura');
+
+        if (bioWs && (bioWs.readyState === WebSocket.OPEN || bioWs.readyState === WebSocket.CONNECTING)) {
+            return;
+        }
+
+        dot.style.background = '#fbbf24';
+        text.textContent     = 'Conectando con lector DigitalPersona (ws://localhost:8080)...';
+
+        try {
+            bioWs = new WebSocket('ws://localhost:8080');
+
+            bioWs.onopen = function () {
+                dot.style.background = '#4ade80';
+                text.textContent     = '🟢 Lector conectado';
+                if (btnCaptura) btnCaptura.disabled = false;
+                document.getElementById('bioRegWarning').style.display = 'none';
+
+                // Solicitar estado del hardware al puente
+                bioWs.send(JSON.stringify({ action: 'status' }));
+            };
+
+            bioWs.onmessage = function (e) {
+                try {
+                    const data = JSON.parse(e.data);
+                    const stat = document.getElementById('capturaStatus');
+                    const ok   = document.getElementById('capturaOk');
+                    const btnTxt = document.getElementById('btnCapturaText');
+                    const btnG = document.getElementById('btnGuardar');
+                    const btnC = document.getElementById('btnCaptura');
+
+                    if (data.event === 'status') {
+                        if (data.readerConnected) {
+                            dot.style.background = '#4ade80';
+                            text.textContent     = '🟢 Lector conectado';
+                            if (btnC) {
+                                btnC.disabled = false;
+                                btnC.style.opacity = '1';
+                                btnC.style.cursor = 'pointer';
+                                btnC.title = 'Haz clic para iniciar captura en el sensor DigitalPersona';
+                            }
+                            if (btnTxt) btnTxt.textContent = 'Iniciar captura de huella';
+                        } else {
+                            dot.style.background = '#fbbf24';
+                            text.textContent     = '🟡 Lector desconectado (conecta el U.are.U 4500)';
+                            if (btnC) {
+                                btnC.disabled = true;
+                                btnC.style.opacity = '0.5';
+                                btnC.style.cursor = 'not-allowed';
+                                btnC.title = 'Conecta el lector DigitalPersona U.are.U 4500 al puerto USB para habilitar la captura.';
+                            }
+                            if (btnTxt) btnTxt.textContent = 'Lector USB desconectado';
+                        }
+                    } else if (data.event === 'finger_touch') {
+                        if (stat) {
+                            stat.style.display = 'block';
+                            stat.style.color   = '#38bdf8';
+                            stat.textContent   = 'Dedo detectado en el sensor... Escaneando...';
+                        }
+                    } else if (data.event === 'finger_gone') {
+                        if (stat) {
+                            stat.textContent = 'Dedo retirado. Procesando muestra...';
+                        }
+                    } else if (data.event === 'sample_quality') {
+                        if (stat) {
+                            stat.textContent = data.message || `Muestra ${data.muestra} de ${data.totalMuestras} capturada correctamente...`;
+                        }
+                    } else if (data.event === 'enrolled' || data.event === 'fingerprint_captured' || data.template) {
+                        templateCapturado = data.template || null;
+                        if (stat) stat.style.display = 'none';
+                        if (ok) {
+                            ok.style.display = 'block';
+                            ok.innerHTML = '<i class="fa-solid fa-circle-check"></i> Huella capturada correctamente (DigitalPersona U.are.U 4500)';
+                        }
+                        if (btnTxt) btnTxt.textContent = 'Recapturar huella';
+                        if (btnG) {
+                            btnG.disabled = false;
+                            btnG.style.opacity = '1';
+                        }
+                        mostrarMsg('✓ Huella dactilar capturada y plantilla generada con éxito.', '#4ade80');
+                    } else if (data.event === 'error') {
+                        if (stat) {
+                            stat.style.display = 'block';
+                            stat.style.color   = '#f87171';
+                            stat.innerHTML     = '<i class="fa-solid fa-triangle-exclamation"></i> ' + (data.message || 'Error al capturar huella.');
+                        }
+                        if (ok) ok.style.display = 'none';
+                    }
+                } catch (parseEx) {
+                    console.warn('Error parseando mensaje WS biométrico:', parseEx);
+                }
+            };
+
+            bioWs.onerror = function () {
+                // Fallback automático a Modo PIN si no está corriendo el puente
+                dot.style.background = '#94a3b8';
+                text.textContent     = '⚪ Sin lector USB — Modo PIN / Teclado activo';
+                const btnC = document.getElementById('btnCaptura');
+                const btnTxt = document.getElementById('btnCapturaText');
+                if (btnC) { btnC.disabled = true; btnC.style.opacity = '0.5'; btnC.style.cursor = 'not-allowed'; }
+                if (btnTxt) btnTxt.textContent = 'Modo PIN (sin lector de huella)';
+            };
+
+            bioWs.onclose = function () {
+                // Si se cerró la conexión, mantener Modo PIN
+                dot.style.background = '#94a3b8';
+                text.textContent     = '⚪ Sin lector USB — Modo PIN / Teclado activo';
+                const btnC = document.getElementById('btnCaptura');
+                const btnTxt = document.getElementById('btnCapturaText');
+                if (btnC) { btnC.disabled = true; btnC.style.opacity = '0.5'; btnC.style.cursor = 'not-allowed'; }
+                if (btnTxt) btnTxt.textContent = 'Modo PIN (sin lector de huella)';
+            };
+        } catch {
+            dot.style.background = '#94a3b8';
+            text.textContent     = '⚪ Sin lector USB — Modo PIN / Teclado activo';
+        }
+    }
 
     // ── Abrir modal ────────────────────────────────────────────────
     window.abrirBiometrico = async function(idSocio) {
@@ -370,7 +537,6 @@
 
         // Auto-rellenar PIN con la clave del socio (sugerencia por defecto)
         document.getElementById('bioPin').value = data.pin;
-        // Si ya está configurado ocultar el hint, si no mostrarlo
         document.getElementById('bioPinHint').style.display = data.configurado ? 'none' : 'block';
 
         if (data.configurado) {
@@ -381,14 +547,14 @@
             document.getElementById('bioDispositivo').value = data.idDispositivo ?? '';
         }
 
-        // Detectar lector USB y listar dispositivos
-        detectarLectorUsb();
+        // Conectar al puente WebSocket local ws://localhost:8080 (DigitalPersona U.are.U 4500)
+        conectarWebSocketBiometrico();
+
+        // Cargar lista de dispositivos
         try {
             const dr   = await fetch('/Biometrico/Dispositivos');
             const ddat = await dr.json();
-            if (ddat.error === 'bridge_offline') throw new Error();
-
-            const sel = document.getElementById('bioDispositivo');
+            const sel  = document.getElementById('bioDispositivo');
             sel.innerHTML = '<option value="">Seleccionar dispositivo...</option>';
             (ddat.devices ?? []).forEach(d => {
                 const opt = document.createElement('option');
@@ -397,55 +563,28 @@
                 if (data.idDispositivo && opt.value === data.idDispositivo) opt.selected = true;
                 sel.appendChild(opt);
             });
-        } catch {
-            document.getElementById('bioRegWarning').style.display = 'block';
-        }
+        } catch { }
     };
 
     // ── Detección en vivo de hardware USB ──────────────────────────
-    window.detectarLectorUsb = async function() {
-        const dot  = document.getElementById('bioHwDot');
-        const text = document.getElementById('bioHwText');
-        dot.style.background = '#fbbf24';
-        text.textContent     = 'Escaneando puertos USB...';
-
-        try {
-            const r    = await fetch('/Biometrico/Diagnostico');
-            const data = await r.json();
-
-            if (data.error === 'bridge_offline') {
-                dot.style.background = '#f87171';
-                text.textContent     = 'Servicio biométrico desconectado';
-                document.getElementById('bioRegWarning').style.display = 'block';
-                return;
-            }
-
-            document.getElementById('bioRegWarning').style.display = 'none';
-            const diag = data.diag || {};
-
-            if (diag.hasWbfSensor || (diag.devices && diag.devices.some(d => d.status === 'Ready'))) {
-                dot.style.background = '#4ade80';
-                const dev = (diag.devices || []).find(d => d.status === 'Ready');
-                text.textContent = dev ? `🟢 ${dev.name} (Listo)` : '🟢 Lector biométrico listo';
-            } else if (diag.hasPhysicalUsbDevice && diag.devices && diag.devices.length > 0) {
-                dot.style.background = '#fbbf24';
-                const dev = diag.devices[0];
-                text.textContent = `🟡 ${dev.name} (Requiere driver)`;
-                text.title = dev.recommendation || '';
-            } else {
-                dot.style.background = '#94a3b8';
-                text.textContent = '⚪ Sin lector USB — Modo PIN / Teclado activo';
-            }
-        } catch {
-            dot.style.background = '#f87171';
-            text.textContent     = 'No se pudo consultar el hardware';
-        }
+    window.detectarLectorUsb = function() {
+        conectarWebSocketBiometrico();
     };
 
     window.cerrarBiometrico = function() {
         modal.style.display = 'none';
         idSocioActivo = null;
         templateCapturado = null;
+
+        if (bioWs) {
+            try {
+                if (bioWs.readyState === WebSocket.OPEN) {
+                    bioWs.send(JSON.stringify({ action: 'cancel' }));
+                    bioWs.close();
+                }
+            } catch { }
+            bioWs = null;
+        }
     };
 
     // ── Captura de huella ──────────────────────────────────────────
@@ -455,33 +594,29 @@
         const stat = document.getElementById('capturaStatus');
         const ok   = document.getElementById('capturaOk');
 
-        btn.disabled = true;
         ok.style.display   = 'none';
         stat.style.display = 'block';
-        stat.textContent   = 'Coloca el dedo en el lector...';
-
-        try {
-            const fd = new FormData();
-            fd.append('__RequestVerificationToken', CSRF);
-            const r    = await fetch('/Biometrico/IniciarCaptura', { method: 'POST', body: fd });
-            const data = await r.json();
-
-            if (data.error === 'bridge_offline') {
-                stat.textContent = 'Servicio no disponible.';
-                document.getElementById('bioRegWarning').style.display = 'block';
-            } else if (data.ok) {
-                templateCapturado = data.template || null;
-                stat.style.display = 'none';
-                ok.style.display   = 'block';
-            } else {
-                stat.textContent = data.msg ?? 'Error en captura.';
-            }
-        } catch {
-            stat.textContent = 'Error de conexión con el servicio.';
-        } finally {
-            btn.disabled = false;
-            txt.textContent = 'Reintentar captura';
+        stat.style.color   = 'var(--text-muted)';
+        // Si el estado indica lector desconectado, avisar y no iniciar
+        const textHw = document.getElementById('bioHwText')?.textContent ?? '';
+        if (textHw.includes('desconectado')) {
+            stat.style.display = 'block';
+            stat.style.color   = '#fbbf24';
+            stat.innerHTML     = '<i class="fa-solid fa-triangle-exclamation"></i> <strong>Lector USB desconectado:</strong> Conecta el lector DigitalPersona U.are.U 4500 al puerto USB para capturar huellas, o ingresa el PIN manualmente.';
+            return;
         }
+
+        // Si el WebSocket está conectado, emitir inicio de enrolamiento al hardware
+        if (bioWs && bioWs.readyState === WebSocket.OPEN) {
+            btn.disabled = true;
+            bioWs.send(JSON.stringify({ action: 'start_enroll' }));
+            setTimeout(() => { btn.disabled = false; }, 800);
+            return;
+        }
+
+        // Si no está conectado el WebSocket, intentar reconectar o fallback
+        conectarWebSocketBiometrico();
+        stat.textContent = 'Esperando conexión con ws://localhost:8080... Si no tienes el lector, usa el Modo PIN.';
     };
 
     // ── Guardar PIN + sincronizar ──────────────────────────────────
@@ -660,15 +795,15 @@
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;">
                 <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:12px;padding:12px 16px;text-align:center;">
                     <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#f87171;font-weight:700;">Saldo Total Deudor</div>
-                    <div id="ctaTotalDeuda" style="font-size:22px;font-weight:800;color:#f87171;margin-top:4px;">$0.00</div>
+                    <div id="ctaTotalDeuda" style="font-size:22px;font-weight:800;color:#f87171;margin-top:4px;">@GymWeb.Helpers.AppSettings.MonedaSimbolo 0.00</div>
                 </div>
                 <div style="background:rgba(251,146,60,0.08);border:1px solid rgba(251,146,60,0.3);border-radius:12px;padding:12px 16px;text-align:center;">
                     <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#fb923c;font-weight:700;">Productos a Crédito</div>
-                    <div id="ctaDeudaProductos" style="font-size:20px;font-weight:700;color:#fb923c;margin-top:4px;">$0.00</div>
+                    <div id="ctaDeudaProductos" style="font-size:20px;font-weight:700;color:#fb923c;margin-top:4px;">@GymWeb.Helpers.AppSettings.MonedaSimbolo 0.00</div>
                 </div>
                 <div style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.3);border-radius:12px;padding:12px 16px;text-align:center;">
                     <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#38bdf8;font-weight:700;">Membresías Adeudadas</div>
-                    <div id="ctaDeudaMembresias" style="font-size:20px;font-weight:700;color:#38bdf8;margin-top:4px;">$0.00</div>
+                    <div id="ctaDeudaMembresias" style="font-size:20px;font-weight:700;color:#38bdf8;margin-top:4px;">@GymWeb.Helpers.AppSettings.MonedaSimbolo 0.00</div>
                 </div>
             </div>
 
@@ -692,7 +827,7 @@
                 </div>
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;">
                     <div>
-                        <label class="form-label" style="font-size:12px;">Monto a cobrar ($) *</label>
+                        <label class="form-label" style="font-size:12px;">Monto a cobrar (@GymWeb.Helpers.AppSettings.MonedaSimbolo) *</label>
                         <input type="number" id="abonoMonto" class="form-control" step="0.50" min="0.50" placeholder="0.00" style="font-size:16px;font-weight:700;color:#4ade80;" />
                     </div>
                     <div>
@@ -778,7 +913,7 @@
 </div>
 
 <script>
-// ── FILTROS Y BÚSQUEDA DE SOCIOS EN VIVO ─────────────────────────────
+// ── FILTROS, ORDENAMIENTO Y BÚSQUEDA DE SOCIOS EN VIVO ────────────────
 let filtroActivo = 'todos';
 
 function filtrarSocios(tipo, btn) {
@@ -793,6 +928,77 @@ function filtrarSocios(tipo, btn) {
     }
     ejecutarBusquedaYFiltro();
 }
+
+function aplicarOrdenSocios() {
+    const chk = document.getElementById('chkOrdenAlfabetico');
+    const esAlfabetico = chk ? chk.checked : false;
+    const tbody = document.querySelector('#tablaSocios tbody');
+    if (!tbody) return;
+
+    const rows = Array.from(tbody.querySelectorAll('tr.socio-row'));
+    if (rows.length === 0) return;
+
+    // Estilo visual del botón/pill
+    const pill = document.querySelector('.orden-alfa-pill');
+    if (pill) {
+        if (esAlfabetico) {
+            pill.style.borderColor = 'rgba(0, 229, 255, 0.45)';
+            pill.style.background = 'rgba(0, 229, 255, 0.1)';
+            pill.style.color = 'var(--accent)';
+        } else {
+            pill.style.borderColor = 'var(--border)';
+            pill.style.background = 'rgba(255, 255, 255, 0.03)';
+            pill.style.color = 'var(--text-secondary)';
+        }
+    }
+
+    rows.sort((a, b) => {
+        if (esAlfabetico) {
+            const nomA = (a.getAttribute('data-nombre') || '').trim();
+            const nomB = (b.getAttribute('data-nombre') || '').trim();
+            return nomA.localeCompare(nomB, 'es', { sensitivity: 'base' });
+        } else {
+            const ordA = parseInt(a.getAttribute('data-default-order') || '0', 10);
+            const ordB = parseInt(b.getAttribute('data-default-order') || '0', 10);
+            return ordA - ordB;
+        }
+    });
+
+    rows.forEach(r => tbody.appendChild(r));
+    renumerarFilas();
+}
+
+function renumerarFilas() {
+    const rows = document.querySelectorAll('#tablaSocios tbody tr.socio-row');
+    let idx = 1;
+    rows.forEach(r => {
+        const colNum = r.querySelector('.col-num');
+        if (colNum) {
+            colNum.textContent = idx++;
+        }
+    });
+}
+
+function toggleOrdenAlfabetico(checked) {
+    try {
+        localStorage.setItem('gym_socios_orden_alfabetico', checked ? 'true' : 'false');
+    } catch(e) {}
+    aplicarOrdenSocios();
+    ejecutarBusquedaYFiltro();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const chk = document.getElementById('chkOrdenAlfabetico');
+    if (chk) {
+        try {
+            const guardado = localStorage.getItem('gym_socios_orden_alfabetico');
+            if (guardado === 'true') {
+                chk.checked = true;
+                aplicarOrdenSocios();
+            }
+        } catch(e) {}
+    }
+});
 
 function ejecutarBusquedaYFiltro() {
     const q = (document.getElementById('tableSearch')?.value || '').toLowerCase().trim();
@@ -836,7 +1042,8 @@ let asisPeriodoActual = 'semana';
 
 function abrirModalAsistencias(idSocio, nombreSocio) {
     asisSocioIdActivo = idSocio;
-    document.getElementById('asisSocioNombre').textContent = `${nombreSocio} (Clave #${idSocio})`;
+    const claveFmt = String(idSocio).padStart(4, '0');
+    document.getElementById('asisSocioNombre').textContent = `${nombreSocio} (Clave #${claveFmt})`;
     document.getElementById('modalAsistencias').style.display = 'flex';
     cambiarPeriodoAsistencias('semana');
 }
@@ -961,7 +1168,8 @@ let ctaSaldoTotalPendiente = 0;
 
 function abrirModalEstadoCuenta(idSocio, nombreSocio) {
     ctaSocioIdActivo = idSocio;
-    document.getElementById('ctaNombreSocio').textContent = `${nombreSocio} (Clave #${idSocio})`;
+    const claveFmt = String(idSocio).padStart(4, '0');
+    document.getElementById('ctaNombreSocio').textContent = `${nombreSocio} (Clave #${claveFmt})`;
     document.getElementById('modalEstadoCuenta').style.display = 'flex';
     toggleFormAbono(false);
     cargarEstadoCuenta();
@@ -988,10 +1196,11 @@ async function cargarEstadoCuenta() {
         const deuProd  = Number(data.deudaProductos ?? 0);
         const deuMem   = Number(data.deudaMembresias ?? 0);
 
+        const mon = window.MONEDA_SIMBOLO || window.GYM_CONFIG?.monedaSimbolo || '$';
         ctaSaldoTotalPendiente = totDeuda;
-        document.getElementById('ctaTotalDeuda').textContent = `$${totDeuda.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        document.getElementById('ctaDeudaProductos').textContent = `$${deuProd.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        document.getElementById('ctaDeudaMembresias').textContent = `$${deuMem.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        document.getElementById('ctaTotalDeuda').textContent = `${mon}${totDeuda.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        document.getElementById('ctaDeudaProductos').textContent = `${mon}${deuProd.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        document.getElementById('ctaDeudaMembresias').textContent = `${mon}${deuMem.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
         // Render productos fiados
         const tbodyProd = document.getElementById('ctaTbodyProductos');
@@ -1013,8 +1222,8 @@ async function cargarEstadoCuenta() {
                 tr.innerHTML = `
                     <td class="text-muted" style="white-space:nowrap;">${p.fecha || '—'}</td>
                     <td style="font-weight:600;">${itemsTexto}</td>
-                    <td style="text-align:right;">$${totNota}</td>
-                    <td style="text-align:right;color:#fb923c;font-weight:700;">$${salPend}</td>
+                    <td style="text-align:right;">${mon}${totNota}</td>
+                    <td style="text-align:right;color:#fb923c;font-weight:700;">${mon}${salPend}</td>
                 `;
                 tbodyProd.appendChild(tr);
             });
@@ -1041,9 +1250,9 @@ async function cargarEstadoCuenta() {
                 tr.innerHTML = `
                     <td style="font-weight:600;">${m.nombre || 'Membresía'}</td>
                     <td class="text-muted">${m.vigencia || m.fechaInicio || '—'}</td>
-                    <td style="text-align:right;">$${mPrecio}</td>
-                    <td style="text-align:right;color:#4ade80;">$${mPagado}</td>
-                    <td style="text-align:right;color:#38bdf8;font-weight:700;">$${mPend}</td>
+                    <td style="text-align:right;">${mon}${mPrecio}</td>
+                    <td style="text-align:right;color:#4ade80;">${mon}${mPagado}</td>
+                    <td style="text-align:right;color:#38bdf8;font-weight:700;">${mon}${mPend}</td>
                 `;
                 tbodyMem.appendChild(tr);
             });
@@ -1088,14 +1297,15 @@ async function procesarAbono() {
 
     err.style.display = 'none';
 
+    const monAbono = window.MONEDA_SIMBOLO || window.GYM_CONFIG?.monedaSimbolo || '$';
     if (isNaN(montoVal) || montoVal <= 0) {
-        err.textContent = 'Ingresa un monto válido mayor a $0.00';
+        err.textContent = `Ingresa un monto válido mayor a ${monAbono}0.00`;
         err.style.display = 'block';
         return;
     }
 
     if (montoVal > ctaSaldoTotalPendiente + 0.01) {
-        if (!confirm(`El monto ingresado ($${montoVal.toFixed(2)}) supera el saldo total adeudado ($${ctaSaldoTotalPendiente.toFixed(2)}). ¿Deseas cobrar este monto de todos modos?`)) {
+        if (!confirm(`El monto ingresado (${monAbono}${montoVal.toFixed(2)}) supera el saldo total adeudado (${monAbono}${ctaSaldoTotalPendiente.toFixed(2)}). ¿Deseas cobrar este monto de todos modos?`)) {
             return;
         }
     }
@@ -1163,6 +1373,7 @@ async function imprimirComprobanteAbono(idPago) {
         const cajero = data.cajero || 'Recepción';
         const notas = data.notas || '';
         const monto = Number(data.monto || 0).toFixed(2);
+        const monTicket = window.MONEDA_SIMBOLO || window.GYM_CONFIG?.monedaSimbolo || '$';
         const gymNom = data.gymNombre || 'MI GIMNASIO';
         const gymDom = data.gymDomicilio || '';
         const gymTel = data.gymTelefono || '';
@@ -1225,7 +1436,7 @@ async function imprimirComprobanteAbono(idPago) {
         <table class="totals-table">
             <tr class="total-big">
                 <td>MONTO ABONADO:</td>
-                <td class="text-right">$${monto}</td>
+                <td class="text-right">${monTicket}${monto}</td>
             </tr>
         </table>
         ${barcodeHtml}

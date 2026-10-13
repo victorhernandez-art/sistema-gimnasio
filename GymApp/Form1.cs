@@ -33,7 +33,13 @@ public partial class Form1 : Form
         Width = 1366;
         Height = 768;
         StartPosition = FormStartPosition.CenterScreen;
+        WindowState = FormWindowState.Maximized;
         BackColor = Color.FromArgb(15, 20, 28);
+
+        Load += (s, e) =>
+        {
+            WindowState = FormWindowState.Maximized;
+        };
 
         string baseDir = AppDomain.CurrentDomain.BaseDirectory;
         string icoPath = Path.Combine(baseDir, "app.ico");
@@ -269,17 +275,17 @@ public partial class Form1 : Form
 
     private static async Task<string?> TryGetActiveUrlAsync(int timeoutMs)
     {
-        // Revisar 5080 (producción) y 5250 (pruebas)
-        string[] ports = { "5080", "5250" };
+        // Probar primero 127.0.0.1 (IPv4 directa sin retardo de resolución DNS) y luego localhost
+        string[] urls = { "http://127.0.0.1:5080", "http://localhost:5080", "http://127.0.0.1:5250", "http://localhost:5250" };
         using var client = new HttpClient { Timeout = TimeSpan.FromMilliseconds(timeoutMs) };
 
-        foreach (var port in ports)
+        foreach (var url in urls)
         {
             try
             {
-                var res = await client.GetAsync($"http://localhost:{port}");
+                var res = await client.GetAsync(url);
                 if (res.IsSuccessStatusCode || (int)res.StatusCode < 500)
-                    return $"http://localhost:{port}";
+                    return url;
             }
             catch { }
         }

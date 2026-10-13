@@ -82,3 +82,11 @@ license.json
 # ============================================
 logs/
 *.log
+
+# WhatsApp Gateway temporales y sesion
+WhatsAppGateway/node_modules/
+WhatsAppGateway/auth_session/
+WhatsAppGateway/messages_store.json
+Publish/WhatsAppGateway/node_modules/
+Publish/WhatsAppGateway/auth_session/
+Publish/WhatsAppGateway/messages_store.json

@@ -27,13 +27,28 @@ for /L %%i in (1,1,10) do (
 sc query BioService >nul 2>&1
 if %errorlevel% equ 0 (
     net start BioService >nul 2>&1
-    goto open_app
+) else if exist "BioService\BioService.exe" (
+    start "" /B "BioService\BioService.exe"
 )
-if exist "BioService\BioService.exe" start "" /B "BioService\BioService.exe"
+
+:: Iniciar Puente Biométrico DigitalPersona en segundo plano si no está corriendo
+if exist "PuenteBiometrico\DigitalPersonaBridge.exe" (
+    powershell -NoProfile -Command "try { $c = New-Object System.Net.Sockets.TcpClient('127.0.0.1', 8080); $c.Close(); exit 0 } catch { exit 1 }" >nul 2>&1
+    if errorlevel 1 start "" /B "PuenteBiometrico\DigitalPersonaBridge.exe"
+) else if exist "DigitalPersonaBridge\publish\DigitalPersonaBridge.exe" (
+    powershell -NoProfile -Command "try { $c = New-Object System.Net.Sockets.TcpClient('127.0.0.1', 8080); $c.Close(); exit 0 } catch { exit 1 }" >nul 2>&1
+    if errorlevel 1 start "" /B "DigitalPersonaBridge\publish\DigitalPersonaBridge.exe"
+)
+
+:: Iniciar Gateway de WhatsApp (Baileys) en segundo plano si no está corriendo
+if exist "WhatsAppGateway\server.js" (
+    powershell -NoProfile -Command "try { $c = New-Object System.Net.Sockets.TcpClient('127.0.0.1', 5085); $c.Close(); exit 0 } catch { exit 1 }" >nul 2>&1
+    if errorlevel 1 start "" /B node WhatsAppGateway\server.js
+)
 
 :open_app
 if exist "%~dp0Gym.exe" (
-    start "" "%~dp0Gym.exe"
+    start "" /max "%~dp0Gym.exe"
     exit
 )
 
@@ -47,11 +62,11 @@ if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" set "CHROME_PATH=
 if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" set "CHROME_PATH=%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"
 
 if defined EDGE_PATH (
-    start "" "%EDGE_PATH%" --app="http://localhost:5080" --window-size=1366,768
+    start "" "%EDGE_PATH%" --start-maximized --app="http://localhost:5080"
     exit
 )
 if defined CHROME_PATH (
-    start "" "%CHROME_PATH%" --app="http://localhost:5080" --window-size=1366,768
+    start "" "%CHROME_PATH%" --start-maximized --app="http://localhost:5080"
     exit
 )
 start http://localhost:5080

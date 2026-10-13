@@ -38,7 +38,7 @@
 <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px;">
     <div class="card" style="padding:20px;">
         <div class="text-muted" style="font-size:13px;margin-bottom:8px;">Ingresos del Mes</div>
-        <div style="font-size:28px;font-weight:700;color:var(--accent);">$@ingresosMes.ToString("N2")</div>
+        <div style="font-size:28px;font-weight:700;color:var(--accent);">@GymWeb.Helpers.AppSettings.MonedaSimbolo@ingresosMes.ToString("N2")</div>
     </div>
     <div class="card" style="padding:20px;">
         <div class="text-muted" style="font-size:13px;margin-bottom:8px;">Pagos del Mes</div>
@@ -127,7 +127,7 @@
                 {
                     <tr>
                         <td class="text-muted" style="font-size:12px;">@p.FechaPago.ToString("dd/MM/yyyy")</td>
-                        <td><span class="name-cell">@p.IdSocioNavigation?.Nombre @p.IdSocioNavigation?.Paterno</span></td>
+                        <td><span class="name-cell">@p.IdSocioNavigation?.NombreCompleto</span></td>
                         <td>
                             @if (p.IdMembresiaNavigation != null)
                             { <span class="badge badge-info">@p.IdMembresiaNavigation.Nombre</span> }
@@ -144,7 +144,7 @@
                             }
                             <span style="font-size:13px;"><i class="fa-solid @iconMetodo" style="margin-right:5px;opacity:0.7;"></i>@p.MetodoPago</span>
                         </td>
-                        <td><span class="text-accent" style="font-weight:600;">$@p.Monto.ToString("N2")</span></td>
+                        <td><span class="text-accent" style="font-weight:600;">@GymWeb.Helpers.AppSettings.MonedaSimbolo@p.Monto.ToString("N2")</span></td>
                         <td class="text-muted" style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="@p.Notas">@(p.Notas ?? "—")</td>
                         <td style="white-space:nowrap;text-align:right;">
                             <button type="button" class="btn btn-sm"
@@ -176,7 +176,7 @@
         <div style="text-align:right;padding:12px 0 0;font-size:13px;">
             <strong>Total mostrado:</strong>
             <span class="text-accent" style="font-size:15px;font-weight:700;margin-left:8px;">
-                $@Model.Sum(p => p.Monto).ToString("N2")
+                @GymWeb.Helpers.AppSettings.MonedaSimbolo@Model.Sum(p => p.Monto).ToString("N2")
             </span>
         </div>
     }
@@ -222,13 +222,13 @@
                         <option value="">— Sin cambio de plan —</option>
                         @foreach (var m in membresias)
                         {
-                            <option value="@m.IdMembresia" data-precio="@m.Precio">@m.Nombre — $@m.Precio?.ToString("N2")</option>
+                            <option value="@m.IdMembresia" data-precio="@m.Precio">@m.Nombre — @GymWeb.Helpers.AppSettings.MonedaSimbolo@m.Precio?.ToString("N2")</option>
                         }
                     </select>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                     <div>
-                        <label class="form-label">Monto (MXN) <span style="color:#f87171;">*</span></label>
+                        <label class="form-label">Monto (@GymWeb.Helpers.AppSettings.MonedaCodigo) <span style="color:#f87171;">*</span></label>
                         <input type="number" name="monto" id="inputMonto" class="form-control" placeholder="0.00"
                                step="0.01" min="0.01" required />
                     </div>
@@ -269,8 +269,8 @@
 // ── Datos de socios para búsqueda ──
 const sociosData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(socios.Select(s => new {
     id    = s.IdSocio,
-    clave = s.IdSocio.ToString(),
-    nombre = (s.Paterno + " " + s.Materno + ", " + s.Nombre).Trim()
+    clave = s.ClaveFormateada,
+    nombre = s.NombreCompleto
 })));
 
 function filtrarSocios(q) {
@@ -279,7 +279,7 @@ function filtrarSocios(q) {
     const resultados = q.length === 0
         ? sociosData.slice(0, 50)
         : sociosData.filter(s =>
-            s.clave.startsWith(q) ||
+            s.clave.toLowerCase().includes(q) ||
             s.nombre.toLowerCase().includes(q)
           ).slice(0, 50);
     renderDropdown(resultados);
@@ -289,7 +289,7 @@ function filtrarSocios(q) {
 function mostrarDropdown() {
     const q = document.getElementById('socioSearch').value.trim().toLowerCase();
     const lista = q.length === 0 ? sociosData.slice(0, 50)
-        : sociosData.filter(s => s.clave.startsWith(q) || s.nombre.toLowerCase().includes(q)).slice(0, 50);
+        : sociosData.filter(s => s.clave.toLowerCase().includes(q) || s.nombre.toLowerCase().includes(q)).slice(0, 50);
     renderDropdown(lista);
     document.getElementById('socioDropdown').style.display = 'block';
 }
@@ -558,7 +558,7 @@ function ejecutarImpresionTicketPago(data) {
         <table class="totals-table">
             <tr class="total-big">
                 <td>TOTAL PAGADO:</td>
-                <td class="text-right">$${monto}</td>
+                <td class="text-right">${window.MONEDA_SIMBOLO || '$'}${monto}</td>
             </tr>
         </table>
 

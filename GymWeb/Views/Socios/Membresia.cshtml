@@ -30,17 +30,17 @@
                 @if (vencida)
                 {
                     <i class="fa-solid fa-rotate" style="color:#f87171;"></i>
-                    <span style="color:#f87171;">@socio?.Nombre @socio?.Paterno — Renovar Membresía</span>
+                    <span style="color:#f87171;">@socio?.NombreCompleto — Renovar Membresía</span>
                 }
                 else if (!Model.Any())
                 {
                     <i class="fa-solid fa-id-card"></i>
-                    <span>@socio?.Nombre @socio?.Paterno — Asignar Membresía</span>
+                    <span>@socio?.NombreCompleto — Asignar Membresía</span>
                 }
                 else
                 {
                     <i class="fa-solid fa-id-card"></i>
-                    <span>@socio?.Nombre @socio?.Paterno — Nueva Membresía</span>
+                    <span>@socio?.NombreCompleto — Nueva Membresía</span>
                 }
             </div>
             <a asp-action="Index" class="btn btn-outline btn-sm"><i class="fa-solid fa-arrow-left"></i></a>
@@ -57,9 +57,16 @@
         else if (actual != null)
         {
             <div class="alert alert-success" style="margin-bottom:16px;font-size:13px;">
-                <i class="fa-solid fa-circle-check"></i>
-                Membresía activa: <strong>@actual.NombreMembresia</strong> — vence el <strong>@actual.Vencimiento?.ToString("dd/MM/yyyy")</strong>.
-                Puedes asignar una nueva para cuando concluya.
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                    <div>
+                        <i class="fa-solid fa-circle-check"></i>
+                        Membresía activa: <strong>@actual.NombreMembresia</strong> — inicio: <strong>@actual.FechaInicioMembresia?.ToString("dd/MM/yyyy")</strong> — vence el <strong>@actual.Vencimiento?.ToString("dd/MM/yyyy")</strong>.
+                    </div>
+                    <button type="button" class="btn btn-sm" onclick="abrirModalEditarFecha(@actual.IdSocioMembresia, '@(actual.FechaInicioMembresia?.ToString("yyyy-MM-dd"))')"
+                            style="background:rgba(0,229,255,0.15);color:#00e5ff;border:1px solid rgba(0,229,255,0.3);font-size:11.5px;padding:3px 9px;" title="Corregir fecha de inicio si hubo un error al dar de alta">
+                        <i class="fa-solid fa-pen-to-square"></i> Corregir fecha de inicio
+                    </button>
+                </div>
             </div>
         }
 
@@ -82,7 +89,7 @@
                                 var x when x.HasValue => $"{x.Value} días",
                                 _ => "Personalizada"
                             };
-                            <option value="@m.IdMembresia" data-precio="@(m.Precio ?? 0)">@m.Nombre — @durLabel — $@m.Precio</option>
+                            <option value="@m.IdMembresia" data-precio="@(m.Precio ?? 0)">@m.Nombre — @durLabel — @GymWeb.Helpers.AppSettings.MonedaSimbolo@m.Precio</option>
                         }
                     </select>
                 </div>
@@ -96,12 +103,13 @@
                 <div class="form-group" style="grid-column:1/-1;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);padding:14px;border-radius:10px;margin-top:6px;">
                     <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:10px;">
                         <input type="checkbox" name="registrarPago" id="chkRegistrarPago" value="true" checked onchange="toggleCobroMembresia(this.checked)" style="width:18px;height:18px;accent-color:#00e5ff;" />
+                        <input type="hidden" name="registrarPago" value="false" />
                         <span style="font-weight:700;color:#00e5ff;font-size:13.5px;"><i class="fa-solid fa-cash-register"></i> Registrar cobro e ingresar a caja de inmediato</span>
                     </label>
 
                     <div id="seccionCamposCobro" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;">
                         <div>
-                            <label class="form-label" style="font-size:12px;">Monto a Cobrar ($MXN)</label>
+                            <label class="form-label" style="font-size:12px;">Monto a Cobrar (@GymWeb.Helpers.AppSettings.MonedaSimbolo @GymWeb.Helpers.AppSettings.MonedaCodigo)</label>
                             <input type="number" name="montoPago" id="inputMontoPago" class="form-control" step="0.01" min="0.01" placeholder="0.00" />
                         </div>
                         <div>
@@ -143,6 +151,25 @@
                 if (campos) campos.style.display = checked ? 'grid' : 'none';
                 if (aviso) aviso.style.display = checked ? 'none' : 'block';
             }
+
+            document.addEventListener('DOMContentLoaded', function() {
+                const sel = document.getElementById('selMembresia');
+                if (sel && sel.value) {
+                    onMembresiaChange(sel);
+                }
+            });
+
+            document.getElementById('formAsignarMembresia')?.addEventListener('submit', function() {
+                const chk = document.getElementById('chkRegistrarPago');
+                const inp = document.getElementById('inputMontoPago');
+                const sel = document.getElementById('selMembresia');
+                if (chk && chk.checked && (!inp.value || parseFloat(inp.value) <= 0) && sel) {
+                    const opt = sel.options[sel.selectedIndex];
+                    if (opt && opt.dataset.precio) {
+                        inp.value = parseFloat(opt.dataset.precio).toFixed(2);
+                    }
+                }
+            });
         </script>
     </div>
 
@@ -164,6 +191,7 @@
                         <th>Inicio</th>
                         <th>Vencimiento</th>
                         <th>Estado</th>
+                        <th style="text-align:center;">Acción</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -191,6 +219,13 @@
                             else
                             { <span class="badge" style="background:rgba(255,255,255,0.07);color:#8b8fa8;">Inactiva</span> }
                         </td>
+                        <td style="text-align:center;">
+                            <button type="button" class="btn btn-outline btn-sm" style="padding:2px 7px;font-size:11px;"
+                                    onclick="abrirModalEditarFecha(@v.IdSocioMembresia, '@(v.FechaInicioMembresia?.ToString("yyyy-MM-dd"))')"
+                                    title="Corregir fecha de inicio">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </button>
+                        </td>
                     </tr>
                 }
                 </tbody>
@@ -198,3 +233,47 @@
         }
     </div>
 </div>
+
+<!-- Modal para Corregir Fecha de Inicio de Membresía -->
+<div id="modalEditarFechaMembresia" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+    <div style="background:#111827;border:1px solid rgba(0,229,255,0.3);border-radius:14px;padding:22px;max-width:420px;width:90%;box-shadow:0 15px 35px rgba(0,0,0,0.6);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <h4 style="color:#00e5ff;font-size:15px;margin:0;display:flex;align-items:center;gap:8px;">
+                <i class="fa-regular fa-calendar-days"></i> Corregir Fecha de Inicio
+            </h4>
+            <button type="button" onclick="cerrarModalEditarFecha()" style="background:none;border:none;color:#94a3b8;font-size:18px;cursor:pointer;">&times;</button>
+        </div>
+        <p style="font-size:12px;color:#94a3b8;margin-bottom:14px;line-height:1.45;">
+            Si por error ingresaste una fecha equivocada al dar de alta al socio, especifica aquí la fecha real de inicio. La fecha de vencimiento se recalculará automáticamente.
+        </p>
+        <form asp-action="ActualizarFechaInicioMembresia" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="idSocio" value="@socio?.IdSocio" />
+            <input type="hidden" name="idSocioMembresia" id="inputEditIdSocioMembresia" />
+            <div style="margin-bottom:16px;">
+                <label class="form-label" style="font-size:12px;">Nueva Fecha de Inicio</label>
+                <input type="date" name="nuevaFechaInicio" id="inputEditNuevaFechaInicio" class="form-control" required style="border-color:rgba(0,229,255,0.4);background:rgba(0,0,0,0.3);" />
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:8px;">
+                <button type="button" class="btn btn-outline btn-sm" onclick="cerrarModalEditarFecha()">Cancelar</button>
+                <button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-floppy-disk"></i> Guardar Fecha</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function abrirModalEditarFecha(idSm, fecha) {
+    document.getElementById('inputEditIdSocioMembresia').value = idSm;
+    if (fecha) {
+        document.getElementById('inputEditNuevaFechaInicio').value = fecha;
+    }
+    const modal = document.getElementById('modalEditarFechaMembresia');
+    modal.style.display = 'flex';
+}
+
+function cerrarModalEditarFecha() {
+    const modal = document.getElementById('modalEditarFechaMembresia');
+    modal.style.display = 'none';
+}
+</script>
